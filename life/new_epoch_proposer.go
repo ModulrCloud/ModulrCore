@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -194,12 +193,10 @@ func NewEpochProposerThread() {
 						return
 					}
 
-					fmt.Println("DEBUG: Received STATUS => ", responseStatus.Status)
-
 					switch responseStatus.Status {
 
 					case "OK":
-						fmt.Println("DEBUG: Received OK")
+
 						dataToSign := "EPOCH_DONE:" + strconv.Itoa(epochFinishPropositionRequest.CurrentLeader) + ":" +
 							strconv.Itoa(epochFinishPropositionRequest.LastBlockProposition.Index) + ":" +
 							epochFinishPropositionRequest.LastBlockProposition.Hash + ":" +
@@ -211,7 +208,7 @@ func NewEpochProposerThread() {
 						json.Unmarshal(responseBytes, &resultAsStruct)
 
 						if ed25519.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
-							fmt.Println("DEBUG: Signature verified!")
+
 							resultsCh <- Agreement{
 								PubKey: desc.PubKey,
 								Sig:    resultAsStruct.Sig,
@@ -220,7 +217,7 @@ func NewEpochProposerThread() {
 						}
 
 					case "UPGRADE":
-						fmt.Println("DEBUG: Received UPGRADE")
+
 						var resultAsStruct structures.EpochFinishResponseUpgrade
 
 						json.Unmarshal(responseBytes, &resultAsStruct)
@@ -269,8 +266,6 @@ func NewEpochProposerThread() {
 				}
 
 			}
-
-			fmt.Println("DEBUG: Quorum agreements size is => ", len(LAST_LEADER_PROPOSITION.QuorumAgreements))
 
 			if len(LAST_LEADER_PROPOSITION.QuorumAgreements) >= majority {
 

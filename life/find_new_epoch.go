@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -167,18 +166,6 @@ func EpochRotationThread() {
 						}
 
 					}
-
-				}
-
-				fmt.Println("DEBUG: HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
-
-				if pretty, err := json.MarshalIndent(AEFP_AND_FIRST_BLOCK_DATA, "", "  "); err == nil {
-
-					fmt.Println("DEBUG: Received proposition =>\n", string(pretty))
-
-				} else {
-
-					fmt.Printf("Failed to marshal: %v\n", err)
 
 				}
 
