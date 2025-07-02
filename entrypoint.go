@@ -20,22 +20,28 @@ func RunBlockchain() {
 
 	prepareBlockchain()
 
-	//_________________________ RUN SEVERAL THREADS _________________________
+	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
-	//✅1.Thread to find AEFPs and change the epoch for AT
+	//✅ 1.Thread to find AEFPs and change the epoch for AT
 	go life.EpochRotationThread()
 
-	//✅2.Share our blocks within quorum members and get the finalization proofs
+	//✅ 2.Share our blocks within quorum members and get the finalization proofs
 	go life.BlocksSharingAndProofsGrabingThread()
 
-	//✅3.Thread to propose AEFPs to move to next epoch
+	//✅ 3.Thread to propose AEFPs to move to next epoch
 	go life.NewEpochProposerThread()
 
-	//✅4.Start to generate blocks
+	//✅ 4.Start to generate blocks
 	go life.BlocksGenerationThread()
 
-	//✅5.Start a separate thread to work with voting for blocks in a sync way (for security)
+	//✅ 5.Start a separate thread to work with voting for blocks in a sync way (for security)
 	go life.LeaderRotationThread()
+
+	//✅ 6.Logical thread to build the temporary sequence of blocks to verify them
+	go life.SequenceAlignmentThread()
+
+	//✅ 7.Start execution process - take blocks and execute transactions
+	go life.ExecutionThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
@@ -69,6 +75,7 @@ func prepareBlockchain() {
 	}
 
 	globals.BLOCKS = utils.OpenDb("BLOCKS")
+	globals.STATE = utils.OpenDb("STATE")
 	globals.EPOCH_DATA = utils.OpenDb("EPOCH_DATA")
 	globals.APPROVEMENT_THREAD_METADATA = utils.OpenDb("APPROVEMENT_THREAD_METADATA")
 	globals.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")

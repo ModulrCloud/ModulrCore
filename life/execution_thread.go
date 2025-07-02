@@ -1,1 +1,3 @@
 package life
+
+func ExecutionThread() {}

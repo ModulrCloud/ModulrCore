@@ -17,6 +17,8 @@ func NewRouter() fasthttp.RequestHandler {
 
 	r.GET("/first_block_assumption/{epochIndex}", routes.GetFirstBlockAssumption)
 
+	r.GET("/sequence_alignment", routes.GetSequenceAlignmentData)
+
 	r.POST("/transaction", routes.AcceptTransaction)
 	r.POST("/epoch_proposition", routes.EpochProposition)
 

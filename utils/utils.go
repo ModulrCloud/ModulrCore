@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -30,6 +31,8 @@ const (
 )
 
 var shutdownOnce sync.Once
+
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type QuorumWaiter struct {
 	responseCh chan QuorumResponse
@@ -284,6 +287,12 @@ type CurrentLeaderData struct {
 func IsMyCoreVersionOld(thread *structures.ApprovementThreadMetadataHandler) bool {
 
 	return thread.CoreMajorVersion > globals.CORE_MAJOR_VERSION
+
+}
+
+func GetRandomFromArray(arr []structures.QuorumMemberData) structures.QuorumMemberData {
+
+	return arr[rng.Intn(len(arr))]
 
 }
 

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
+	"github.com/VladChernenko/UndchainCore/block"
 	"github.com/VladChernenko/UndchainCore/common_functions"
 	"github.com/VladChernenko/UndchainCore/globals"
 	"github.com/VladChernenko/UndchainCore/structures"
@@ -14,6 +15,10 @@ import (
 
 type ErrMsg struct {
 	Err string `json:"err"`
+}
+
+type SequenceAlignmentProposition struct {
+	PossibleLeaderIndex int `json:"possibleLeaderIndex"`
 }
 
 func sendJson(ctx *fasthttp.RequestCtx, payload any) {
@@ -77,6 +82,50 @@ func GetAggregatedEpochFinalizationProof(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusNotFound)
 	ctx.SetContentType("application/json")
 	ctx.Write([]byte(`{"err": "No assumptions found"}`))
+}
+
+func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
+
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	// var proposition SequenceAlignmentProposition
+
+	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+
+	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+	epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochHandler
+
+	epochIndex := epochHandler.Id
+
+	localIndexOfLeader := epochHandler.CurrentLeaderIndex
+
+	pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
+
+	firstBlockIdByThisLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
+
+	firstBlockAsBytes, err := globals.BLOCKS.Get([]byte(firstBlockIdByThisLeader), nil)
+
+	if err == nil {
+
+		var firstBlockParsed block.Block
+
+		err = json.Unmarshal(firstBlockAsBytes, &firstBlockParsed)
+
+		if err == nil {
+			//
+		} else {
+
+			sendJson(ctx, ErrMsg{Err: "No first block"})
+
+		}
+
+	} else {
+
+		sendJson(ctx, ErrMsg{Err: "No first block"})
+
+	}
+
 }
 
 func EpochProposition(ctx *fasthttp.RequestCtx) {
