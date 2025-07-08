@@ -1,3 +1,5 @@
 package life
 
-func SequenceAlignmentThread() {}
+func SequenceAlignmentThread() {
+
+}
