@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/VladChernenko/UndchainCore/common_functions"
-	"github.com/VladChernenko/UndchainCore/globals"
-	"github.com/VladChernenko/UndchainCore/structures"
+	"github.com/Undchainorg/UndchainCore/common_functions"
+	"github.com/Undchainorg/UndchainCore/globals"
+	"github.com/Undchainorg/UndchainCore/structures"
 )
 
 type DelayedTxExecutorFunction = func(map[string]string) bool

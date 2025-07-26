@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/VladChernenko/UndchainCore/globals"
-	"github.com/VladChernenko/UndchainCore/structures"
-	"github.com/VladChernenko/UndchainCore/utils"
+	"github.com/Undchainorg/UndchainCore/globals"
+	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/Undchainorg/UndchainCore/utils"
 )
 
 type ValidatorData struct {

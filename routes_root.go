@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/VladChernenko/UndchainCore/routes"
+	"github.com/Undchainorg/UndchainCore/routes"
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 )

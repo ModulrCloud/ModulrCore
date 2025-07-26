@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/VladChernenko/UndchainCore/block"
-	"github.com/VladChernenko/UndchainCore/common_functions"
-	"github.com/VladChernenko/UndchainCore/globals"
-	"github.com/VladChernenko/UndchainCore/structures"
-	"github.com/VladChernenko/UndchainCore/utils"
+	"github.com/Undchainorg/UndchainCore/block"
+	"github.com/Undchainorg/UndchainCore/common_functions"
+	"github.com/Undchainorg/UndchainCore/globals"
+	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/Undchainorg/UndchainCore/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 

@@ -1,4 +1,4 @@
-module github.com/VladChernenko/UndchainCore
+module github.com/Undchainorg/UndchainCore
 
 go 1.23.1
 

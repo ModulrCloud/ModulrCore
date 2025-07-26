@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
-	"github.com/VladChernenko/UndchainCore/block"
-	"github.com/VladChernenko/UndchainCore/common_functions"
-	"github.com/VladChernenko/UndchainCore/globals"
-	"github.com/VladChernenko/UndchainCore/structures"
-	"github.com/VladChernenko/UndchainCore/utils"
-	ws_structures "github.com/VladChernenko/UndchainCore/websocket"
+	"github.com/Undchainorg/UndchainCore/block"
+	"github.com/Undchainorg/UndchainCore/common_functions"
+	"github.com/Undchainorg/UndchainCore/globals"
+	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/Undchainorg/UndchainCore/utils"
+	ws_structures "github.com/Undchainorg/UndchainCore/websocket"
 	"github.com/gorilla/websocket"
 	"github.com/syndtr/goleveldb/leveldb"
 )

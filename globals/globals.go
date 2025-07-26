@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/VladChernenko/UndchainCore/structures"
+	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
