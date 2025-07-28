@@ -1,0 +1,29 @@
+{
+  "PUBLIC_KEY": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
+  "PRIVATE_KEY": "MC4CAQAwBQYDK2VwBCIEILdhTMVYFz2GP8+uKUA+1FnZTEdN8eHFzbb8400cpEU9",
+
+  "POINT_OF_DISTRIBUTION_WS": "ws://localhost:9999",
+  "POINT_OF_DISTRIBUTION_HTTP": "http://localhost:7332",
+
+  "EXTRA_DATA_TO_BLOCK": {
+    "hello": "world"
+  },
+
+  "TXS_MEMPOOL_SIZE": 300000,
+  "BLOCK_TO_BLOCK_CACHE_SIZE": 100000,
+
+  "BOOTSTRAP_NODES": [
+    "http://localhost:7332",
+    "http://localhost:7333",
+    "http://localhost:44444"
+  ],
+
+  "MY_HOSTNAME": "http://localhost:7332",
+
+  "INTERFACE": "0.0.0.0",
+  "PORT": 7332,
+
+  "WEBSOCKET_INTERFACE": "0.0.0.0",
+  "WEBSOCKET_PORT": 9999
+  
+}
