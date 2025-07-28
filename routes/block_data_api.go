@@ -118,7 +118,7 @@ func AcceptTransaction(ctx *fasthttp.RequestCtx) {
 	globals.MEMPOOL.Mutex.Lock()
 	defer globals.MEMPOOL.Mutex.Unlock()
 
-	if len(globals.MEMPOOL.Slice) >= globals.CONFIGURATION.TxMemPoolSize {
+	if len(globals.MEMPOOL.Slice) >= globals.CONFIGURATION.TxsMempoolSize {
 		ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
 		ctx.Write([]byte(`{"err":"Mempool is fullfilled"}`))
 		return
