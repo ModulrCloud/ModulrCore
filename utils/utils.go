@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/url"
 	"os"
@@ -80,33 +79,45 @@ func OpenWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
 
-	log.Println("Connected to WebSocket")
 	return conn, nil
 }
 
 func SendWebsocketMessageToPoD(msg string) (string, error) {
+
 	if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
+
 		var err error
+
 		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = OpenWebsocketConnectionWithPoD()
+
 		if err != nil {
 			return "", err
 		}
+
 	}
 
 	err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, []byte(msg))
+
 	if err != nil {
-		log.Println("Write failed, reconnecting:", err)
+
 		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+
 		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+
 		return SendWebsocketMessageToPoD(msg)
+
 	}
 
 	_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
+
 	if err != nil {
-		log.Println("Read failed, reconnecting:", err)
+
 		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+
 		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+
 		return SendWebsocketMessageToPoD(msg)
+
 	}
 
 	return string(resp), nil
