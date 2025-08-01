@@ -47,9 +47,6 @@ func ExecutionThread() {
 
 		currentEpochIsFresh := utils.EpochStillFresh(epochHandlerRef)
 
-		// Struct is {currentLeader,currentToVerify,infoAboutFinalBlocksInThisEpoch:{poolPubKey:{index,hash}}}
-		//alignmentData := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData
-
 		shouldMoveToNextEpoch := false
 
 		if epochHandlerRef.LegacyEpochAlignmentData.Activated {
@@ -167,15 +164,49 @@ func ExecutionThread() {
 
 				}
 
-				// TODO: Here we need to skip the following logic and start next iteration
+				// Here we need to skip the following logic and start next iteration
 				// TODO: Cope with mutexes here
 				continue
 
 			}
 
-			// Try check if we have established a WSS channel to fetch blocks
-
 			// Now, when we have connection with some entity which has an ability to give us blocks via WS(s) tunnel
+
+			// ___________ Now start a cycle to fetch blocks and exec ___________
+
+			for {
+
+				// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
+
+				blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + leaderPubkeyToExecBlocks + ":" + strconv.Itoa(execStatsOfLeader.Index+1)
+
+				response := getBlockAndProofFromPoD(blockId)
+
+				if response != nil {
+
+					if execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
+
+						// Let it execute without AFP verification
+
+						ExecuteBlock(response.Block)
+
+					} else if common_functions.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
+
+						ExecuteBlock(response.Block)
+
+					} else {
+
+						break
+
+					}
+
+				} else {
+
+					break
+
+				}
+
+			}
 
 		}
 
@@ -198,7 +229,10 @@ func ExecutionThread() {
 func ExecuteBlock(block *block.Block) {
 
 	if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[block.Creator].Hash == block.PrevHash {
+
 		// Stub
+		// TODO: Modify the index & hash in the globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[block.Creator] here for progress
+
 	}
 
 }
