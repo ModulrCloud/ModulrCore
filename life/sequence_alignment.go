@@ -72,142 +72,101 @@ func SequenceAlignmentThread() {
 				if sameHash && validProof {
 
 					// Verify all the ALRPs in block header
-					// TODO: Verify that blockcreator pubkey is equal to epochHandler.LeadersSequence[proposedIndex]
 
-					isOk, infoAboutFinalBlocks := common_functions.ExtendedCheckAlrpChainValidity(firstBlock, epochHandlerRef, proposedIndex, true)
+					if epochHandlerRef.LeadersSequence[proposedIndex] == firstBlock.Creator {
 
-					shouldChange := true
+						isOk, infoAboutFinalBlocks := common_functions.ExtendedCheckAlrpChainValidity(firstBlock, epochHandlerRef, proposedIndex, true)
 
-					if isOk {
+						shouldChange := true
 
-						collectionOfAlrpsFromAllThePreviousLeaders := []map[string]structures.ExecutionStatsPerPool{infoAboutFinalBlocks} // each element here is object like {pool:{index,hash,firstBlockHash}}
+						if isOk {
 
-						currentAlrpSet := map[string]structures.ExecutionStatsPerPool{}
+							collectionOfAlrpsFromAllThePreviousLeaders := []map[string]structures.ExecutionStatsPerPool{infoAboutFinalBlocks} // each element here is object like {pool:{index,hash,firstBlockHash}}
 
-						for poolKey, execStats := range infoAboutFinalBlocks {
+							currentAlrpSet := map[string]structures.ExecutionStatsPerPool{}
 
-							currentAlrpSet[poolKey] = structures.ExecutionStatsPerPool{
-								Index:          execStats.Index,
-								Hash:           execStats.Hash,
-								FirstBlockHash: execStats.FirstBlockHash,
+							for poolKey, execStats := range infoAboutFinalBlocks {
+
+								currentAlrpSet[poolKey] = structures.ExecutionStatsPerPool{
+									Index:          execStats.Index,
+									Hash:           execStats.Hash,
+									FirstBlockHash: execStats.FirstBlockHash,
+								}
+
 							}
 
-						}
+							position := targetResponse.ProposedIndexOfLeader - 1
 
-						position := targetResponse.ProposedIndexOfLeader - 1
+							/*
 
-						/*
+							   ________________ What to do next? ________________
 
-						   ________________ What to do next? ________________
+							   Now we know that proposed leader has created some first block(firstBlockByCurrentLeader)
 
-						   Now we know that proposed leader has created some first block(firstBlockByCurrentLeader)
-
-						   and we verified the AFP so it's clear proof that block is 100% accepted and the data inside is valid and will be a part of epoch data
+							   and we verified the AFP so it's clear proof that block is 100% accepted and the data inside is valid and will be a part of epoch data
 
 
 
-						   Now, start the cycle in reverse order on range
+							   Now, start the cycle in reverse order on range
 
-						   [proposedIndexOfLeader-1 ; localVersionOfCurrentLeaders]
+							   [proposedIndexOfLeader-1 ; localVersionOfCurrentLeaders]
 
-						*/
+							*/
 
-						if position >= localVersionOfCurrentLeader {
+							if position >= localVersionOfCurrentLeader {
 
-							for {
+								for {
 
-								for ; position >= localVersionOfCurrentLeader; position-- {
+									for ; position >= localVersionOfCurrentLeader; position-- {
 
-									poolOnThisPosition := epochHandlerRef.LeadersSequence[position]
+										poolOnThisPosition := epochHandlerRef.LeadersSequence[position]
 
-									alrpForThisPoolFromCurrentSet := currentAlrpSet[poolOnThisPosition]
+										alrpForThisPoolFromCurrentSet := currentAlrpSet[poolOnThisPosition]
 
-									if alrpForThisPoolFromCurrentSet.Index != -1 {
+										if alrpForThisPoolFromCurrentSet.Index != -1 {
 
-										// Ask the first block and extract next set of ALRPs
+											// Ask the first block and extract next set of ALRPs
 
-										firstBlockInThisEpochByPool := common_functions.GetBlock(epochHandlerRef.Id, poolOnThisPosition, 0, epochHandlerRef)
+											firstBlockInThisEpochByPool := common_functions.GetBlock(epochHandlerRef.Id, poolOnThisPosition, 0, epochHandlerRef)
 
-										if firstBlockInThisEpochByPool != nil && firstBlockInThisEpochByPool.GetHash() == alrpForThisPoolFromCurrentSet.FirstBlockHash {
+											if firstBlockInThisEpochByPool != nil && firstBlockInThisEpochByPool.GetHash() == alrpForThisPoolFromCurrentSet.FirstBlockHash {
 
-											alrpChainValidationOk, dataAboutLastBlocks := false, make(map[string]structures.ExecutionStatsPerPool)
+												alrpChainValidationOk, dataAboutLastBlocks := false, make(map[string]structures.ExecutionStatsPerPool)
 
-											if position == 0 {
+												if position == 0 {
 
-												alrpChainValidationOk = true
+													alrpChainValidationOk = true
 
-											} else {
+												} else {
 
-												alrpChainValidationOk, dataAboutLastBlocks = common_functions.ExtendedCheckAlrpChainValidity(
-													firstBlockInThisEpochByPool, epochHandlerRef, position, true,
-												)
+													alrpChainValidationOk, dataAboutLastBlocks = common_functions.ExtendedCheckAlrpChainValidity(
+														firstBlockInThisEpochByPool, epochHandlerRef, position, true,
+													)
 
-											}
+												}
 
-											if alrpChainValidationOk {
+												if alrpChainValidationOk {
 
-												collectionOfAlrpsFromAllThePreviousLeaders = append(collectionOfAlrpsFromAllThePreviousLeaders, dataAboutLastBlocks)
+													collectionOfAlrpsFromAllThePreviousLeaders = append(collectionOfAlrpsFromAllThePreviousLeaders, dataAboutLastBlocks)
 
-												currentAlrpSet = dataAboutLastBlocks
+													currentAlrpSet = dataAboutLastBlocks
 
-												position--
+													position--
 
-												break
+													break
+
+												} else {
+
+													shouldChange = false
+
+													break
+												}
 
 											} else {
 
 												shouldChange = false
 
 												break
-											}
-
-										} else {
-
-											shouldChange = false
-
-											break
-
-										}
-
-									}
-
-								}
-
-								if !shouldChange || position <= localVersionOfCurrentLeader {
-
-									break
-								}
-
-							}
-
-							// Now, <collectionOfAlrpsFromAllThePreviousLeaders> is array of objects like {pool:{index,hash,firstBlockHash}}
-							// We need to reverse it and fill the temp data for VT
-
-							if shouldChange {
-
-								// Release read mutex and immediately acquire mutex to write operation
-
-								storedEpochIndex := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id
-
-								globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
-
-								globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Lock()
-
-								if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id == storedEpochIndex {
-
-									slices.Reverse(collectionOfAlrpsFromAllThePreviousLeaders)
-
-									for _, poolsExecStats := range collectionOfAlrpsFromAllThePreviousLeaders {
-
-										// collectionOfAlrpsFromAllThePreviousLeaders[i] = {pool0:{index,hash},poolN:{index,hash}}
-
-										for poolPubKey, poolExecData := range poolsExecStats {
-
-											_, dataAlreadyExists := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey]
-
-											if !dataAlreadyExists {
-
-												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey] = poolExecData
 
 											}
 
@@ -215,23 +174,67 @@ func SequenceAlignmentThread() {
 
 									}
 
-									// Finally, set the <currentLeader> to the new pointer
+									if !shouldChange || position <= localVersionOfCurrentLeader {
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeader = targetResponse.ProposedIndexOfLeader
+										break
+									}
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+								}
 
-									time.Sleep(time.Second)
+								// Now, <collectionOfAlrpsFromAllThePreviousLeaders> is array of objects like {pool:{index,hash,firstBlockHash}}
+								// We need to reverse it and fill the temp data for VT
 
-									continue
+								if shouldChange {
 
-								} else {
+									// Release read mutex and immediately acquire mutex to write operation
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+									storedEpochIndex := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id
 
-									time.Sleep(time.Second)
+									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-									continue
+									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Lock()
+
+									if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id == storedEpochIndex {
+
+										slices.Reverse(collectionOfAlrpsFromAllThePreviousLeaders)
+
+										for _, poolsExecStats := range collectionOfAlrpsFromAllThePreviousLeaders {
+
+											// collectionOfAlrpsFromAllThePreviousLeaders[i] = {pool0:{index,hash},poolN:{index,hash}}
+
+											for poolPubKey, poolExecData := range poolsExecStats {
+
+												_, dataAlreadyExists := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey]
+
+												if !dataAlreadyExists {
+
+													globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey] = poolExecData
+
+												}
+
+											}
+
+										}
+
+										// Finally, set the <currentLeader> to the new pointer
+
+										globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeader = targetResponse.ProposedIndexOfLeader
+
+										globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+
+										time.Sleep(time.Second)
+
+										continue
+
+									} else {
+
+										globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+
+										time.Sleep(time.Second)
+
+										continue
+
+									}
 
 								}
 
