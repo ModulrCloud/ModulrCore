@@ -9,8 +9,33 @@ import (
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
+	"github.com/Undchainorg/UndchainCore/websocket"
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+func getBlockAndProofFromPoD(blockID string) *websocket.WsBlockWithAfpResponse {
+
+	request := websocket.WsBlockWithAfpRequest{BlockId: blockID}
+
+	var response websocket.WsBlockWithAfpResponse
+
+	if requestBytes, err := json.Marshal(request); err == nil {
+
+		if responseBytes, err := utils.SendWebsocketMessageToPoD(requestBytes); err == nil {
+
+			if err := json.Unmarshal(responseBytes, &response); err == nil {
+
+				return &response
+
+			}
+
+		}
+
+	}
+
+	return &response
+
+}
 
 func ExecutionThread() {
 
@@ -37,7 +62,7 @@ func ExecutionThread() {
 
 			for {
 
-				indexOfLeaderToExec := epochHandlerRef.LegacyEpochAlignmentData.CurrentToExecute
+				indexOfLeaderToExec := epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom
 
 				pubKeyOfLeader := epochHandlerRef.EpochDataHandler.LeadersSequence[indexOfLeaderToExec]
 
@@ -62,7 +87,7 @@ func ExecutionThread() {
 
 					} else {
 
-						epochHandlerRef.LegacyEpochAlignmentData.CurrentToExecute++
+						epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom++
 
 						continue
 
@@ -72,20 +97,38 @@ func ExecutionThread() {
 
 				/*
 
-					Next:
+					TODO:
 
-					1) Check connection with pool or point of blocks distribution
+						1) Check connection with pool or point of blocks distribution
 
-					2) Fetch blocks
+						2) Fetch blocks
 
-					3) Execute
+						3) Execute
 
 
 				*/
 
+				for {
+
+					// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
+
+					blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + pubKeyOfLeader + ":" + strconv.Itoa(localExecMetadataForLeader.Index+1)
+
+					response := getBlockAndProofFromPoD(blockId)
+
+					if response != nil {
+
+					} else {
+
+						break
+
+					}
+
+				}
+
 			}
 
-			allBlocksWereExecutedInLegacyEpoch := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.LegacyEpochAlignmentData.CurrentToExecute+1
+			allBlocksWereExecutedInLegacyEpoch := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom+1
 
 			finishedToExecBlocksByLastLeader := localExecMetadataForLeader.Index == metadataFromAefpForLeader.Index
 
@@ -100,7 +143,7 @@ func ExecutionThread() {
 
 			currentEpochAlignmentData := &epochHandlerRef.CurrentEpochAlignmentData
 
-			leaderPubkeyToExecBlocks := epochHandlerRef.EpochDataHandler.LeadersSequence[currentEpochAlignmentData.CurrentToExecute]
+			leaderPubkeyToExecBlocks := epochHandlerRef.EpochDataHandler.LeadersSequence[currentEpochAlignmentData.CurrentLeaderToExecBlocksFrom]
 
 			execStatsOfLeader := epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks] // {index,hash}
 
@@ -108,9 +151,9 @@ func ExecutionThread() {
 
 			if exists && execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index {
 
-				// Move to next one
+				// Move to the next leader
 
-				epochHandlerRef.CurrentEpochAlignmentData.CurrentToExecute++
+				epochHandlerRef.CurrentEpochAlignmentData.CurrentLeaderToExecBlocksFrom++
 
 				if !currentEpochIsFresh {
 
@@ -431,8 +474,6 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		for poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
 
 			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubkey] = structures.NewExecutionStatsTemplate()
-
-			// TODO: Close connections here
 
 		}
 

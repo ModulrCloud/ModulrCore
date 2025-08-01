@@ -29,7 +29,7 @@ func SequenceAlignmentThread() {
 
 		epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-		localVersionOfCurrentLeader := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeader
+		localVersionOfCurrentLeader := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption
 
 		quorumMembers := common_functions.GetQuorumUrlsAndPubkeys(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler)
 
@@ -218,7 +218,7 @@ func SequenceAlignmentThread() {
 
 										// Finally, set the <currentLeader> to the new pointer
 
-										globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeader = targetResponse.ProposedIndexOfLeader
+										globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
 
 										globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 

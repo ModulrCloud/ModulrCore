@@ -22,7 +22,7 @@ type ExecutionThreadMetadataHandler struct {
 	LastBlockHash string `json:"lastBlockHash"`
 
 	ExecutionData             map[string]ExecutionStatsPerPool `json:"executionData"` // PUBKEY => {index:int, hash:""}
-	CurrentEpochAlignmentData AlignmentDataHandler             `json:"inEpochAlignmentData"`
+	CurrentEpochAlignmentData AlignmentDataHandler             `json:"currentEpochAlignmentData"`
 	LegacyEpochAlignmentData  AlignmentDataHandler             `json:"legacyEpochAlignmentData"`
 
 	Cache map[string]string `json:"-"`
@@ -59,8 +59,8 @@ type GenerationThreadMetadataHandler struct {
 }
 
 type AlignmentDataHandler struct {
-	Activated                  bool                             `json:"activated"`
-	CurrentLeader              int                              `json:"currentLeader"`
-	CurrentToExecute           int                              `json:"currentToExecute"`
-	InfoAboutLastBlocksInEpoch map[string]ExecutionStatsPerPool `json:"infoAboutLastBlocksInEpoch"` // PUBKEY => {index:int, hash:""}
+	Activated                     bool                             `json:"activated"`
+	CurrentLeaderAssumption       int                              `json:"currentLeader"`
+	CurrentLeaderToExecBlocksFrom int                              `json:"currentToExecute"`
+	InfoAboutLastBlocksInEpoch    map[string]ExecutionStatsPerPool `json:"infoAboutLastBlocksInEpoch"` // PUBKEY => {index:int, hash:""}
 }

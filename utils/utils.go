@@ -31,6 +31,11 @@ const (
 	WHITE_COLOR      = "\033[37;1m"
 )
 
+const (
+	MAX_RETRIES    = 3
+	RETRY_INTERVAL = 200 * time.Millisecond
+)
+
 var shutdownOnce sync.Once
 
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -52,6 +57,11 @@ type QuorumResponse struct {
 	msg []byte
 }
 
+type CurrentLeaderData struct {
+	IsMeLeader bool
+	Url        string
+}
+
 func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
@@ -66,7 +76,7 @@ func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 }
 
-func OpenWebsocketConnectionWithPoD() (*websocket.Conn, error) {
+func openWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 
 	u, err := url.Parse(globals.CONFIGURATION.PointOfDistributionWS)
 
@@ -82,45 +92,58 @@ func OpenWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 	return conn, nil
 }
 
-func SendWebsocketMessageToPoD(msg string) (string, error) {
+func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 
-	if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
+	for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
 
-		var err error
+		if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
 
-		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = OpenWebsocketConnectionWithPoD()
+			var err error
 
-		if err != nil {
-			return "", err
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = openWebsocketConnectionWithPoD()
+
+			if err != nil {
+
+				time.Sleep(RETRY_INTERVAL)
+
+				continue
+
+			}
+
 		}
 
+		err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, msg)
+
+		if err != nil {
+
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+
+			time.Sleep(RETRY_INTERVAL)
+
+			continue
+
+		}
+
+		_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
+
+		if err != nil {
+
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+
+			time.Sleep(RETRY_INTERVAL)
+
+			continue
+
+		}
+
+		return resp, nil
 	}
 
-	err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, []byte(msg))
-
-	if err != nil {
-
-		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
-
-		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
-
-		return SendWebsocketMessageToPoD(msg)
-
-	}
-
-	_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
-
-	if err != nil {
-
-		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
-
-		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
-
-		return SendWebsocketMessageToPoD(msg)
-
-	}
-
-	return string(resp), nil
+	return nil, fmt.Errorf("failed to send message after %d attempts", MAX_RETRIES)
 }
 
 func OpenDb(dbName string) *leveldb.DB {
@@ -337,11 +360,6 @@ func GetUTCTimestampInMilliSeconds() int64 {
 
 	return time.Now().UTC().UnixMilli()
 
-}
-
-type CurrentLeaderData struct {
-	IsMeLeader bool
-	Url        string
 }
 
 func IsMyCoreVersionOld(thread structures.LogicalThread) bool {
