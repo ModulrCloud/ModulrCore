@@ -38,3 +38,13 @@ type WsFinalizationProofResponse struct {
 	FinalizationProof string `json:"finalizationProof"`
 	VotedForHash      string `json:"votedForHash"`
 }
+
+type WsBlockWithAfpRequest struct {
+	Route   string      `json:"route"`
+	BlockId block.Block `json:"blockID"`
+}
+
+type WsBlockWithAfpResponse struct {
+	Block            block.Block                            `json:"block"`
+	PreviousBlockAfp structures.AggregatedFinalizationProof `json:"previousBlockAfp"`
+}

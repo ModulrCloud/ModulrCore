@@ -430,3 +430,24 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 	}
 
 }
+
+// To return block with AFP via websockets
+func GetBlockWithProof(parsedRequest WsFinalizationProofRequest, connection *gws.Conn) {
+
+	/*
+
+		Input data format:
+
+		{
+			blockID:"<blockID>"
+		}
+
+		Output:
+
+		{
+			block, afp
+		}
+
+	*/
+
+}
