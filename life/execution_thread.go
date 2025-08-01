@@ -73,15 +73,16 @@ func ExecutionThread() {
 				if !dataExists {
 
 					metadataFromAefpForLeader = structures.NewExecutionStatsTemplate()
+
 				}
 
 				finishedToExecBlocksByThisLeader := localExecMetadataForLeader.Index == metadataFromAefpForLeader.Index
 
 				if finishedToExecBlocksByThisLeader {
 
-					itsTheLastBlockInSequence := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == indexOfLeaderToExec+1
+					itsTheLastLeaderInSequence := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == indexOfLeaderToExec+1
 
-					if itsTheLastBlockInSequence {
+					if itsTheLastLeaderInSequence {
 
 						break
 
@@ -95,18 +96,7 @@ func ExecutionThread() {
 
 				}
 
-				/*
-
-					TODO:
-
-						1) Check connection with pool or point of blocks distribution
-
-						2) Fetch blocks
-
-						3) Execute
-
-
-				*/
+				// ___________ Now start a cycle to fetch blocks and exec ___________
 
 				for {
 
@@ -117,6 +107,22 @@ func ExecutionThread() {
 					response := getBlockAndProofFromPoD(blockId)
 
 					if response != nil {
+
+						if localExecMetadataForLeader.Index+1 == metadataFromAefpForLeader.Index && response.Block.GetHash() == metadataFromAefpForLeader.Hash {
+
+							// Let it execute without AFP verification
+
+							ExecuteBlock(response.Block)
+
+						} else if common_functions.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
+
+							ExecuteBlock(response.Block)
+
+						} else {
+
+							break
+
+						}
 
 					} else {
 
