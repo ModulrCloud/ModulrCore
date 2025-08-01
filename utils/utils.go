@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
+	"net/url"
 	"os"
 	"strconv"
 	"sync"
@@ -33,6 +35,8 @@ const (
 var shutdownOnce sync.Once
 
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+var WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn
 
 type QuorumWaiter struct {
 	responseCh chan QuorumResponse
@@ -63,6 +67,51 @@ func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 }
 
+func OpenWebsocketConnectionWithPoD() (*websocket.Conn, error) {
+
+	u, err := url.Parse(globals.CONFIGURATION.PointOfDistributionWS)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid url: %w", err)
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("dial error: %w", err)
+	}
+
+	log.Println("Connected to WebSocket")
+	return conn, nil
+}
+
+func SendWebsocketMessageToPoD(msg string) (string, error) {
+	if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
+		var err error
+		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = OpenWebsocketConnectionWithPoD()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, []byte(msg))
+	if err != nil {
+		log.Println("Write failed, reconnecting:", err)
+		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+		return SendWebsocketMessageToPoD(msg)
+	}
+
+	_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
+	if err != nil {
+		log.Println("Read failed, reconnecting:", err)
+		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+		WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+		return SendWebsocketMessageToPoD(msg)
+	}
+
+	return string(resp), nil
+}
+
 func OpenDb(dbName string) *leveldb.DB {
 
 	db, err := leveldb.OpenFile(globals.CHAINDATA_PATH+"/DATABASES/"+dbName, nil)
@@ -70,33 +119,6 @@ func OpenDb(dbName string) *leveldb.DB {
 		panic("Impossible to open db : " + dbName + " =>" + err.Error())
 	}
 	return db
-}
-
-func OpenWebsocketConnectionWithPool(poolPubkey string) (*websocket.Conn, error) {
-
-	// Retrieve pool metadata from LevelDB
-	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(poolPubkey+"(POOL)_STORAGE_POOL"), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pool metadata: %w", err)
-	}
-
-	var pool structures.PoolStorage
-	if err := json.Unmarshal(raw, &pool); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal pool metadata: %w", err)
-	}
-
-	// Check if WebSocket URL is present
-	if pool.WssPoolUrl == "" {
-		return nil, fmt.Errorf("pool %s has empty WssPoolUrl", poolPubkey)
-	}
-
-	// Attempt to establish WebSocket connection
-	conn, _, err := websocket.DefaultDialer.Dial(pool.WssPoolUrl, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial websocket for pool %s: %w", poolPubkey, err)
-	}
-
-	return conn, nil
 }
 
 func OpenWebsocketConnectionsWithQuorum(quorum []string, wsConnMap map[string]*websocket.Conn) {
