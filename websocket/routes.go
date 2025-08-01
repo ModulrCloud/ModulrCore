@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
+	"github.com/Undchainorg/UndchainCore/block"
 	"github.com/Undchainorg/UndchainCore/common_functions"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
@@ -431,23 +432,40 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 }
 
-// To return block with AFP via websockets
-func GetBlockWithProof(parsedRequest WsFinalizationProofRequest, connection *gws.Conn) {
+func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn) {
 
-	/*
+	if blockBytes, err := globals.BLOCKS.Get([]byte(parsedRequest.BlockId), nil); err == nil {
 
-		Input data format:
+		var block block.Block
 
-		{
-			blockID:"<blockID>"
+		if err := json.Unmarshal(blockBytes, &block); err == nil {
+
+			resp := WsBlockWithAfpResponse{&block, nil}
+
+			// Now try to get AFP for block
+
+			if afpBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+parsedRequest.BlockId), nil); err == nil {
+
+				var afp structures.AggregatedFinalizationProof
+
+				if err := json.Unmarshal(afpBytes, &afp); err == nil {
+
+					resp.Afp = &afp
+
+				}
+
+			}
+
+			jsonResponse, err := json.Marshal(resp)
+
+			if err == nil {
+
+				connection.WriteMessage(gws.OpcodeText, jsonResponse)
+
+			}
+
 		}
 
-		Output:
-
-		{
-			block, afp
-		}
-
-	*/
+	}
 
 }

@@ -63,6 +63,17 @@ func (h *Handler) OnMessage(connection *gws.Conn, message *gws.Message) {
 
 		GetLeaderRotationProof(req, connection)
 
+	case "get_block_with_afp":
+
+		var req WsBlockWithAfpRequest
+
+		if err := json.Unmarshal(message.Bytes(), &req); err != nil {
+			connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"invalid_block_with_afp_request"}`))
+			return
+		}
+
+		GetBlockWithProof(req, connection)
+
 	default:
 		connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"unknown_type"}`))
 

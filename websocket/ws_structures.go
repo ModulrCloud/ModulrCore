@@ -40,11 +40,11 @@ type WsFinalizationProofResponse struct {
 }
 
 type WsBlockWithAfpRequest struct {
-	Route   string      `json:"route"`
-	BlockId block.Block `json:"blockID"`
+	Route   string `json:"route"`
+	BlockId string `json:"blockID"`
 }
 
 type WsBlockWithAfpResponse struct {
-	Block            block.Block                            `json:"block"`
-	PreviousBlockAfp structures.AggregatedFinalizationProof `json:"previousBlockAfp"`
+	Block *block.Block                            `json:"block"`
+	Afp   *structures.AggregatedFinalizationProof `json:"afp"`
 }
