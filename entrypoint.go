@@ -43,6 +43,9 @@ func RunBlockchain() {
 	//✅ 7.Start execution process - take blocks and execute transactions
 	//go life.ExecutionThread()
 
+	//✅ 8.This thread will be responsible to find the first block in each epoch
+	go life.FirstBlockInEpochMonitor()
+
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
 	go websocket.CreateWebsocketServer()

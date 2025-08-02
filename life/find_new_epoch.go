@@ -180,6 +180,7 @@ func EpochRotationThread() {
 					if firstBlock != nil && firstBlock.GetHash() == AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash {
 
 						// 3. Verify that quorum agreed batch of delayed transactions
+
 						latestBatchIndex := int64(0)
 
 						latestBatchIndexRaw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
