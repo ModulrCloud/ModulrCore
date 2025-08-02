@@ -387,6 +387,7 @@ func GetFirstBlockInEpoch(epochHandler *structures.EpochDataHandler, threadType 
 				}
 
 				responses <- &prop
+
 			}(node.Url)
 		}
 

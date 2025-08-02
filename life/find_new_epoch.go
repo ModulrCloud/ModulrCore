@@ -152,7 +152,7 @@ func EpochRotationThread() {
 						}
 					}
 
-					// 2. Find first block in epoch
+					// 2. Find first block in this epoch
 					if AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash == "" {
 
 						firstBlockData := common_functions.GetFirstBlockInEpoch(epochHandlerRef, "APPROVEMENT")
@@ -172,6 +172,7 @@ func EpochRotationThread() {
 				if AEFP_AND_FIRST_BLOCK_DATA.Aefp != nil && AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash != "" {
 
 					// 1. Fetch first block
+
 					firstBlock := common_functions.GetBlock(epochHandlerRef.Id, AEFP_AND_FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
 
 					// 2. Compare hashes
