@@ -224,7 +224,7 @@ func BlocksSharingAndProofsGrabingThread() {
 
 			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(200 * time.Millisecond)
 
 			continue
 

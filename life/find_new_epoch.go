@@ -361,7 +361,7 @@ func EpochRotationThread() {
 
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 
 	}
 
