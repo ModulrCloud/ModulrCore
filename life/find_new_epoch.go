@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
 	"github.com/Undchainorg/UndchainCore/common_functions"
+	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/system_contracts"
@@ -207,7 +207,7 @@ func EpochRotationThread() {
 
 						for signerPubKey, signa := range firstBlock.ExtraData.DelayedTransactionsBatch.Proofs {
 
-							isOK := ed25519.VerifySignature(dataThatShouldBeSigned, signerPubKey, signa)
+							isOK := crypto_module.VerifySignature(dataThatShouldBeSigned, signerPubKey, signa)
 
 							loweredPubKey := strings.ToLower(signerPubKey)
 

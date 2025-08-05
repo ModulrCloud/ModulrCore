@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
 	"github.com/Undchainorg/UndchainCore/common_functions"
+	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -207,7 +207,7 @@ func NewEpochProposerThread() {
 
 						json.Unmarshal(responseBytes, &resultAsStruct)
 
-						if ed25519.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
+						if crypto_module.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
 
 							resultsCh <- Agreement{
 								PubKey: desc.PubKey,

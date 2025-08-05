@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/KlyntarNetwork/Web1337Golang/crypto_primitives/ed25519"
 	"github.com/Undchainorg/UndchainCore/block"
 	"github.com/Undchainorg/UndchainCore/common_functions"
+	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -238,7 +238,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 									response := WsFinalizationProofResponse{
 										Voter:             globals.CONFIGURATION.PublicKey,
-										FinalizationProof: ed25519.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+										FinalizationProof: crypto_module.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
 										VotedForHash:      proposedBlockHash,
 									}
 
@@ -411,7 +411,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 						Status: "OK",
 
-						Sig: ed25519.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
+						Sig: crypto_module.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
 					}
 
 					jsonResponse, err := json.Marshal(leaderRotationProofMessage)
