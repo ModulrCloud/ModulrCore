@@ -393,17 +393,6 @@ func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	if nextEpochData != nil {
 
-		nextEpochDataTemplate := structures.EpochDataHandler{
-
-			Id: nextEpochIndex,
-
-			Hash: nextEpochData.NextEpochHash,
-
-			Quorum: nextEpochData.NextEpochQuorum,
-
-			LeadersSequence: nextEpochData.NextEpochLeadersSequence,
-		}
-
 		// Find the first blocks for epoch X+1
 
 		var firstBlockDataOnNextEpoch structures.FirstBlockDataForNextEpoch
@@ -418,7 +407,7 @@ func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 		if firstBlockDataOnNextEpoch.FirstBlockCreator == "" {
 
-			findResult := common_functions.GetFirstBlockInEpoch(&nextEpochDataTemplate, "EXECUTION")
+			findResult := GetFirstBlockDataFromDB(nextEpochIndex)
 
 			if findResult != nil {
 

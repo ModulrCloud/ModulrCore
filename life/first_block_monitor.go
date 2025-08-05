@@ -31,7 +31,21 @@ func FirstBlockInEpochMonitor() {
 
 		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-		firstBlockData := getFirstBlockInEpoch(epochHandlerRef)
+		firstBlockData := GetFirstBlockDataFromDB(epochHandlerRef.Id)
+
+		// If we found first block data for current epoch - no sense to do smth else. Just sleep and keep the cycle active
+
+		if firstBlockData != nil {
+
+			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+			time.Sleep(time.Second)
+
+			continue
+
+		}
+
+		firstBlockData = getFirstBlockInEpoch(epochHandlerRef)
 
 		if firstBlockData != nil {
 
@@ -47,7 +61,27 @@ func FirstBlockInEpochMonitor() {
 
 		}
 
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
 	}
+
+}
+
+func GetFirstBlockDataFromDB(epochIndex int) *structures.FirstBlockResult {
+
+	if rawBytes, err := globals.EPOCH_DATA.Get([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochIndex)), nil); err == nil {
+
+		var firstBlockData *structures.FirstBlockResult
+
+		if err := json.Unmarshal(rawBytes, &firstBlockData); err == nil {
+
+			return firstBlockData
+
+		}
+
+	}
+
+	return nil
 
 }
 
