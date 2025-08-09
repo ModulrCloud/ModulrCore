@@ -9,9 +9,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/Undchainorg/UndchainCore/utils"
-
 	"github.com/Undchainorg/UndchainCore/globals"
+	"github.com/Undchainorg/UndchainCore/utils"
 )
 
 func main() {

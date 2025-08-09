@@ -15,9 +15,9 @@ import (
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
-	"github.com/gorilla/websocket"
+	"github.com/Undchainorg/UndchainCore/websocket_pack"
 
-	ws_structures "github.com/Undchainorg/UndchainCore/websocket"
+	"github.com/gorilla/websocket"
 )
 
 var PROOFS_GRABBER_MUTEX = sync.RWMutex{}
@@ -90,7 +90,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 		// Build message - then parse to JSON
 
-		message := ws_structures.WsFinalizationProofRequest{
+		message := websocket_pack.WsFinalizationProofRequest{
 			Route:            "get_finalization_proof",
 			Block:            *BLOCK_TO_SHARE,
 			PreviousBlockAfp: PROOFS_GRABBER.AfpForPrevious,
@@ -111,7 +111,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 			for _, raw := range responses {
 
-				var parsedFinalizationProof ws_structures.WsFinalizationProofResponse
+				var parsedFinalizationProof websocket_pack.WsFinalizationProofResponse
 
 				if err := json.Unmarshal(raw, &parsedFinalizationProof); err == nil {
 

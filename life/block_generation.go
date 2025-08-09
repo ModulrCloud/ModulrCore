@@ -15,7 +15,8 @@ import (
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
-	ws_structures "github.com/Undchainorg/UndchainCore/websocket"
+	"github.com/Undchainorg/UndchainCore/websocket_pack"
+
 	"github.com/gorilla/websocket"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -51,7 +52,7 @@ func alrpRequestTemplate(leaderID string, epochHandler *structures.EpochDataHand
 
 	if alrpMetadataForPool != nil {
 
-		request := ws_structures.WsLeaderRotationProofRequest{
+		request := websocket_pack.WsLeaderRotationProofRequest{
 			Route:               "get_leader_rotation_proof",
 			IndexOfPoolToRotate: slices.Index(epochHandler.LeadersSequence, leaderID),
 			AfpForFirstBlock:    alrpMetadataForPool.AfpForFirstBlock,
@@ -530,7 +531,7 @@ func generateBlock() {
 
 									if response.Status == "OK" {
 
-										var lrpOk ws_structures.WsLeaderRotationProofResponseOk
+										var lrpOk websocket_pack.WsLeaderRotationProofResponseOk
 
 										if errParse := json.Unmarshal(validatorResponse, &lrpOk); errParse == nil {
 
@@ -560,7 +561,7 @@ func generateBlock() {
 
 									} else if response.Status == "UPGRADE" {
 
-										var lrpUpgrade ws_structures.WsLeaderRotationProofResponseUpgrade
+										var lrpUpgrade websocket_pack.WsLeaderRotationProofResponseUpgrade
 
 										if errParse := json.Unmarshal(validatorResponse, &lrpUpgrade); errParse == nil {
 

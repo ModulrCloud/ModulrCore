@@ -1,4 +1,4 @@
-package websocket
+package websocket_pack
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
+
 	"github.com/lxzan/gws"
 )
 

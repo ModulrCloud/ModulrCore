@@ -11,7 +11,8 @@ import (
 	"github.com/Undchainorg/UndchainCore/life"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
-	"github.com/Undchainorg/UndchainCore/websocket"
+	"github.com/Undchainorg/UndchainCore/websocket_pack"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/valyala/fasthttp"
 )
@@ -48,7 +49,7 @@ func RunBlockchain() {
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
-	go websocket.CreateWebsocketServer()
+	go websocket_pack.CreateWebsocketServer()
 
 	serverAddr := globals.CONFIGURATION.Interface + ":" + strconv.Itoa(globals.CONFIGURATION.Port)
 

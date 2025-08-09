@@ -9,15 +9,16 @@ import (
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
-	"github.com/Undchainorg/UndchainCore/websocket"
+	"github.com/Undchainorg/UndchainCore/websocket_pack"
+
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-func getBlockAndProofFromPoD(blockID string) *websocket.WsBlockWithAfpResponse {
+func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
-	request := websocket.WsBlockWithAfpRequest{BlockId: blockID}
+	request := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
 
-	var response websocket.WsBlockWithAfpResponse
+	var response websocket_pack.WsBlockWithAfpResponse
 
 	if requestBytes, err := json.Marshal(request); err == nil {
 
