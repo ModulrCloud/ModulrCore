@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -55,12 +55,12 @@ func (block *Block) GetHash() string {
 
 func (block *Block) SignBlock() {
 
-	block.Sig = crypto_module.GenerateSignature(globals.CONFIGURATION.PrivateKey, block.GetHash())
+	block.Sig = cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, block.GetHash())
 
 }
 
 func (block *Block) VerifySignature() bool {
 
-	return crypto_module.VerifySignature(block.GetHash(), block.Creator, block.Sig)
+	return cryptography.VerifySignature(block.GetHash(), block.Creator, block.Sig)
 
 }

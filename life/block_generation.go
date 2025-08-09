@@ -11,7 +11,7 @@ import (
 
 	"github.com/Undchainorg/UndchainCore/block"
 	"github.com/Undchainorg/UndchainCore/common_functions"
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -544,7 +544,7 @@ func generateBlock() {
 
 											dataThatShouldBeSigned += ":" + epochFullID
 
-											if validatorID == lrpOk.Voter && leaderID == lrpOk.ForPoolPubkey && crypto_module.VerifySignature(dataThatShouldBeSigned, validatorID, lrpOk.Sig) {
+											if validatorID == lrpOk.Voter && leaderID == lrpOk.ForPoolPubkey && cryptography.VerifySignature(dataThatShouldBeSigned, validatorID, lrpOk.Sig) {
 
 												alrpMetadataForPrevLeader.Proofs[validatorID] = lrpOk.Sig
 
@@ -620,7 +620,7 @@ func generateBlock() {
 
 		blockHash := blockCandidate.GetHash()
 
-		blockCandidate.Sig = crypto_module.GenerateSignature(globals.CONFIGURATION.PrivateKey, blockHash)
+		blockCandidate.Sig = cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, blockHash)
 
 		// BlockID has the following format => epochID(epochIndex):Ed25519_Pubkey:IndexOfBlockInCurrentEpoch
 

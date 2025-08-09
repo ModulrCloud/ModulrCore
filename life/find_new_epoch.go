@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Undchainorg/UndchainCore/common_functions"
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/system_contracts"
@@ -207,7 +207,7 @@ func EpochRotationThread() {
 
 						for signerPubKey, signa := range firstBlock.ExtraData.DelayedTransactionsBatch.Proofs {
 
-							isOK := crypto_module.VerifySignature(dataThatShouldBeSigned, signerPubKey, signa)
+							isOK := cryptography.VerifySignature(dataThatShouldBeSigned, signerPubKey, signa)
 
 							loweredPubKey := strings.ToLower(signerPubKey)
 

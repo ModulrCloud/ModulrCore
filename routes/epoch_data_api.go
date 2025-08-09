@@ -6,7 +6,7 @@ import (
 
 	"github.com/Undchainorg/UndchainCore/block"
 	"github.com/Undchainorg/UndchainCore/common_functions"
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -229,7 +229,7 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 				response := structures.EpochFinishResponseOk{
 					Status: "OK",
-					Sig:    crypto_module.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+					Sig:    cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
 				}
 
 				sendJson(ctx, response)

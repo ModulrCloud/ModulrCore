@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/Undchainorg/UndchainCore/common_functions"
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 	"github.com/Undchainorg/UndchainCore/utils"
@@ -207,7 +207,7 @@ func NewEpochProposerThread() {
 
 						json.Unmarshal(responseBytes, &resultAsStruct)
 
-						if crypto_module.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
+						if cryptography.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
 
 							resultsCh <- Agreement{
 								PubKey: desc.PubKey,

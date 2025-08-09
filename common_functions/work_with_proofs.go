@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Undchainorg/UndchainCore/block"
-	crypto_module "github.com/Undchainorg/UndchainCore/cryptography"
+	"github.com/Undchainorg/UndchainCore/cryptography"
 	"github.com/Undchainorg/UndchainCore/globals"
 	"github.com/Undchainorg/UndchainCore/structures"
 )
@@ -125,7 +125,7 @@ func VerifyAggregatedEpochFinalizationProof(
 
 	for pubKey, signature := range proofStruct.Proofs {
 
-		if crypto_module.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
+		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
 			loweredPubKey := strings.ToLower(pubKey)
 			if quorumMap[loweredPubKey] && !seen[loweredPubKey] {
 				seen[loweredPubKey] = true
@@ -161,7 +161,7 @@ func VerifyAggregatedFinalizationProof(
 
 	for pubKey, signature := range proof.Proofs {
 
-		if crypto_module.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
+		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
 
 			loweredPubKey := strings.ToLower(pubKey)
 
@@ -201,7 +201,7 @@ func VerifyAggregatedLeaderRotationProof(
 
 	for pubKey, signature := range proof.Proofs {
 
-		if crypto_module.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
+		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
 
 			loweredPubKey := strings.ToLower(pubKey)
 
