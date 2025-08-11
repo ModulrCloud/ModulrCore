@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Undchainorg/UndchainCore/structures"
 
@@ -105,3 +106,6 @@ var EXECUTION_THREAD_METADATA_HANDLER = struct {
 }
 
 var BLOCKS, STATE, EPOCH_DATA, APPROVEMENT_THREAD_METADATA, FINALIZATION_VOTING_STATS *leveldb.DB
+
+// Flag to use in websocket & http routes to prevent flood of .RLock() calls on mutexes
+var ROUTES_MUTEX_FLOOD_PREVENTION atomic.Bool
