@@ -91,47 +91,55 @@ func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+	if globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Load() {
 
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
 
-	epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-	epochIndex := epochHandler.Id
+		epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-	localIndexOfLeader := epochHandler.CurrentLeaderIndex
+		epochIndex := epochHandler.Id
 
-	pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
+		localIndexOfLeader := epochHandler.CurrentLeaderIndex
 
-	firstBlockIdByThisLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
+		pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
 
-	firstBlockAsBytes, dbErr := globals.BLOCKS.Get([]byte(firstBlockIdByThisLeader), nil)
+		firstBlockIdByThisLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
 
-	if dbErr == nil {
+		firstBlockAsBytes, dbErr := globals.BLOCKS.Get([]byte(firstBlockIdByThisLeader), nil)
 
-		var firstBlockParsed block.Block
+		if dbErr == nil {
 
-		parseErr := json.Unmarshal(firstBlockAsBytes, &firstBlockParsed)
+			var firstBlockParsed block.Block
 
-		if parseErr == nil {
+			parseErr := json.Unmarshal(firstBlockAsBytes, &firstBlockParsed)
 
-			secondBlockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":1"
+			if parseErr == nil {
 
-			afpForSecondBlockByCurrentLeader := common_functions.GetVerifiedAggregatedFinalizationProofByBlockId(secondBlockID, epochHandler)
+				secondBlockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":1"
 
-			if afpForSecondBlockByCurrentLeader != nil {
+				afpForSecondBlockByCurrentLeader := common_functions.GetVerifiedAggregatedFinalizationProofByBlockId(secondBlockID, epochHandler)
 
-				alignmentDataResponse := AlignmentData{
-					ProposedIndexOfLeader:            localIndexOfLeader,
-					FirstBlockByCurrentLeader:        firstBlockParsed,
-					AfpForSecondBlockByCurrentLeader: *afpForSecondBlockByCurrentLeader,
+				if afpForSecondBlockByCurrentLeader != nil {
+
+					alignmentDataResponse := AlignmentData{
+						ProposedIndexOfLeader:            localIndexOfLeader,
+						FirstBlockByCurrentLeader:        firstBlockParsed,
+						AfpForSecondBlockByCurrentLeader: *afpForSecondBlockByCurrentLeader,
+					}
+
+					sendJson(ctx, alignmentDataResponse)
+
+				} else {
+
+					sendJson(ctx, ErrMsg{Err: "No AFP for second block"})
+
 				}
-
-				sendJson(ctx, alignmentDataResponse)
 
 			} else {
 
-				sendJson(ctx, ErrMsg{Err: "No AFP for second block"})
+				sendJson(ctx, ErrMsg{Err: "No first block"})
 
 			}
 
@@ -143,7 +151,7 @@ func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
 
 	} else {
 
-		sendJson(ctx, ErrMsg{Err: "No first block"})
+		sendJson(ctx, ErrMsg{Err: "Try later"})
 
 	}
 
@@ -165,77 +173,91 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+	if globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Load() {
 
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
 
-	epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-	epochIndex := epochHandler.Id
+		epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(int(epochHandler.Id))
+		epochIndex := epochHandler.Id
 
-	localIndexOfLeader := epochHandler.CurrentLeaderIndex
+		epochFullID := epochHandler.Hash + "#" + strconv.Itoa(int(epochHandler.Id))
 
-	pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
+		localIndexOfLeader := epochHandler.CurrentLeaderIndex
 
-	if utils.SignalAboutEpochRotationExists(epochIndex) {
+		pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
 
-		votingMetadataForPool := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
+		if utils.SignalAboutEpochRotationExists(epochIndex) {
 
-		votingRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForPool), nil)
+			votingMetadataForPool := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
 
-		var votingData structures.PoolVotingStat
+			votingRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForPool), nil)
 
-		if err != nil || votingRaw == nil {
+			var votingData structures.PoolVotingStat
 
-			votingData = structures.NewPoolVotingStatTemplate()
+			if err != nil || votingRaw == nil {
 
-		} else {
-			_ = json.Unmarshal(votingRaw, &votingData)
-		}
+				votingData = structures.NewPoolVotingStatTemplate()
 
-		blockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
+			} else {
+				_ = json.Unmarshal(votingRaw, &votingData)
+			}
 
-		var hashOfFirstBlock string
+			blockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
 
-		if proposition.AfpForFirstBlock.BlockId == blockID && proposition.LastBlockProposition.Index >= 0 {
+			var hashOfFirstBlock string
 
-			if common_functions.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
+			if proposition.AfpForFirstBlock.BlockId == blockID && proposition.LastBlockProposition.Index >= 0 {
 
-				hashOfFirstBlock = proposition.AfpForFirstBlock.BlockHash
+				if common_functions.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
+
+					hashOfFirstBlock = proposition.AfpForFirstBlock.BlockHash
+
+				}
 
 			}
 
-		}
+			if hashOfFirstBlock == "" {
 
-		if hashOfFirstBlock == "" {
+				sendJson(ctx, ErrMsg{Err: "Can't verify hash"})
 
-			sendJson(ctx, ErrMsg{Err: "Can't verify hash"})
+				return
 
-			return
+			}
 
-		}
+			if proposition.CurrentLeader == localIndexOfLeader {
 
-		if proposition.CurrentLeader == localIndexOfLeader {
+				if votingData.Index == proposition.LastBlockProposition.Index && votingData.Hash == proposition.LastBlockProposition.Hash {
 
-			if votingData.Index == proposition.LastBlockProposition.Index && votingData.Hash == proposition.LastBlockProposition.Hash {
+					dataToSign := "EPOCH_DONE:" +
+						strconv.Itoa(proposition.CurrentLeader) + ":" +
+						strconv.Itoa(proposition.LastBlockProposition.Index) + ":" +
+						proposition.LastBlockProposition.Hash + ":" +
+						hashOfFirstBlock + ":" +
+						epochFullID
 
-				dataToSign := "EPOCH_DONE:" +
-					strconv.Itoa(proposition.CurrentLeader) + ":" +
-					strconv.Itoa(proposition.LastBlockProposition.Index) + ":" +
-					proposition.LastBlockProposition.Hash + ":" +
-					hashOfFirstBlock + ":" +
-					epochFullID
+					response := structures.EpochFinishResponseOk{
+						Status: "OK",
+						Sig:    cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+					}
 
-				response := structures.EpochFinishResponseOk{
-					Status: "OK",
-					Sig:    cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+					sendJson(ctx, response)
+
+				} else if votingData.Index > proposition.LastBlockProposition.Index {
+
+					response := structures.EpochFinishResponseUpgrade{
+						Status:               "UPGRADE",
+						CurrentLeader:        localIndexOfLeader,
+						LastBlockProposition: votingData,
+					}
+
+					sendJson(ctx, response)
+
 				}
 
-				sendJson(ctx, response)
-
-			} else if votingData.Index > proposition.LastBlockProposition.Index {
+			} else if proposition.CurrentLeader < localIndexOfLeader {
 
 				response := structures.EpochFinishResponseUpgrade{
 					Status:               "UPGRADE",
@@ -247,21 +269,15 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 			}
 
-		} else if proposition.CurrentLeader < localIndexOfLeader {
+		} else {
 
-			response := structures.EpochFinishResponseUpgrade{
-				Status:               "UPGRADE",
-				CurrentLeader:        localIndexOfLeader,
-				LastBlockProposition: votingData,
-			}
-
-			sendJson(ctx, response)
+			sendJson(ctx, ErrMsg{Err: "Too early"})
 
 		}
 
 	} else {
 
-		sendJson(ctx, ErrMsg{Err: "Too early"})
+		sendJson(ctx, ErrMsg{Err: "Try later"})
 
 	}
 
