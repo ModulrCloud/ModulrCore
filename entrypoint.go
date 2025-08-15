@@ -6,12 +6,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/Undchainorg/UndchainCore/common_functions"
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/life"
-	"github.com/Undchainorg/UndchainCore/structures"
-	"github.com/Undchainorg/UndchainCore/utils"
-	"github.com/Undchainorg/UndchainCore/websocket_pack"
+	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/life"
+	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/ModulrCloud/ModulrCore/websocket_pack"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/valyala/fasthttp"

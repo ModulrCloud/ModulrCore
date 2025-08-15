@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/structures"
-	"github.com/Undchainorg/UndchainCore/utils"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
 type ValidatorData struct {

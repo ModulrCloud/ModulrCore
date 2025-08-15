@@ -75,7 +75,7 @@ export CHAINDATA_PATH = full/path/to/chaindata
 In the same shell where you stored the env variable - run
 
 ```sh
-./undchain
+./modulr
 ```
 
 **This should run the local testnet with a single validator which generates blocks**

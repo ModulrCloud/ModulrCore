@@ -6,6 +6,6 @@ go mod download
 
 # Build the project
 echo "Building the project..."
-GOOS=linux GOARCH=amd64 go build -o undchain
+GOOS=linux GOARCH=amd64 go build -o modulr
 
-echo "Done. Binary name is : undchain"
+echo "Done. Binary name is : modulr"

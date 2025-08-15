@@ -7,6 +7,6 @@ go mod download
 echo Building the project...
 set GOOS=windows
 set GOARCH=amd64
-go build -o undchain.exe
+go build -o modulr.exe
 
-echo Done. Binary name is: undchain.exe
+echo Done. Binary name is: modulr.exe

@@ -1,4 +1,4 @@
-module github.com/Undchainorg/UndchainCore
+module github.com/ModulrCloud/ModulrCore
 
 go 1.23.1
 

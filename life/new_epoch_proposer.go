@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Undchainorg/UndchainCore/common_functions"
-	"github.com/Undchainorg/UndchainCore/cryptography"
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/structures"
-	"github.com/Undchainorg/UndchainCore/utils"
+	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
 type Agreement struct {

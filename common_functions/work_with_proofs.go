@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Undchainorg/UndchainCore/block"
-	"github.com/Undchainorg/UndchainCore/cryptography"
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/ModulrCloud/ModulrCore/block"
+	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
 func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *block.Block {

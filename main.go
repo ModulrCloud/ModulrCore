@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/utils"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
 func main() {

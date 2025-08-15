@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Undchainorg/UndchainCore/globals"
-	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/structures"
 
 	"github.com/gorilla/websocket"
 	"github.com/syndtr/goleveldb/leveldb"

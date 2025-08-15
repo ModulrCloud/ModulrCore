@@ -8,7 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/Undchainorg/UndchainCore/structures"
+	"github.com/ModulrCloud/ModulrCore/structures"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
