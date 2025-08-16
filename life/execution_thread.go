@@ -167,7 +167,9 @@ func ExecutionThread() {
 				}
 
 				// Here we need to skip the following logic and start next iteration
-				// TODO: Cope with mutexes here
+
+				globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
 				continue
 
 			}
@@ -233,9 +235,6 @@ func ExecuteBlock(block *block.Block) {
 	epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
 
 	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
-
-		// Stub
-		// TODO: Modify the index & hash in the globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[block.Creator] here for progress
 
 		currentEpochIndex := epochHandlerRef.EpochDataHandler.Id
 
