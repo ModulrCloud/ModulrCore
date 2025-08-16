@@ -2,6 +2,7 @@ package life
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/block"
@@ -13,6 +14,10 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+var ACCOUNTS_DATA_CACHE map[string]structures.Account
+
+var VALIDATORS_DATA_CACHE map[string]structures.PoolStorage
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
@@ -229,13 +234,93 @@ func ExecutionThread() {
 
 func ExecuteBlock(block *block.Block) {
 
-	if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[block.Creator].Hash == block.PrevHash {
+	epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
+
+	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
 
 		// Stub
 		// TODO: Modify the index & hash in the globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[block.Creator] here for progress
 
+		currentEpochIndex := epochHandlerRef.EpochDataHandler.Id
+
+		currentBlockId := strconv.Itoa(currentEpochIndex) + ":" + block.Creator + ":" + strconv.Itoa(block.Index)
+
+		// To change the state atomically - prepare the atomic batch
+
+		stateBatch := new(leveldb.Batch)
+
+		for _, transaction := range block.Transactions {
+
+			ExecuteTransaction(&transaction)
+
+		}
+
+		//_____________________________________SHARE FEES AMONG POOL OWNER AND STAKERS__________________________________
+
+		/*
+
+		   Distribute fees among:
+
+		       [0] Block creator itself
+		       [1] Stakers of his pool
+
+		*/
+
+		DistributeFeesAmongStakersAndPool(block.Creator, structures.BigInt{})
+
+		for accountID, accountData := range ACCOUNTS_DATA_CACHE {
+
+			if accountDataBytes, err := json.Marshal(accountData); err == nil {
+
+				stateBatch.Put([]byte(accountID), accountDataBytes)
+
+			} else {
+
+				panic("Impossible to add new account data to atomic batch")
+
+			}
+
+		}
+
+		// Update the execution data for progress
+
+		blockCreatorData := epochHandlerRef.ExecutionData[block.Creator]
+
+		blockCreatorData.Index = block.Index
+
+		blockCreatorData.Hash = block.GetHash()
+
+		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
+
+		// Finally set the updated execution thread handler to atomic batch
+
+		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
+
+			stateBatch.Put([]byte("ET"), execThreadRawBytes)
+
+		} else {
+
+			panic("Impossible to store updated execution thread version to atomic batch")
+
+		}
+
+		if err := globals.STATE.Write(stateBatch, nil); err == nil {
+
+			utils.LogWithTime(fmt.Sprintf("Executed block %s ✅", currentBlockId), utils.CYAN_COLOR)
+
+		} else {
+
+			panic("Impossible to commit changes in atomic batch to permanent state")
+
+		}
+
 	}
 
+}
+
+func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee structures.BigInt) {
+
+	// Stub
 }
 
 func ExecuteTransaction(tx *structures.Transaction) {}
