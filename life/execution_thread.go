@@ -280,15 +280,21 @@ func ExecuteBlock(block *block.Block) {
 
 		// Update the execution data for progress
 
+		blockHash := block.GetHash()
+
 		blockCreatorData := epochHandlerRef.ExecutionData[block.Creator]
 
 		blockCreatorData.Index = block.Index
 
-		blockCreatorData.Hash = block.GetHash()
+		blockCreatorData.Hash = blockHash
 
 		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
 
 		// Finally set the updated execution thread handler to atomic batch
+
+		epochHandlerRef.LastHeight++
+
+		epochHandlerRef.LastBlockHash = blockHash
 
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
 
