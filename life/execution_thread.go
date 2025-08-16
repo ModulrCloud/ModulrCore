@@ -15,10 +15,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var ACCOUNTS_DATA_CACHE map[string]structures.Account
-
-var VALIDATORS_DATA_CACHE map[string]structures.PoolStorage
-
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
 	request := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
@@ -268,7 +264,7 @@ func ExecuteBlock(block *block.Block) {
 
 		DistributeFeesAmongStakersAndPool(block.Creator, structures.BigInt{})
 
-		for accountID, accountData := range ACCOUNTS_DATA_CACHE {
+		for accountID, accountData := range epochHandlerRef.Cache {
 
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
 

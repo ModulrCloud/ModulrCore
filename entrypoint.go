@@ -153,7 +153,7 @@ func prepareBlockchain() {
 
 			if etHandler.Cache == nil {
 
-				etHandler.Cache = make(map[string]string)
+				etHandler.Cache = make(map[string]*structures.Account)
 
 			}
 

@@ -25,7 +25,7 @@ type ExecutionThreadMetadataHandler struct {
 	CurrentEpochAlignmentData AlignmentDataHandler             `json:"currentEpochAlignmentData"`
 	LegacyEpochAlignmentData  AlignmentDataHandler             `json:"legacyEpochAlignmentData"`
 
-	Cache map[string]string `json:"-"`
+	Cache map[string]*Account `json:"-"`
 }
 
 func (handler *ApprovementThreadMetadataHandler) GetCoreMajorVersion() int {
