@@ -1,6 +1,6 @@
 package structures
 
 type Account struct {
-	Balance BigInt
+	Balance uint64
 	Nonce   uint64
 }
