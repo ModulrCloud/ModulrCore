@@ -222,9 +222,9 @@ func setGenesisToState() error {
 
 	epochTimestamp := globals.GENESIS.FirstEpochStartTimestamp
 
-	poolsRegistryForEpochHandler := make(map[string]struct{})
+	poolsRegistryForEpochHandler := []string{}
 
-	poolsRegistryForEpochHandler2 := make(map[string]struct{})
+	poolsRegistryForEpochHandler2 := []string{}
 
 	// __________________________________ Load info about accounts __________________________________
 
@@ -242,7 +242,9 @@ func setGenesisToState() error {
 
 	// __________________________________ Load info about pools __________________________________
 
-	for poolPubKey, poolStorage := range globals.GENESIS.Pools {
+	for _, poolStorage := range globals.GENESIS.Pools {
+
+		poolPubKey := poolStorage.Pubkey
 
 		serializedStorage, err := json.Marshal(poolStorage)
 
@@ -254,9 +256,9 @@ func setGenesisToState() error {
 
 		execThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
 
-		poolsRegistryForEpochHandler[poolPubKey] = struct{}{}
+		poolsRegistryForEpochHandler = append(poolsRegistryForEpochHandler, poolPubKey)
 
-		poolsRegistryForEpochHandler2[poolPubKey] = struct{}{}
+		poolsRegistryForEpochHandler2 = append(poolsRegistryForEpochHandler2, poolPubKey)
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubKey] = structures.NewExecutionStatsTemplate()
 

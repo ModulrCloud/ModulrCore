@@ -1,6 +1,7 @@
 package system_contracts
 
 import (
+	"slices"
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/common_functions"
@@ -15,6 +16,15 @@ var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"updateStakingPool": UpdateStakingPool,
 	"stake":             Stake,
 	"unstake":           Unstake,
+}
+
+func removeFromSlice[T comparable](s []T, v T) []T {
+	for i, x := range s {
+		if x == v {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }
 
 func CreateStakingPool(delayedTransaction map[string]string) bool {
@@ -70,18 +80,26 @@ func UpdateStakingPool(delayedTransaction map[string]string) bool {
 	if poolStorage != nil {
 
 		poolStorage.Percentage = percentage
+
 		poolStorage.PoolUrl = poolURL
+
 		poolStorage.WssPoolUrl = wssPoolURL
 
 		requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
 
 		if poolStorage.TotalStaked >= requiredStake {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[creator] = struct{}{}
+			if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator) {
+
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = append(
+
+					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator,
+				)
+			}
 
 		} else {
 
-			delete(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator)
+			removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator)
 
 		}
 
@@ -140,9 +158,11 @@ func Stake(delayedTransaction map[string]string) bool {
 
 		if poolStorage.TotalStaked >= requiredStake {
 
-			if _, exists := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[poolPubKey]; !exists {
+			if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey) {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[poolPubKey] = struct{}{}
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = append(
+					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey,
+				)
 
 			}
 
@@ -204,7 +224,7 @@ func Unstake(delayedTransaction map[string]string) bool {
 
 		if poolStorage.TotalStaked < requiredStake {
 
-			delete(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
+			removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
 
 		}
 

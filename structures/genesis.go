@@ -29,6 +29,7 @@ type Staker struct {
 }
 
 type PoolStorage struct {
+	Pubkey      string            `json:"pubkey"`
 	Percentage  int               `json:"percentage"`
 	TotalStaked uint64            `json:"totalStaked"`
 	Stakers     map[string]Staker `json:"stakers"`
@@ -37,10 +38,10 @@ type PoolStorage struct {
 }
 
 type Genesis struct {
-	NetworkId                string                 `json:"NETWORK_ID"`
-	CoreMajorVersion         int                    `json:"CORE_MAJOR_VERSION"`
-	FirstEpochStartTimestamp uint64                 `json:"FIRST_EPOCH_START_TIMESTAMP"`
-	NetworkParameters        NetworkParameters      `json:"NETWORK_PARAMETERS"`
-	Pools                    map[string]PoolStorage `json:"POOLS"`
-	State                    map[string]Account     `json:"STATE"`
+	NetworkId                string             `json:"NETWORK_ID"`
+	CoreMajorVersion         int                `json:"CORE_MAJOR_VERSION"`
+	FirstEpochStartTimestamp uint64             `json:"FIRST_EPOCH_START_TIMESTAMP"`
+	NetworkParameters        NetworkParameters  `json:"NETWORK_PARAMETERS"`
+	Pools                    []PoolStorage      `json:"POOLS"`
+	State                    map[string]Account `json:"STATE"`
 }

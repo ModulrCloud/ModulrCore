@@ -57,7 +57,7 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 
 	// Populate validator data and calculate total stake sum
 
-	for validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
 		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
 
@@ -163,11 +163,9 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 
 	if totalNumberOfValidators <= quorumSize {
 
-		futureQuorum := make([]string, 0, len(epochHandler.PoolsRegistry))
+		futureQuorum := make([]string, len(epochHandler.PoolsRegistry))
 
-		for validatorPubkey := range epochHandler.PoolsRegistry {
-			futureQuorum = append(futureQuorum, validatorPubkey)
-		}
+		copy(futureQuorum, epochHandler.PoolsRegistry)
 
 		return futureQuorum
 	}
@@ -182,7 +180,7 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 
 	var totalStakeSum uint64 = 0
 
-	for validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
 		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
 

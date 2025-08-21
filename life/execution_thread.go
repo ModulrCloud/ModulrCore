@@ -587,7 +587,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerPool)
 
-		for poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
+		for _, poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
 
 			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubkey] = structures.NewExecutionStatsTemplate()
 
