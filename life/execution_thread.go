@@ -261,7 +261,7 @@ func ExecuteBlock(block *block.Block) {
 
 		*/
 
-		DistributeFeesAmongStakersAndPool(block.Creator, structures.BigInt{})
+		DistributeFeesAmongStakersAndPool(block.Creator, 0)
 
 		for accountID, accountData := range epochHandlerRef.Cache {
 
@@ -319,7 +319,7 @@ func ExecuteBlock(block *block.Block) {
 
 }
 
-func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee structures.BigInt) {
+func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee uint64) {
 
 	// Stub
 }

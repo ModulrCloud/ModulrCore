@@ -1,58 +1,8 @@
 package structures
 
-import (
-	"encoding/json"
-	"fmt"
-	"math/big"
-)
-
-type BigInt struct {
-	*big.Int
-}
-
-func (b BigInt) Copy() BigInt {
-	if b.Int == nil {
-		return BigInt{nil}
-	}
-	return BigInt{new(big.Int).Set(b.Int)}
-}
-
-func (b *BigInt) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err == nil {
-		i := new(big.Int)
-		i, ok := i.SetString(s, 10)
-		if !ok {
-			return fmt.Errorf("invalid bigint string: %s", s)
-		}
-		b.Int = i
-		return nil
-	}
-
-	var num json.Number
-	if err := json.Unmarshal(data, &num); err != nil {
-		return err
-	}
-
-	i := new(big.Int)
-	i, ok := i.SetString(num.String(), 10)
-	if !ok {
-		return fmt.Errorf("invalid bigint number: %s", num)
-	}
-	b.Int = i
-	return nil
-}
-
-func (b BigInt) MarshalJSON() ([]byte, error) {
-	if b.Int == nil {
-		return []byte(`"0"`), nil
-	}
-	return json.Marshal(b.String())
-}
-
 type NetworkParameters struct {
-	ValidatorStake        BigInt `json:"VALIDATOR_STAKE"`
-	MinimalStakePerEntity BigInt `json:"MINIMAL_STAKE_PER_ENTITY"`
+	ValidatorStake        uint64 `json:"VALIDATOR_STAKE"`
+	MinimalStakePerEntity uint64 `json:"MINIMAL_STAKE_PER_ENTITY"`
 	QuorumSize            int    `json:"QUORUM_SIZE"`
 	EpochTime             int64  `json:"EPOCH_TIME"`
 	LeadershipTimeframe   int64  `json:"LEADERSHIP_TIMEFRAME"`
@@ -63,8 +13,8 @@ type NetworkParameters struct {
 
 func CopyNetworkParameters(src NetworkParameters) NetworkParameters {
 	return NetworkParameters{
-		ValidatorStake:        src.ValidatorStake.Copy(),
-		MinimalStakePerEntity: src.MinimalStakePerEntity.Copy(),
+		ValidatorStake:        src.ValidatorStake,
+		MinimalStakePerEntity: src.MinimalStakePerEntity,
 		QuorumSize:            src.QuorumSize,
 		EpochTime:             src.EpochTime,
 		LeadershipTimeframe:   src.LeadershipTimeframe,
@@ -75,12 +25,12 @@ func CopyNetworkParameters(src NetworkParameters) NetworkParameters {
 }
 
 type Staker struct {
-	Stake BigInt `json:"stake"`
+	Stake uint64 `json:"stake"`
 }
 
 type PoolStorage struct {
 	Percentage  int               `json:"percentage"`
-	TotalStaked BigInt            `json:"totalStaked"`
+	TotalStaked uint64            `json:"totalStaked"`
 	Stakers     map[string]Staker `json:"stakers"`
 	PoolUrl     string            `json:"poolURL"`
 	WssPoolUrl  string            `json:"wssPoolURL"`
