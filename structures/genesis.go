@@ -92,4 +92,5 @@ type Genesis struct {
 	FirstEpochStartTimestamp uint64                 `json:"FIRST_EPOCH_START_TIMESTAMP"`
 	NetworkParameters        NetworkParameters      `json:"NETWORK_PARAMETERS"`
 	Pools                    map[string]PoolStorage `json:"POOLS"`
+	State                    map[string]Account     `json:"STATE"`
 }

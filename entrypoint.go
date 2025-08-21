@@ -218,23 +218,41 @@ func setGenesisToState() error {
 
 	approvementThreadBatch := new(leveldb.Batch)
 
+	execThreadBatch := new(leveldb.Batch)
+
 	epochTimestamp := globals.GENESIS.FirstEpochStartTimestamp
 
 	poolsRegistryForEpochHandler := make(map[string]struct{})
 
 	poolsRegistryForEpochHandler2 := make(map[string]struct{})
 
-	// __________________________________ Load info about pools __________________________________
+	// __________________________________ Load info about accounts __________________________________
 
-	for poolPubKey, poolStorage := range globals.GENESIS.Pools {
+	for accountPubkey, accountData := range globals.GENESIS.State {
 
-		serialized, err := json.Marshal(poolStorage)
+		serialized, err := json.Marshal(accountData)
 
 		if err != nil {
 			return err
 		}
 
-		approvementThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serialized)
+		execThreadBatch.Put([]byte(accountPubkey), serialized)
+
+	}
+
+	// __________________________________ Load info about pools __________________________________
+
+	for poolPubKey, poolStorage := range globals.GENESIS.Pools {
+
+		serializedStorage, err := json.Marshal(poolStorage)
+
+		if err != nil {
+			return err
+		}
+
+		approvementThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
+
+		execThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
 
 		poolsRegistryForEpochHandler[poolPubKey] = struct{}{}
 
@@ -254,6 +272,10 @@ func setGenesisToState() error {
 
 	// Commit changes
 	if err := globals.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
+		return err
+	}
+
+	if err := globals.STATE.Write(execThreadBatch, nil); err != nil {
 		return err
 	}
 
