@@ -99,7 +99,8 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 				// Add the chosen validator to the leaders sequence
 				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validator.ValidatorPubKey)
 
-				// Update totalStakeSum and remove the chosen validator from the map
+				// Update totalStakeSum and remove the chosen validator from the list
+
 				if validator.TotalStake <= totalStakeSum {
 					totalStakeSum -= validator.TotalStake
 				} else {

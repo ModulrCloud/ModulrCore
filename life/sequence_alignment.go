@@ -109,7 +109,7 @@ func SequenceAlignmentThread() {
 
 							   Now, start the cycle in reverse order on range
 
-							   [proposedIndexOfLeader-1 ; localVersionOfCurrentLeaders]
+							   [proposedIndexOfLeader-1 ; localVersionOfCurrentLeader]
 
 							*/
 
