@@ -2,11 +2,12 @@ package structures
 
 type Transaction struct {
 	V       uint           `json:"v"`
-	Fee     string         `json:"fee"`
-	Creator string         `json:"creator"`
-	Sig     string         `json:"sig"`
 	Type    string         `json:"type"`
-	SigType string         `json:"sigType"`
+	From    string         `json:"from"`
+	To      string         `json:"to"`
+	Amount  uint64         `json:"amount"`
+	Fee     string         `json:"fee"`
+	Sig     string         `json:"sig"`
 	Nonce   int            `json:"nonce"`
 	Payload map[string]any `json:"payload"`
 }
