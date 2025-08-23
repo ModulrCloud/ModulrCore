@@ -9,7 +9,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
-type DelayedTxExecutorFunction = func(map[string]string) bool
+type DelayedTxExecutorFunction = func(map[string]string, string) bool
 
 var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"createStakingPool": CreateStakingPool,
@@ -27,7 +27,7 @@ func removeFromSlice[T comparable](s []T, v T) []T {
 	return s
 }
 
-func CreateStakingPool(delayedTransaction map[string]string) bool {
+func CreateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
 	percentage, _ := strconv.Atoi(delayedTransaction["percentage"])
@@ -62,7 +62,7 @@ func CreateStakingPool(delayedTransaction map[string]string) bool {
 	return false
 }
 
-func UpdateStakingPool(delayedTransaction map[string]string) bool {
+func UpdateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
 	percentage, err1 := strconv.Atoi(delayedTransaction["percentage"])
@@ -113,7 +113,7 @@ func UpdateStakingPool(delayedTransaction map[string]string) bool {
 
 }
 
-func Stake(delayedTransaction map[string]string) bool {
+func Stake(delayedTransaction map[string]string, context string) bool {
 
 	staker := delayedTransaction["staker"]
 	poolPubKey := delayedTransaction["poolPubKey"]
@@ -176,7 +176,7 @@ func Stake(delayedTransaction map[string]string) bool {
 
 }
 
-func Unstake(delayedTransaction map[string]string) bool {
+func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	unstaker := delayedTransaction["unstaker"]
 	poolPubKey := delayedTransaction["poolPubKey"]

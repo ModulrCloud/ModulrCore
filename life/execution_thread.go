@@ -566,7 +566,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		for _, delayedTx := range nextEpochData.DelayedTransactions {
 
-			ExecuteDelayedTransaction(delayedTx)
+			ExecuteDelayedTransaction(delayedTx, "EXECUTION_THREAD")
 
 		}
 
