@@ -39,6 +39,58 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 }
 
+func GetAccountFromExecThreadState(accountId string) *structures.Account {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(accountId), nil)
+
+	if err != nil {
+		return nil
+	}
+
+	var account structures.Account
+
+	err = json.Unmarshal(data, &account)
+
+	if err != nil {
+		return nil
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
+
+	return &account
+
+}
+
+func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(poolId), nil)
+
+	if err != nil {
+		return nil
+	}
+
+	var poolStorage structures.PoolStorage
+
+	err = json.Unmarshal(data, &poolStorage)
+
+	if err != nil {
+		return nil
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
+
+	return &poolStorage
+
+}
+
 func ExecutionThread() {
 
 	for {
