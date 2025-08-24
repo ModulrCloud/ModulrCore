@@ -618,7 +618,35 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerPool),
 		}
 
-		// TODO: Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
+		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
+
+		for accountID, accountData := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache {
+
+			if accountDataBytes, err := json.Marshal(accountData); err == nil {
+
+				dbBatch.Put([]byte(accountID), accountDataBytes)
+
+			} else {
+
+				panic("Impossible to add new account data to atomic batch")
+
+			}
+
+		}
+
+		for poolID, poolStorage := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache {
+
+			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+
+				dbBatch.Put([]byte(poolID), dataBytes)
+
+			} else {
+
+				panic("Impossible to add pool data to atomic batch")
+
+			}
+
+		}
 
 		if err := globals.STATE.Write(dbBatch, nil); err != nil {
 
@@ -627,6 +655,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		}
 
 		// Version check once new epoch started
+
 		if utils.IsMyCoreVersionOld(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler) {
 
 			utils.LogWithTime("New version detected on EXECUTION_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
