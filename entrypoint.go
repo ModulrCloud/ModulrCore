@@ -151,9 +151,15 @@ func prepareBlockchain() {
 
 		if err := json.Unmarshal(data, &etHandler); err == nil {
 
-			if etHandler.Cache == nil {
+			if etHandler.AccountsCache == nil {
 
-				etHandler.Cache = make(map[string]*structures.Account)
+				etHandler.AccountsCache = make(map[string]*structures.Account)
+
+			}
+
+			if etHandler.PoolsCache == nil {
+
+				etHandler.PoolsCache = make(map[string]*structures.PoolStorage)
 
 			}
 

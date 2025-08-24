@@ -1,10 +1,15 @@
 package common_functions
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
+	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -13,6 +18,91 @@ import (
 type ValidatorData struct {
 	ValidatorPubKey string
 	TotalStake      uint64
+}
+
+func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *block.Block {
+
+	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
+
+	blockAsBytes, err := globals.BLOCKS.Get([]byte(blockID), nil)
+
+	if err == nil {
+
+		var blockParsed *block.Block
+
+		err = json.Unmarshal(blockAsBytes, &blockParsed)
+
+		if err == nil {
+			return blockParsed
+		}
+
+	}
+
+	// Find from other nodes
+
+	quorumUrlsAndPubkeys := GetQuorumUrlsAndPubkeys(epochHandler)
+
+	var quorumUrls []string
+
+	for _, quorumMember := range quorumUrlsAndPubkeys {
+
+		quorumUrls = append(quorumUrls, quorumMember.Url)
+
+	}
+
+	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
+
+	resultChan := make(chan *block.Block, len(allKnownNodes))
+	var wg sync.WaitGroup
+
+	for _, node := range allKnownNodes {
+
+		if node == globals.CONFIGURATION.MyHostname {
+			continue
+		}
+
+		wg.Add(1)
+		go func(endpoint string) {
+
+			defer wg.Done()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			url := endpoint + "/block/" + blockID
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				return
+			}
+			defer resp.Body.Close()
+
+			var block block.Block
+
+			if err := json.NewDecoder(resp.Body).Decode(&block); err == nil {
+				resultChan <- &block
+			}
+
+		}(node)
+
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for block := range resultChan {
+		if block != nil {
+			return block
+		}
+	}
+
+	return nil
 }
 
 func GetFromApprovementThreadState(poolId string) *structures.PoolStorage {

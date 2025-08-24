@@ -263,7 +263,7 @@ func ExecuteBlock(block *block.Block) {
 
 		DistributeFeesAmongStakersAndPool(block.Creator, 0)
 
-		for accountID, accountData := range epochHandlerRef.Cache {
+		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
 
@@ -272,6 +272,20 @@ func ExecuteBlock(block *block.Block) {
 			} else {
 
 				panic("Impossible to add new account data to atomic batch")
+
+			}
+
+		}
+
+		for poolID, poolStorage := range epochHandlerRef.PoolsCache {
+
+			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+
+				stateBatch.Put([]byte(poolID), dataBytes)
+
+			} else {
+
+				panic("Impossible to add pool data to atomic batch")
 
 			}
 

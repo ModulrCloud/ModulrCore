@@ -92,7 +92,8 @@ var EXECUTION_THREAD_METADATA_HANDLER = struct {
 }{
 	Handler: structures.ExecutionThreadMetadataHandler{
 		CoreMajorVersion: -1,
-		Cache:            make(map[string]*structures.Account),
+		AccountsCache:    make(map[string]*structures.Account),
+		PoolsCache:       make(map[string]*structures.PoolStorage),
 		LastHeight:       -1,
 		ExecutionData:    make(map[string]structures.ExecutionStatsPerPool),
 		CurrentEpochAlignmentData: structures.AlignmentDataHandler{
