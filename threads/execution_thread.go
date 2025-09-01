@@ -398,7 +398,37 @@ func ExecuteBlock(block *block.Block) {
 
 func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee uint64) {
 
-	// Stub
+	/*
+
+	   _____________________Here we perform the following logic_____________________
+
+	   [*] FEES_COLLECTOR - number of total fees received in this block
+
+	   1) Get the pool storage to extract list of stakers
+
+	   2) In this list (poolStorage.stakers) we have structure like:
+
+	       {
+	           poolCreatorPubkey:{stake},
+	           ...
+	           stakerPubkey:{stake}
+	           ...
+	       }
+
+	   3) Send <stakingPoolStorage.percentage * FEES_COLLECTOR> to block creator:
+
+	       poolCreatorAccount.balance += stakingPoolStorage.percentage * FEES_COLLECTOR
+
+	   2) Distribute the rest among other stakers
+
+	       For this, we should:
+
+	           2.1) Go through poolStorage.stakers
+
+	           2.2) Increase balance - stakerAccount.balance += totalStakerPowerPercentage * restOfFees
+
+	*/
+
 }
 
 func ExecuteTransaction(tx *structures.Transaction) {
