@@ -7,6 +7,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+var FEES_COLLECTOR uint = 0
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
@@ -390,7 +393,17 @@ func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee uint64) {
 	// Stub
 }
 
-func ExecuteTransaction(tx *structures.Transaction) {}
+func ExecuteTransaction(tx *structures.Transaction) {
+
+	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
+
+		// totalSpend := tx.Fee + tx.Amount
+
+		// FEES_COLLECTOR += tx.Fee
+
+	}
+
+}
 
 /*
 The following 3 functions are responsible of final sequence alignment before we finish
