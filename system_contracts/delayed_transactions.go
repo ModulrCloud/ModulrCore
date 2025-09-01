@@ -7,6 +7,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
 type DelayedTxExecutorFunction = func(map[string]string, string) bool
@@ -30,11 +31,11 @@ func removeFromSlice[T comparable](s []T, v T) []T {
 func CreateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
-	percentage, _ := strconv.Atoi(delayedTransaction["percentage"])
+	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	poolURL := delayedTransaction["poolURL"]
 	wssPoolURL := delayedTransaction["wssPoolURL"]
 
-	if poolURL != "" && wssPoolURL != "" && percentage >= 0 && percentage <= 100 {
+	if poolURL != "" && wssPoolURL != "" && percentage <= 100 {
 
 		storageKey := creator + "(POOL)_STORAGE_POOL"
 
@@ -65,11 +66,11 @@ func CreateStakingPool(delayedTransaction map[string]string, context string) boo
 func UpdateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
-	percentage, err1 := strconv.Atoi(delayedTransaction["percentage"])
+	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	poolURL := delayedTransaction["poolURL"]
 	wssPoolURL := delayedTransaction["wssPoolURL"]
 
-	if err1 != nil || percentage < 0 || percentage > 100 || poolURL == "" || wssPoolURL == "" {
+	if percentage > 100 || poolURL == "" || wssPoolURL == "" {
 
 		return false
 

@@ -115,6 +115,14 @@ func (qw *QuorumWaiter) sendMessages(targets []string, msg []byte, wsConnMap map
 
 }
 
+func StrToUint8(s string) uint8 {
+	v, err := strconv.ParseUint(s, 10, 8)
+	if err != nil {
+		return 0
+	}
+	return uint8(v)
+}
+
 func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))

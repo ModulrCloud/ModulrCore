@@ -30,7 +30,7 @@ type Staker struct {
 
 type PoolStorage struct {
 	Pubkey      string            `json:"pubkey"`
-	Percentage  int               `json:"percentage"`
+	Percentage  uint8             `json:"percentage"`
 	TotalStaked uint64            `json:"totalStaked"`
 	Stakers     map[string]Staker `json:"stakers"`
 	PoolUrl     string            `json:"poolURL"`

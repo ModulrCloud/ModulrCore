@@ -396,7 +396,7 @@ func ExecuteBlock(block *block.Block) {
 
 }
 
-func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee uint64) {
+func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string, totalFee uint64) {
 
 	/*
 
@@ -428,6 +428,34 @@ func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee uint64) {
 	           2.2) Increase balance - stakerAccount.balance += totalStakerPowerPercentage * restOfFees
 
 	*/
+
+	blockCreatorStorage := GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
+
+	blockCreatorAccount := GetAccountFromExecThreadState(blockCreatorPubkey)
+
+	// 1. Transfer part of fees to account with pubkey associated with block creator
+
+	rewardForBlockCreator := uint64(blockCreatorStorage.Percentage) * FEES_COLLECTOR
+
+	blockCreatorAccount.Balance += rewardForBlockCreator
+
+	// 2. Share the rest of fees among stakers due to their % part in total pool stake
+
+	feesToShareAmongStakers := FEES_COLLECTOR - rewardForBlockCreator
+
+	for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
+
+		stakerReward := (stakerData.Stake / blockCreatorStorage.TotalStaked) * feesToShareAmongStakers
+
+		stakerAccount := GetAccountFromExecThreadState(stakerPubkey)
+
+		stakerAccount.Balance += stakerReward
+
+	}
+
+	// 3. Finally - nullify the global counter
+
+	FEES_COLLECTOR = 0
 
 }
 
