@@ -14,15 +14,16 @@ type Transaction struct {
 	From    string         `json:"from"`
 	To      string         `json:"to"`
 	Amount  uint64         `json:"amount"`
-	Fee     string         `json:"fee"`
+	Fee     uint64         `json:"fee"`
 	Sig     string         `json:"sig"`
-	Nonce   int            `json:"nonce"`
+	Nonce   uint64         `json:"nonce"`
 	Payload map[string]any `json:"payload"`
 }
 
 func (t Transaction) Hash() string {
 
 	payloadJSON, err := json.Marshal(t.Payload)
+
 	if err != nil {
 		return ""
 	}
@@ -32,13 +33,12 @@ func (t Transaction) Hash() string {
 		t.From +
 		t.To +
 		strconv.FormatUint(t.Amount, 10) +
-		t.Fee +
+		strconv.FormatUint(t.Fee, 10) +
 		t.Sig +
-		strconv.Itoa(t.Nonce) +
+		strconv.FormatUint(uint64(t.Nonce), 10) +
 		string(payloadJSON)
 
 	blake3Hash := blake3.Sum256([]byte(data))
 
 	return hex.EncodeToString(blake3Hash[:])
-
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var FEES_COLLECTOR uint = 0
+var FEES_COLLECTOR uint64 = 0
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
@@ -51,7 +51,11 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 	data, err := globals.STATE.Get([]byte(accountId), nil)
 
 	if err != nil {
-		return nil
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
 	}
 
 	var account structures.Account
@@ -59,7 +63,11 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 	err = json.Unmarshal(data, &account)
 
 	if err != nil {
-		return nil
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
 	}
 
 	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
@@ -397,9 +405,21 @@ func ExecuteTransaction(tx *structures.Transaction) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
-		// totalSpend := tx.Fee + tx.Amount
+		accountFrom := GetAccountFromExecThreadState(tx.From)
 
-		// FEES_COLLECTOR += tx.Fee
+		accountTo := GetAccountFromExecThreadState(tx.To)
+
+		totalSpend := tx.Fee + tx.Amount
+
+		if accountFrom.Balance >= totalSpend && tx.Nonce == accountFrom.Nonce+1 {
+
+			accountFrom.Balance -= totalSpend
+
+			accountTo.Balance += totalSpend
+
+			FEES_COLLECTOR += tx.Fee
+
+		}
 
 	}
 
