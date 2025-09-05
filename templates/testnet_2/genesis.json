@@ -8,8 +8,8 @@
             
     "NETWORK_PARAMETERS":{
 
-        "VALIDATOR_STAKE":"50000000000000000000000",
-        "MINIMAL_STAKE_PER_ENTITY":"20000000000000000000",
+        "VALIDATOR_STAKE":50000000000,
+        "MINIMAL_STAKE_PER_ENTITY":2000000000,
         "QUORUM_SIZE":127,
         "EPOCH_TIME":86400000,
         "LEADERSHIP_TIMEFRAME":120000,
@@ -19,65 +19,60 @@
     
     },
 
-    
-    "POOLS":{
-
-        "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK":{
-        
-            "percentage":50,
-            "totalStaked":"55000000000000000000000",
-            "stakers":{
-                "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK":{
-                    "stake":"55000000000000000000000"
+   
+    "POOLS": [
+        {
+            "pubkey": "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R",
+            "percentage": 50,
+            "totalStaked": 50000000000,
+            "stakers": {
+                "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R": {
+                    "stake": 50000000000
                 }
             },
-            "poolURL":"http://localhost:7332",
-            "wssPoolURL":"ws://localhost:9999"
-        
+            "poolURL": "http://localhost:7335",
+            "wssPoolURL": "ws://localhost:9996"
         },
-
-        "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE":{
-        
-            "percentage":50,
-            "totalStaked":"55000000000000000000000",
-            "stakers":{
-                "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE":{
-                    "stake": "55000000000000000000000"
+        {
+            "pubkey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+            "percentage": 50,
+            "totalStaked": 50000000000,
+            "stakers": {
+                "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": {
+                    "stake": 50000000000
                 }
             },
-            "poolURL":"http://localhost:7333",
-            "wssPoolURL":"ws://localhost:9998"
-        
+            "poolURL": "http://localhost:7333",
+            "wssPoolURL": "ws://localhost:9998"
         }
-
-    },
+    ],
     
     "STATE":{
 
         "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK":{
         
-            "balance":20000000,
+            "balance":20000000000,
             "nonce":0
         },
 
         "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE":{
         
-            "balance":20000000,
+            "balance":20000000000,
             "nonce":0
         },
         "GUbYLN5NqmRocMBHqS183r2FQRoUjhx1p5nKyyUBpntQ":{
             
-            "balance":20000000,
+            "balance":20000000000,
             "nonce":0
         },
         "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R":{
             
-            "balance":20000000,
+            "balance":20000000000,
             "nonce":0
         },
         "EGU4u3Anwahbtbx8F1ZZgFQSg2u49EkrkqMERT9r3q1o":{
             
-            "balance":20000000,
+            "balance":20000000000,
             "nonce":0
         }
 
