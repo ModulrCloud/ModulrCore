@@ -91,3 +91,8 @@ This version may contains the bugs, so to restart the network you should:
 2. Delete the `DATABASES` directory in `$CHAINDATA_PATH`
 3. Update the `FIRST_EPOCH_START_TIMESTAMP` with a new value (just run the `time_update.py` again)
 4. Run binary again
+
+
+# Netspawner usage
+
+See https://github.com/ModulrCloud/NetSpawner
