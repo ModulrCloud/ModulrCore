@@ -80,7 +80,7 @@ func AcceptTransaction(ctx *fasthttp.RequestCtx) {
 
 	}
 
-	if transaction.Creator == "" || transaction.Nonce == 0 || transaction.Sig == "" {
+	if transaction.From == "" || transaction.Nonce == 0 || transaction.Sig == "" {
 
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.Write([]byte(`{"err":"Event structure is wrong"}`))

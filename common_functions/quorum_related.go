@@ -1,10 +1,15 @@
 package common_functions
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
-	"math/big"
+	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
+	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -12,7 +17,92 @@ import (
 
 type ValidatorData struct {
 	ValidatorPubKey string
-	TotalStake      *big.Int
+	TotalStake      uint64
+}
+
+func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *block.Block {
+
+	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
+
+	blockAsBytes, err := globals.BLOCKS.Get([]byte(blockID), nil)
+
+	if err == nil {
+
+		var blockParsed *block.Block
+
+		err = json.Unmarshal(blockAsBytes, &blockParsed)
+
+		if err == nil {
+			return blockParsed
+		}
+
+	}
+
+	// Find from other nodes
+
+	quorumUrlsAndPubkeys := GetQuorumUrlsAndPubkeys(epochHandler)
+
+	var quorumUrls []string
+
+	for _, quorumMember := range quorumUrlsAndPubkeys {
+
+		quorumUrls = append(quorumUrls, quorumMember.Url)
+
+	}
+
+	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
+
+	resultChan := make(chan *block.Block, len(allKnownNodes))
+	var wg sync.WaitGroup
+
+	for _, node := range allKnownNodes {
+
+		if node == globals.CONFIGURATION.MyHostname {
+			continue
+		}
+
+		wg.Add(1)
+		go func(endpoint string) {
+
+			defer wg.Done()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			url := endpoint + "/block/" + blockID
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				return
+			}
+			defer resp.Body.Close()
+
+			var block block.Block
+
+			if err := json.NewDecoder(resp.Body).Decode(&block); err == nil {
+				resultChan <- &block
+			}
+
+		}(node)
+
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for block := range resultChan {
+		if block != nil {
+			return block
+		}
+	}
+
+	return nil
 }
 
 func GetFromApprovementThreadState(poolId string) *structures.PoolStorage {
@@ -46,71 +136,73 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 	epochHandler.LeadersSequence = []string{} // [pool0, pool1,...poolN]
 
 	// Hash of metadata from the old epoch
-
 	hashOfMetadataFromOldEpoch := utils.Blake3(epochSeed)
 
 	// Change order of validators pseudo-randomly
+	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
 
-	validatorsExtendedData := make(map[string]ValidatorData)
-
-	var totalStakeSum *big.Int = big.NewInt(0)
+	var totalStakeSum uint64 = 0
 
 	// Populate validator data and calculate total stake sum
-
-	for validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
 		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
 
 		// Calculate total stake
+		totalStakeByThisValidator := validatorData.TotalStaked
 
-		totalStakeByThisValidator := new(big.Int)
+		totalStakeSum += totalStakeByThisValidator
 
-		totalStakeByThisValidator.Add(totalStakeByThisValidator, validatorData.TotalStaked.Int)
-
-		totalStakeSum.Add(totalStakeSum, totalStakeByThisValidator)
-
-		validatorsExtendedData[validatorPubKey] = ValidatorData{validatorPubKey, totalStakeByThisValidator}
-
+		validatorsExtendedData = append(validatorsExtendedData, ValidatorData{
+			ValidatorPubKey: validatorPubKey,
+			TotalStake:      totalStakeByThisValidator,
+		})
 	}
 
 	// Iterate over the poolsRegistry and pseudo-randomly choose leaders
+	for i := 0; i < len(epochHandler.PoolsRegistry); i++ {
 
-	for i := range len(epochHandler.PoolsRegistry) {
-
-		cumulativeSum := big.NewInt(0)
+		cumulativeSum := uint64(0)
 
 		// Generate deterministic random value using the hash of metadata
 		hashInput := hashOfMetadataFromOldEpoch + "_" + strconv.Itoa(i)
-
-		deterministicRandomValue := new(big.Int)
-
-		deterministicRandomValue.SetString(utils.Blake3(hashInput), 16)
-
-		deterministicRandomValue.Mod(deterministicRandomValue, totalStakeSum)
-
-		// Find the validator based on the random value
-		for validatorPubKey, validator := range validatorsExtendedData {
-
-			cumulativeSum.Add(cumulativeSum, validator.TotalStake)
-
-			if deterministicRandomValue.Cmp(cumulativeSum) <= 0 {
-
-				// Add the chosen validator to the leaders sequence
-				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validatorPubKey)
-
-				// Update totalStakeSum and remove the chosen validator from the map
-				totalStakeSum.Sub(totalStakeSum, validator.TotalStake)
-
-				delete(validatorsExtendedData, validatorPubKey)
-
-				break
-
+		hashHex := utils.Blake3(hashInput)
+		var deterministicRandomValue uint64
+		if len(hashHex) >= 16 {
+			if b, err := hex.DecodeString(hashHex[:16]); err == nil {
+				for _, by := range b {
+					deterministicRandomValue = (deterministicRandomValue << 8) | uint64(by)
+				}
 			}
-
+		}
+		if totalStakeSum > 0 {
+			deterministicRandomValue = deterministicRandomValue % totalStakeSum
 		}
 
-	}
+		// Find the validator based on the random value
+		for idx, validator := range validatorsExtendedData {
 
+			cumulativeSum += validator.TotalStake
+
+			if deterministicRandomValue <= cumulativeSum {
+
+				// Add the chosen validator to the leaders sequence
+				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validator.ValidatorPubKey)
+
+				// Update totalStakeSum and remove the chosen validator from the list
+
+				if validator.TotalStake <= totalStakeSum {
+					totalStakeSum -= validator.TotalStake
+				} else {
+					totalStakeSum = 0
+				}
+
+				validatorsExtendedData = append(validatorsExtendedData[:idx], validatorsExtendedData[idx+1:]...)
+
+				break
+			}
+		}
+	}
 }
 
 func GetQuorumMajority(epochHandler *structures.EpochDataHandler) int {
@@ -150,73 +242,97 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 
 	if totalNumberOfValidators <= quorumSize {
 
-		futureQuorum := make([]string, 0, len(epochHandler.PoolsRegistry))
+		futureQuorum := make([]string, len(epochHandler.PoolsRegistry))
 
-		for validatorPubkey := range epochHandler.PoolsRegistry {
-
-			futureQuorum = append(futureQuorum, validatorPubkey)
-		}
+		copy(futureQuorum, epochHandler.PoolsRegistry)
 
 		return futureQuorum
-
 	}
 
 	quorum := []string{}
 
+	// Blake3 hash of epoch metadata (hex string)
 	hashOfMetadataFromEpoch := utils.Blake3(newEpochSeed)
 
-	validatorsExtendedData := make(map[string]ValidatorData)
+	// Collect validator data and total stake (uint64)
+	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
 
-	totalStakeSum := big.NewInt(0)
+	var totalStakeSum uint64 = 0
 
-	for validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
 		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
 
-		totalStakeByThisValidator := new(big.Int)
+		totalStakeByThisValidator := validatorData.TotalStaked // uint64
 
-		totalStakeByThisValidator.Add(totalStakeByThisValidator, validatorData.TotalStaked.Int)
+		totalStakeSum += totalStakeByThisValidator
 
-		validatorsExtendedData[validatorPubKey] = ValidatorData{
+		validatorsExtendedData = append(validatorsExtendedData, ValidatorData{
 			ValidatorPubKey: validatorPubKey,
 			TotalStake:      totalStakeByThisValidator,
-		}
-
-		totalStakeSum.Add(totalStakeSum, totalStakeByThisValidator)
+		})
 	}
 
-	for i := range quorumSize {
+	// If total stake is zero, no weighted choice is possible
 
-		cumulativeSum := big.NewInt(0)
+	if totalStakeSum == 0 {
+		return quorum
+	}
 
+	// Draw 'quorumSize' validators without replacement
+	for i := 0; i < quorumSize && len(validatorsExtendedData) > 0; i++ {
+
+		// Deterministic "random": Blake3(hash || "_" || i) -> uint64
 		hashInput := hashOfMetadataFromEpoch + "_" + strconv.Itoa(i)
+		hashHex := utils.Blake3(hashInput) // hex string
 
-		deterministicRandomValue := new(big.Int)
+		// Take the first 8 bytes (16 hex chars) -> uint64 BigEndian
+		var r uint64 = 0
 
-		deterministicRandomValue.SetString(utils.Blake3(hashInput), 16)
+		if len(hashHex) >= 16 {
+			if b, err := hex.DecodeString(hashHex[:16]); err == nil {
+				for _, by := range b {
+					r = (r << 8) | uint64(by)
+				}
+			}
+		}
 
-		deterministicRandomValue.Mod(deterministicRandomValue, totalStakeSum)
+		// Reduce into [0, totalStakeSum-1]
+		if totalStakeSum > 0 {
+			r = r % totalStakeSum
+		} else {
+			r = 0
+		}
 
-		for validatorPubKey, validator := range validatorsExtendedData {
+		// Iterate over current validators and pick the one that hits the interval
+		var cumulativeSum uint64 = 0
 
-			cumulativeSum.Add(cumulativeSum, validator.TotalStake)
+		for idx, validator := range validatorsExtendedData {
 
-			if deterministicRandomValue.Cmp(cumulativeSum) <= 0 {
+			cumulativeSum += validator.TotalStake
 
-				quorum = append(quorum, validatorPubKey)
+			// Preserve original logic: choose when r <= cumulativeSum
+			if r <= cumulativeSum {
+				// Add chosen validator
+				quorum = append(quorum, validator.ValidatorPubKey)
 
-				totalStakeSum.Sub(totalStakeSum, validator.TotalStake)
-
-				delete(validatorsExtendedData, validatorPubKey)
-
+				// Update total stake and remove chosen one (draw without replacement)
+				if validator.TotalStake <= totalStakeSum {
+					totalStakeSum -= validator.TotalStake
+				} else {
+					totalStakeSum = 0
+				}
+				validatorsExtendedData = append(validatorsExtendedData[:idx], validatorsExtendedData[idx+1:]...)
 				break
-
 			}
 
 		}
 
+		// If total stake became zero, no further weighted draws are possible
+		if totalStakeSum == 0 || len(validatorsExtendedData) == 0 {
+			break
+		}
 	}
 
 	return quorum
-
 }

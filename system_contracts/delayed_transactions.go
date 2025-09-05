@@ -1,15 +1,16 @@
 package system_contracts
 
 import (
-	"math/big"
+	"slices"
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
-type DelayedTxExecutorFunction = func(map[string]string) bool
+type DelayedTxExecutorFunction = func(map[string]string, string) bool
 
 var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"createStakingPool": CreateStakingPool,
@@ -18,14 +19,23 @@ var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"unstake":           Unstake,
 }
 
-func CreateStakingPool(delayedTransaction map[string]string) bool {
+func removeFromSlice[T comparable](s []T, v T) []T {
+	for i, x := range s {
+		if x == v {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
+}
+
+func CreateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
-	percentage, _ := strconv.Atoi(delayedTransaction["percentage"])
+	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	poolURL := delayedTransaction["poolURL"]
 	wssPoolURL := delayedTransaction["wssPoolURL"]
 
-	if poolURL != "" && wssPoolURL != "" && percentage >= 0 && percentage <= 100 {
+	if poolURL != "" && wssPoolURL != "" && percentage <= 100 {
 
 		storageKey := creator + "(POOL)_STORAGE_POOL"
 
@@ -37,10 +47,10 @@ func CreateStakingPool(delayedTransaction map[string]string) bool {
 
 		globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[storageKey] = &structures.PoolStorage{
 			Percentage:  percentage,
-			TotalStaked: structures.BigInt{Int: big.NewInt(0)},
+			TotalStaked: 0,
 			Stakers: map[string]structures.Staker{
 				creator: {
-					Stake: structures.BigInt{Int: big.NewInt(0)},
+					Stake: 0,
 				},
 			},
 			PoolUrl:    poolURL,
@@ -53,14 +63,14 @@ func CreateStakingPool(delayedTransaction map[string]string) bool {
 	return false
 }
 
-func UpdateStakingPool(delayedTransaction map[string]string) bool {
+func UpdateStakingPool(delayedTransaction map[string]string, context string) bool {
 
 	creator := delayedTransaction["creator"]
-	percentage, err1 := strconv.Atoi(delayedTransaction["percentage"])
+	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	poolURL := delayedTransaction["poolURL"]
 	wssPoolURL := delayedTransaction["wssPoolURL"]
 
-	if err1 != nil || percentage < 0 || percentage > 100 || poolURL == "" || wssPoolURL == "" {
+	if percentage > 100 || poolURL == "" || wssPoolURL == "" {
 
 		return false
 
@@ -71,15 +81,27 @@ func UpdateStakingPool(delayedTransaction map[string]string) bool {
 	if poolStorage != nil {
 
 		poolStorage.Percentage = percentage
+
 		poolStorage.PoolUrl = poolURL
+
 		poolStorage.WssPoolUrl = wssPoolURL
 
 		requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
 
-		if poolStorage.TotalStaked.Int.Cmp(requiredStake.Int) >= 0 {
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[creator] = struct{}{}
+		if poolStorage.TotalStaked >= requiredStake {
+
+			if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator) {
+
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = append(
+
+					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator,
+				)
+			}
+
 		} else {
-			delete(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator)
+
+			removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator)
+
 		}
 
 		globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
@@ -92,13 +114,13 @@ func UpdateStakingPool(delayedTransaction map[string]string) bool {
 
 }
 
-func Stake(delayedTransaction map[string]string) bool {
+func Stake(delayedTransaction map[string]string, context string) bool {
 
 	staker := delayedTransaction["staker"]
 	poolPubKey := delayedTransaction["poolPubKey"]
-	amount, ok := new(big.Int).SetString(delayedTransaction["amount"], 10)
+	amount, err := strconv.ParseUint(delayedTransaction["amount"], 10, 64)
 
-	if !ok {
+	if err != nil {
 
 		return false
 
@@ -110,7 +132,7 @@ func Stake(delayedTransaction map[string]string) bool {
 
 		minStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerEntity
 
-		if amount.Cmp(minStake.Int) < 0 {
+		if amount < minStake {
 
 			return false
 
@@ -120,23 +142,28 @@ func Stake(delayedTransaction map[string]string) bool {
 
 			poolStorage.Stakers[staker] = structures.Staker{
 
-				Stake: structures.BigInt{Int: big.NewInt(0)},
+				Stake: 0,
 			}
 
 		}
 
 		stakerData := poolStorage.Stakers[staker]
-		stakerData.Stake = structures.BigInt{Int: new(big.Int).Add(stakerData.Stake.Int, amount)}
-		poolStorage.TotalStaked = structures.BigInt{Int: new(big.Int).Add(poolStorage.TotalStaked.Int, amount)}
+
+		stakerData.Stake += amount
+
+		poolStorage.TotalStaked += amount
+
 		poolStorage.Stakers[staker] = stakerData
 
 		requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
 
-		if poolStorage.TotalStaked.Cmp(requiredStake.Int) >= 0 {
+		if poolStorage.TotalStaked >= requiredStake {
 
-			if _, exists := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[poolPubKey]; !exists {
+			if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey) {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry[poolPubKey] = struct{}{}
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = append(
+					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey,
+				)
 
 			}
 
@@ -150,13 +177,13 @@ func Stake(delayedTransaction map[string]string) bool {
 
 }
 
-func Unstake(delayedTransaction map[string]string) bool {
+func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	unstaker := delayedTransaction["unstaker"]
 	poolPubKey := delayedTransaction["poolPubKey"]
-	amount, ok := new(big.Int).SetString(delayedTransaction["amount"], 10)
+	amount, err := strconv.ParseUint(delayedTransaction["amount"], 10, 64)
 
-	if !ok {
+	if err != nil {
 
 		return false
 
@@ -174,19 +201,19 @@ func Unstake(delayedTransaction map[string]string) bool {
 
 		}
 
-		if stakerData.Stake.Cmp(amount) < 0 {
+		if stakerData.Stake < amount {
 
 			return false
 
 		}
 
-		stakerData.Stake.Sub(stakerData.Stake.Int, amount)
+		stakerData.Stake -= amount
 
-		poolStorage.TotalStaked.Sub(poolStorage.TotalStaked.Int, amount)
+		poolStorage.TotalStaked -= amount
 
-		if stakerData.Stake.Cmp(big.NewInt(0)) == 0 {
+		if stakerData.Stake == 0 {
 
-			delete(poolStorage.Stakers, unstaker)
+			delete(poolStorage.Stakers, unstaker) // no sense to store staker with 0 balance in stakers list
 
 		} else {
 
@@ -196,9 +223,9 @@ func Unstake(delayedTransaction map[string]string) bool {
 
 		requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
 
-		if poolStorage.TotalStaked.Cmp(requiredStake.Int) < 0 {
+		if poolStorage.TotalStaked < requiredStake {
 
-			delete(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
+			removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
 
 		}
 

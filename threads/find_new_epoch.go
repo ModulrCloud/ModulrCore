@@ -1,4 +1,4 @@
-package life
+package threads
 
 import (
 	"context"
@@ -28,7 +28,7 @@ type FirstBlockDataWithAefp struct {
 
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
 
-func ExecuteDelayedTransaction(delayedTransaction map[string]string) {
+func ExecuteDelayedTransaction(delayedTransaction map[string]string, context string) {
 
 	if delayedTxType, ok := delayedTransaction["type"]; ok {
 
@@ -36,7 +36,7 @@ func ExecuteDelayedTransaction(delayedTransaction map[string]string) {
 
 		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
 
-			funcHandler(delayedTransaction)
+			funcHandler(delayedTransaction, context)
 
 		}
 
@@ -274,10 +274,11 @@ func EpochRotationThread() {
 
 						delayedTransactionsOrderByPriority := append(daoVotingContractCalls, allTheRestContractCalls...)
 
-						// Execute delayed transactions
+						// Execute delayed transactions (in context of approvement thread)
+
 						for _, delayedTransaction := range delayedTransactionsOrderByPriority {
 
-							ExecuteDelayedTransaction(delayedTransaction)
+							ExecuteDelayedTransaction(delayedTransaction, "APPROVEMENT_THREAD")
 
 						}
 

@@ -63,20 +63,6 @@ type CurrentLeaderData struct {
 	Url        string
 }
 
-func SignalAboutEpochRotationExists(epochIndex int) bool {
-
-	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
-
-	if readyToChangeEpochRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
-
-		return true
-
-	}
-
-	return false
-
-}
-
 func openWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 
 	u, err := url.Parse(globals.CONFIGURATION.PointOfDistributionWS)
@@ -91,6 +77,64 @@ func openWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+func (qw *QuorumWaiter) sendMessages(targets []string, msg []byte, wsConnMap map[string]*websocket.Conn) {
+
+	for _, id := range targets {
+
+		conn, ok := wsConnMap[id]
+
+		if !ok {
+			continue
+		}
+
+		go func(id string, c *websocket.Conn) {
+
+			if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
+				return
+			}
+
+			_ = c.SetReadDeadline(time.Now().Add(time.Second))
+			_, raw, err := c.ReadMessage()
+
+			if err == nil {
+
+				select {
+
+				case qw.responseCh <- QuorumResponse{id: id, msg: raw}:
+				case <-qw.done:
+
+				}
+
+			}
+
+		}(id, conn)
+
+	}
+
+}
+
+func StrToUint8(s string) uint8 {
+	v, err := strconv.ParseUint(s, 10, 8)
+	if err != nil {
+		return 0
+	}
+	return uint8(v)
+}
+
+func SignalAboutEpochRotationExists(epochIndex int) bool {
+
+	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
+
+	if readyToChangeEpochRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
+
+		return true
+
+	}
+
+	return false
+
 }
 
 func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
@@ -210,42 +254,6 @@ func NewQuorumWaiter(maxQuorumSize int) *QuorumWaiter {
 		timer:      time.NewTimer(0),
 		buf:        make([]string, 0, maxQuorumSize),
 	}
-}
-
-func (qw *QuorumWaiter) sendMessages(targets []string, msg []byte, wsConnMap map[string]*websocket.Conn) {
-
-	for _, id := range targets {
-
-		conn, ok := wsConnMap[id]
-
-		if !ok {
-			continue
-		}
-
-		go func(id string, c *websocket.Conn) {
-
-			if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
-				return
-			}
-
-			_ = c.SetReadDeadline(time.Now().Add(time.Second))
-			_, raw, err := c.ReadMessage()
-
-			if err == nil {
-
-				select {
-
-				case qw.responseCh <- QuorumResponse{id: id, msg: raw}:
-				case <-qw.done:
-
-				}
-
-			}
-
-		}(id, conn)
-
-	}
-
 }
 
 func (qw *QuorumWaiter) SendAndWait(

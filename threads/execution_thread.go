@@ -1,4 +1,4 @@
-package life
+package threads
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+var FEES_COLLECTOR uint64 = 0
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
@@ -36,6 +39,66 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 	}
 
 	return &response
+
+}
+
+func GetAccountFromExecThreadState(accountId string) *structures.Account {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(accountId), nil)
+
+	if err != nil {
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
+	}
+
+	var account structures.Account
+
+	err = json.Unmarshal(data, &account)
+
+	if err != nil {
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
+
+	return &account
+
+}
+
+func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(poolId), nil)
+
+	if err != nil {
+		return nil
+	}
+
+	var poolStorage structures.PoolStorage
+
+	err = json.Unmarshal(data, &poolStorage)
+
+	if err != nil {
+		return nil
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
+
+	return &poolStorage
 
 }
 
@@ -261,9 +324,9 @@ func ExecuteBlock(block *block.Block) {
 
 		*/
 
-		DistributeFeesAmongStakersAndPool(block.Creator, structures.BigInt{})
+		DistributeFeesAmongStakersAndPool(block.Creator, 0)
 
-		for accountID, accountData := range epochHandlerRef.Cache {
+		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
 
@@ -272,6 +335,20 @@ func ExecuteBlock(block *block.Block) {
 			} else {
 
 				panic("Impossible to add new account data to atomic batch")
+
+			}
+
+		}
+
+		for poolID, poolStorage := range epochHandlerRef.PoolsCache {
+
+			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+
+				stateBatch.Put([]byte(poolID), dataBytes)
+
+			} else {
+
+				panic("Impossible to add pool data to atomic batch")
 
 			}
 
@@ -319,12 +396,92 @@ func ExecuteBlock(block *block.Block) {
 
 }
 
-func DistributeFeesAmongStakersAndPool(blockCreator string, totalFee structures.BigInt) {
+func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string, totalFee uint64) {
 
-	// Stub
+	/*
+
+	   _____________________Here we perform the following logic_____________________
+
+	   [*] FEES_COLLECTOR - number of total fees received in this block
+
+	   1) Get the pool storage to extract list of stakers
+
+	   2) In this list (poolStorage.stakers) we have structure like:
+
+	       {
+	           poolCreatorPubkey:{stake},
+	           ...
+	           stakerPubkey:{stake}
+	           ...
+	       }
+
+	   3) Send <stakingPoolStorage.percentage * FEES_COLLECTOR> to block creator:
+
+	       poolCreatorAccount.balance += stakingPoolStorage.percentage * FEES_COLLECTOR
+
+	   2) Distribute the rest among other stakers
+
+	       For this, we should:
+
+	           2.1) Go through poolStorage.stakers
+
+	           2.2) Increase balance - stakerAccount.balance += totalStakerPowerPercentage * restOfFees
+
+	*/
+
+	blockCreatorStorage := GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
+
+	blockCreatorAccount := GetAccountFromExecThreadState(blockCreatorPubkey)
+
+	// 1. Transfer part of fees to account with pubkey associated with block creator
+
+	rewardForBlockCreator := uint64(blockCreatorStorage.Percentage) * FEES_COLLECTOR
+
+	blockCreatorAccount.Balance += rewardForBlockCreator
+
+	// 2. Share the rest of fees among stakers due to their % part in total pool stake
+
+	feesToShareAmongStakers := FEES_COLLECTOR - rewardForBlockCreator
+
+	for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
+
+		stakerReward := (stakerData.Stake / blockCreatorStorage.TotalStaked) * feesToShareAmongStakers
+
+		stakerAccount := GetAccountFromExecThreadState(stakerPubkey)
+
+		stakerAccount.Balance += stakerReward
+
+	}
+
+	// 3. Finally - nullify the global counter
+
+	FEES_COLLECTOR = 0
+
 }
 
-func ExecuteTransaction(tx *structures.Transaction) {}
+func ExecuteTransaction(tx *structures.Transaction) {
+
+	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
+
+		accountFrom := GetAccountFromExecThreadState(tx.From)
+
+		accountTo := GetAccountFromExecThreadState(tx.To)
+
+		totalSpend := tx.Fee + tx.Amount
+
+		if accountFrom.Balance >= totalSpend && tx.Nonce == accountFrom.Nonce+1 {
+
+			accountFrom.Balance -= totalSpend
+
+			accountTo.Balance += totalSpend
+
+			FEES_COLLECTOR += tx.Fee
+
+		}
+
+	}
+
+}
 
 /*
 The following 3 functions are responsible of final sequence alignment before we finish
@@ -566,7 +723,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		for _, delayedTx := range nextEpochData.DelayedTransactions {
 
-			ExecuteDelayedTransaction(delayedTx)
+			ExecuteDelayedTransaction(delayedTx, "EXECUTION_THREAD")
 
 		}
 
@@ -587,7 +744,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerPool)
 
-		for poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
+		for _, poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
 
 			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubkey] = structures.NewExecutionStatsTemplate()
 
@@ -604,7 +761,35 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerPool),
 		}
 
-		// TODO: Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
+		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
+
+		for accountID, accountData := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache {
+
+			if accountDataBytes, err := json.Marshal(accountData); err == nil {
+
+				dbBatch.Put([]byte(accountID), accountDataBytes)
+
+			} else {
+
+				panic("Impossible to add new account data to atomic batch")
+
+			}
+
+		}
+
+		for poolID, poolStorage := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache {
+
+			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+
+				dbBatch.Put([]byte(poolID), dataBytes)
+
+			} else {
+
+				panic("Impossible to add pool data to atomic batch")
+
+			}
+
+		}
 
 		if err := globals.STATE.Write(dbBatch, nil); err != nil {
 
@@ -613,6 +798,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		}
 
 		// Version check once new epoch started
+
 		if utils.IsMyCoreVersionOld(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler) {
 
 			utils.LogWithTime("New version detected on EXECUTION_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)

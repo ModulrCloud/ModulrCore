@@ -8,8 +8,8 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/life"
 	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/threads"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
 
@@ -24,28 +24,28 @@ func RunBlockchain() {
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
 	//✅ 1.Thread to find AEFPs and change the epoch for AT
-	go life.EpochRotationThread()
+	go threads.EpochRotationThread()
 
 	//✅ 2.Share our blocks within quorum members and get the finalization proofs
-	go life.BlocksSharingAndProofsGrabingThread()
+	go threads.BlocksSharingAndProofsGrabingThread()
 
 	//✅ 3.Thread to propose AEFPs to move to next epoch
-	go life.NewEpochProposerThread()
+	go threads.NewEpochProposerThread()
 
 	//✅ 4.Start to generate blocks
-	go life.BlocksGenerationThread()
+	go threads.BlocksGenerationThread()
 
 	//✅ 5.Start a separate thread to work with voting for blocks in a sync way (for security)
-	go life.LeaderRotationThread()
+	go threads.LeaderRotationThread()
 
 	//✅ 6.Logical thread to build the temporary sequence of blocks to verify them
-	//go life.SequenceAlignmentThread()
+	//go threads.SequenceAlignmentThread()
 
 	//✅ 7.Start execution process - take blocks and execute transactions
-	//go life.ExecutionThread()
+	//go threads.ExecutionThread()
 
 	//✅ 8.This thread will be responsible to find the first block in each epoch
-	go life.FirstBlockInEpochMonitor()
+	go threads.FirstBlockInEpochMonitor()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
@@ -151,9 +151,15 @@ func prepareBlockchain() {
 
 		if err := json.Unmarshal(data, &etHandler); err == nil {
 
-			if etHandler.Cache == nil {
+			if etHandler.AccountsCache == nil {
 
-				etHandler.Cache = make(map[string]*structures.Account)
+				etHandler.AccountsCache = make(map[string]*structures.Account)
+
+			}
+
+			if etHandler.PoolsCache == nil {
+
+				etHandler.PoolsCache = make(map[string]*structures.PoolStorage)
 
 			}
 
@@ -218,27 +224,47 @@ func setGenesisToState() error {
 
 	approvementThreadBatch := new(leveldb.Batch)
 
+	execThreadBatch := new(leveldb.Batch)
+
 	epochTimestamp := globals.GENESIS.FirstEpochStartTimestamp
 
-	poolsRegistryForEpochHandler := make(map[string]struct{})
+	poolsRegistryForEpochHandler := []string{}
 
-	poolsRegistryForEpochHandler2 := make(map[string]struct{})
+	poolsRegistryForEpochHandler2 := []string{}
 
-	// __________________________________ Load info about pools __________________________________
+	// __________________________________ Load info about accounts __________________________________
 
-	for poolPubKey, poolStorage := range globals.GENESIS.Pools {
+	for accountPubkey, accountData := range globals.GENESIS.State {
 
-		serialized, err := json.Marshal(poolStorage)
+		serialized, err := json.Marshal(accountData)
 
 		if err != nil {
 			return err
 		}
 
-		approvementThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serialized)
+		execThreadBatch.Put([]byte(accountPubkey), serialized)
 
-		poolsRegistryForEpochHandler[poolPubKey] = struct{}{}
+	}
 
-		poolsRegistryForEpochHandler2[poolPubKey] = struct{}{}
+	// __________________________________ Load info about pools __________________________________
+
+	for _, poolStorage := range globals.GENESIS.Pools {
+
+		poolPubKey := poolStorage.Pubkey
+
+		serializedStorage, err := json.Marshal(poolStorage)
+
+		if err != nil {
+			return err
+		}
+
+		approvementThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
+
+		execThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
+
+		poolsRegistryForEpochHandler = append(poolsRegistryForEpochHandler, poolPubKey)
+
+		poolsRegistryForEpochHandler2 = append(poolsRegistryForEpochHandler2, poolPubKey)
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubKey] = structures.NewExecutionStatsTemplate()
 
@@ -254,6 +280,10 @@ func setGenesisToState() error {
 
 	// Commit changes
 	if err := globals.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
+		return err
+	}
+
+	if err := globals.STATE.Write(execThreadBatch, nil); err != nil {
 		return err
 	}
 

@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ModulrCloud/ModulrCore/structures"
-
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -92,7 +91,8 @@ var EXECUTION_THREAD_METADATA_HANDLER = struct {
 }{
 	Handler: structures.ExecutionThreadMetadataHandler{
 		CoreMajorVersion: -1,
-		Cache:            make(map[string]*structures.Account),
+		AccountsCache:    make(map[string]*structures.Account),
+		PoolsCache:       make(map[string]*structures.PoolStorage),
 		LastHeight:       -1,
 		ExecutionData:    make(map[string]structures.ExecutionStatsPerPool),
 		CurrentEpochAlignmentData: structures.AlignmentDataHandler{
@@ -108,4 +108,5 @@ var EXECUTION_THREAD_METADATA_HANDLER = struct {
 var BLOCKS, STATE, EPOCH_DATA, APPROVEMENT_THREAD_METADATA, FINALIZATION_VOTING_STATS *leveldb.DB
 
 // Flag to use in websocket & http routes to prevent flood of .RLock() calls on mutexes
+
 var FLOOD_PREVENTION_FLAG_FOR_ROUTES atomic.Bool
