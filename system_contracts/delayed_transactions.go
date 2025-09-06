@@ -123,41 +123,49 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	}
 
-	poolStorage := common_functions.GetFromApprovementThreadState(creator + "(POOL)_STORAGE_POOL")
+	poolId := creator + "(POOL)_STORAGE_POOL"
 
-	if poolStorage != nil {
+	if context == "AT" {
 
-		poolStorage.Percentage = percentage
+		poolStorage := common_functions.GetFromApprovementThreadState(poolId)
 
-		poolStorage.PoolUrl = poolURL
+		if poolStorage != nil {
 
-		poolStorage.WssPoolUrl = wssPoolURL
+			poolStorage.Percentage = percentage
 
-		requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
+			poolStorage.PoolUrl = poolURL
 
-		if poolStorage.TotalStaked >= requiredStake {
+			poolStorage.WssPoolUrl = wssPoolURL
 
-			if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator) {
+			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = append(
-
-					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator,
-				)
-			}
-
-		} else {
-
-			removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, creator)
+			return true
 
 		}
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
+		return false
 
-		return true
+	} else {
+
+		poolStorage := common_functions.GetPoolFromExecThreadState(poolId)
+
+		if poolStorage != nil {
+
+			poolStorage.Percentage = percentage
+
+			poolStorage.PoolUrl = poolURL
+
+			poolStorage.WssPoolUrl = wssPoolURL
+
+			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
+
+			return true
+
+		}
+
+		return false
 
 	}
-
-	return false
 
 }
 

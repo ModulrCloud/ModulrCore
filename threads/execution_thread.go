@@ -42,66 +42,6 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 }
 
-func GetAccountFromExecThreadState(accountId string) *structures.Account {
-
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
-		return val
-	}
-
-	data, err := globals.STATE.Get([]byte(accountId), nil)
-
-	if err != nil {
-
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
-
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
-
-	}
-
-	var account structures.Account
-
-	err = json.Unmarshal(data, &account)
-
-	if err != nil {
-
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
-
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
-
-	}
-
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
-
-	return &account
-
-}
-
-func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
-
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
-		return val
-	}
-
-	data, err := globals.STATE.Get([]byte(poolId), nil)
-
-	if err != nil {
-		return nil
-	}
-
-	var poolStorage structures.PoolStorage
-
-	err = json.Unmarshal(data, &poolStorage)
-
-	if err != nil {
-		return nil
-	}
-
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
-
-	return &poolStorage
-
-}
-
 func ExecutionThread() {
 
 	for {
@@ -429,9 +369,9 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string, totalFee uint6
 
 	*/
 
-	blockCreatorStorage := GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
+	blockCreatorStorage := common_functions.GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
 
-	blockCreatorAccount := GetAccountFromExecThreadState(blockCreatorPubkey)
+	blockCreatorAccount := common_functions.GetAccountFromExecThreadState(blockCreatorPubkey)
 
 	// 1. Transfer part of fees to account with pubkey associated with block creator
 
@@ -447,7 +387,7 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string, totalFee uint6
 
 		stakerReward := (stakerData.Stake / blockCreatorStorage.TotalStaked) * feesToShareAmongStakers
 
-		stakerAccount := GetAccountFromExecThreadState(stakerPubkey)
+		stakerAccount := common_functions.GetAccountFromExecThreadState(stakerPubkey)
 
 		stakerAccount.Balance += stakerReward
 
@@ -463,9 +403,9 @@ func ExecuteTransaction(tx *structures.Transaction) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
-		accountFrom := GetAccountFromExecThreadState(tx.From)
+		accountFrom := common_functions.GetAccountFromExecThreadState(tx.From)
 
-		accountTo := GetAccountFromExecThreadState(tx.To)
+		accountTo := common_functions.GetAccountFromExecThreadState(tx.To)
 
 		totalSpend := tx.Fee + tx.Amount
 

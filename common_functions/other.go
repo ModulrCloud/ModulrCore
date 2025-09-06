@@ -131,6 +131,66 @@ func GetFromApprovementThreadState(poolId string) *structures.PoolStorage {
 
 }
 
+func GetAccountFromExecThreadState(accountId string) *structures.Account {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(accountId), nil)
+
+	if err != nil {
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
+	}
+
+	var account structures.Account
+
+	err = json.Unmarshal(data, &account)
+
+	if err != nil {
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
+
+	return &account
+
+}
+
+func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
+
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
+		return val
+	}
+
+	data, err := globals.STATE.Get([]byte(poolId), nil)
+
+	if err != nil {
+		return nil
+	}
+
+	var poolStorage structures.PoolStorage
+
+	err = json.Unmarshal(data, &poolStorage)
+
+	if err != nil {
+		return nil
+	}
+
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
+
+	return &poolStorage
+
+}
+
 func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed string) {
 
 	epochHandler.LeadersSequence = []string{} // [pool0, pool1,...poolN]
