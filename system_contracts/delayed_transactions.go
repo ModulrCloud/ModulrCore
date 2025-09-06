@@ -39,25 +39,72 @@ func CreateStakingPool(delayedTransaction map[string]string, context string) boo
 
 		storageKey := creator + "(POOL)_STORAGE_POOL"
 
-		if _, exists := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[storageKey]; exists {
+		if context == "AT" {
+
+			if _, existsInCache := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[storageKey]; existsInCache {
+
+				return false
+
+			}
+
+			_, existErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(storageKey), nil)
+
+			// Activate this branch only in case we still don't have this validator in db
+
+			if existErr != nil {
+
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[storageKey] = &structures.PoolStorage{
+					Pubkey:      creator,
+					Percentage:  percentage,
+					TotalStaked: 0,
+					Stakers: map[string]structures.Staker{
+						creator: {
+							Stake: 0,
+						},
+					},
+					PoolUrl:    poolURL,
+					WssPoolUrl: wssPoolURL,
+				}
+
+				return true
+
+			}
+
+			return false
+
+		} else {
+
+			if _, existsInCache := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[storageKey]; existsInCache {
+
+				return false
+
+			}
+
+			_, existErr := globals.STATE.Get([]byte(storageKey), nil)
+
+			if existErr != nil {
+
+				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[storageKey] = &structures.PoolStorage{
+					Pubkey:      creator,
+					Percentage:  percentage,
+					TotalStaked: 0,
+					Stakers: map[string]structures.Staker{
+						creator: {
+							Stake: 0,
+						},
+					},
+					PoolUrl:    poolURL,
+					WssPoolUrl: wssPoolURL,
+				}
+
+				return true
+
+			}
 
 			return false
 
 		}
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[storageKey] = &structures.PoolStorage{
-			Percentage:  percentage,
-			TotalStaked: 0,
-			Stakers: map[string]structures.Staker{
-				creator: {
-					Stake: 0,
-				},
-			},
-			PoolUrl:    poolURL,
-			WssPoolUrl: wssPoolURL,
-		}
-
-		return true
 	}
 
 	return false
