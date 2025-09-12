@@ -264,7 +264,7 @@ func ExecuteBlock(block *block.Block) {
 
 		*/
 
-		DistributeFeesAmongStakersAndPool(block.Creator, 0)
+		DistributeFeesAmongStakersAndPool(block.Creator)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
@@ -336,7 +336,7 @@ func ExecuteBlock(block *block.Block) {
 
 }
 
-func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string, totalFee uint64) {
+func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
 
 	/*
 
