@@ -51,7 +51,7 @@ func FirstBlockInEpochMonitor() {
 
 			// Store the info about first block on current epoch in DB
 
-			serializedData, serialErr := json.Marshal(PIVOT)
+			serializedData, serialErr := json.Marshal(firstBlockData)
 
 			if serialErr == nil {
 

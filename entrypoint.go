@@ -273,9 +273,9 @@ func setGenesisToState() error {
 
 	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters = structures.CopyNetworkParameters(globals.GENESIS.NetworkParameters)
+	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters = structures.CopyNetworkParameters(globals.GENESIS.NetworkParameters)
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
 	// Commit changes
 	if err := globals.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {

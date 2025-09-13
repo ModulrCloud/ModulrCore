@@ -11,7 +11,7 @@ type NetworkParameters struct {
 	TxLimitPerBlock       uint   `json:"TXS_LIMIT_PER_BLOCK"`
 }
 
-func CopyNetworkParameters(src NetworkParameters) NetworkParameters {
+func (src *NetworkParameters) CopyNetworkParameters() NetworkParameters {
 	return NetworkParameters{
 		ValidatorStake:        src.ValidatorStake,
 		MinimalStakePerEntity: src.MinimalStakePerEntity,
