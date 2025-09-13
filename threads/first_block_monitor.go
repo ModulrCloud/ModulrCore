@@ -8,16 +8,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
 type PivotSearchData struct {
 	Position          int
 	PivotPubKey       string
-	FirstBlockByPivot *block.Block
+	FirstBlockByPivot *block_pack.Block
 	FirstBlockHash    string
 }
 
@@ -89,7 +89,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 	if PIVOT == nil {
 
-		allKnownNodes := common_functions.GetQuorumUrlsAndPubkeys(epochHandler)
+		allKnownNodes := utils.GetQuorumUrlsAndPubkeys(epochHandler)
 
 		var wg sync.WaitGroup
 
@@ -145,7 +145,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 			firstBlockCreator := epochHandler.LeadersSequence[prop.IndexOfFirstBlockCreator]
 
-			if common_functions.VerifyAggregatedFinalizationProof(&prop.AfpForSecondBlock, epochHandler) {
+			if utils.VerifyAggregatedFinalizationProof(&prop.AfpForSecondBlock, epochHandler) {
 
 				expectedSecondBlockID := strconv.Itoa(epochHandler.Id) + ":" + firstBlockCreator + ":1"
 
@@ -167,7 +167,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 			pivotPubKey := epochHandler.LeadersSequence[position]
 
-			firstBlockByPivot := common_functions.GetBlock(epochHandler.Id, pivotPubKey, uint(0), epochHandler)
+			firstBlockByPivot := block_pack.GetBlock(epochHandler.Id, pivotPubKey, uint(0), epochHandler)
 
 			firstBlockHash := afpForSecondBlock.PrevBlockHash
 
@@ -239,7 +239,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 				// Found new potential pivot
 
-				firstBlockByNewPivot := common_functions.GetBlock(epochHandler.Id, previousPool, 0, epochHandler)
+				firstBlockByNewPivot := block_pack.GetBlock(epochHandler.Id, previousPool, 0, epochHandler)
 
 				if firstBlockByNewPivot == nil {
 					return nil

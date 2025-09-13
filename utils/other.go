@@ -1,0 +1,117 @@
+package utils
+
+import (
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/structures"
+
+	"lukechampine.com/blake3"
+)
+
+var shutdownOnce sync.Once
+
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+// ANSI escape codes for text colors
+const (
+	RESET_COLOR      = "\033[0m"
+	RED_COLOR        = "\033[31;1m"
+	DEEP_GREEN_COLOR = "\u001b[38;5;23m"
+	GREEN_COLOR      = "\033[32;1m"
+	YELLOW_COLOR     = "\033[33m"
+	MAGENTA_COLOR    = "\033[38;5;99m"
+	CYAN_COLOR       = "\033[36;1m"
+	WHITE_COLOR      = "\033[37;1m"
+)
+
+type ValidatorData struct {
+	ValidatorPubKey string
+	TotalStake      uint64
+}
+
+func StrToUint8(s string) uint8 {
+	v, err := strconv.ParseUint(s, 10, 8)
+	if err != nil {
+		return 0
+	}
+	return uint8(v)
+}
+
+func GracefulShutdown() {
+
+	shutdownOnce.Do(func() {
+
+		LogWithTime("Stop signal has been initiated.Keep waiting...", CYAN_COLOR)
+
+		LogWithTime("Closing server connections...", CYAN_COLOR)
+
+		LogWithTime("Node was gracefully stopped", GREEN_COLOR)
+
+		os.Exit(0)
+
+	})
+
+}
+
+func LogWithTime(msg, msgColor string) {
+
+	formattedDate := time.Now().Format("02 January 2006 at 03:04:05 PM")
+
+	var prefixColor = DEEP_GREEN_COLOR
+
+	fmt.Printf(prefixColor+"[%s]"+MAGENTA_COLOR+"(pid:%d)"+msgColor+"  %s\n"+RESET_COLOR, formattedDate, os.Getpid(), msg)
+
+}
+
+func Blake3(data string) string {
+
+	blake3Hash := blake3.Sum256([]byte(data))
+
+	return hex.EncodeToString(blake3Hash[:])
+
+}
+
+func GetUTCTimestampInMilliSeconds() int64 {
+
+	return time.Now().UTC().UnixMilli()
+
+}
+
+func IsMyCoreVersionOld(thread structures.LogicalThread) bool {
+
+	return thread.GetCoreMajorVersion() > globals.CORE_MAJOR_VERSION
+
+}
+
+func GetRandomFromSlice(arr []structures.QuorumMemberData) structures.QuorumMemberData {
+
+	return arr[rng.Intn(len(arr))]
+
+}
+
+func EpochStillFresh(thread structures.LogicalThread) bool {
+
+	return (thread.GetEpochHandler().StartTimestamp + uint64(thread.GetNetworkParams().EpochTime)) > uint64(GetUTCTimestampInMilliSeconds())
+
+}
+
+func SignalAboutEpochRotationExists(epochIndex int) bool {
+
+	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
+
+	if readyToChangeEpochRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
+
+		return true
+
+	}
+
+	return false
+
+}

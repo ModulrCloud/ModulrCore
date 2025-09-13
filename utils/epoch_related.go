@@ -1,194 +1,35 @@
-package common_functions
+package utils
 
 import (
-	"context"
 	"encoding/hex"
-	"encoding/json"
-	"net/http"
 	"strconv"
-	"sync"
-	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
-	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
-type ValidatorData struct {
-	ValidatorPubKey string
-	TotalStake      uint64
+type CurrentLeaderData struct {
+	IsMeLeader bool
+	Url        string
 }
 
-func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *block.Block {
+func GetCurrentLeader() CurrentLeaderData {
 
-	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
+	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
 
-	blockAsBytes, err := globals.BLOCKS.Get([]byte(blockID), nil)
+	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-	if err == nil {
+	currentLeaderIndex := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.CurrentLeaderIndex
 
-		var blockParsed *block.Block
+	currentLeaderPubKey := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence[currentLeaderIndex]
 
-		err = json.Unmarshal(blockAsBytes, &blockParsed)
+	if currentLeaderPubKey == globals.CONFIGURATION.PublicKey {
 
-		if err == nil {
-			return blockParsed
-		}
+		return CurrentLeaderData{IsMeLeader: true, Url: ""}
 
 	}
 
-	// Find from other nodes
-
-	quorumUrlsAndPubkeys := GetQuorumUrlsAndPubkeys(epochHandler)
-
-	var quorumUrls []string
-
-	for _, quorumMember := range quorumUrlsAndPubkeys {
-
-		quorumUrls = append(quorumUrls, quorumMember.Url)
-
-	}
-
-	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
-
-	resultChan := make(chan *block.Block, len(allKnownNodes))
-	var wg sync.WaitGroup
-
-	for _, node := range allKnownNodes {
-
-		if node == globals.CONFIGURATION.MyHostname {
-			continue
-		}
-
-		wg.Add(1)
-		go func(endpoint string) {
-
-			defer wg.Done()
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-
-			url := endpoint + "/block/" + blockID
-			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				return
-			}
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil || resp.StatusCode != http.StatusOK {
-				return
-			}
-			defer resp.Body.Close()
-
-			var block block.Block
-
-			if err := json.NewDecoder(resp.Body).Decode(&block); err == nil {
-				resultChan <- &block
-			}
-
-		}(node)
-
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for block := range resultChan {
-		if block != nil {
-			return block
-		}
-	}
-
-	return nil
-}
-
-func GetFromApprovementThreadState(poolId string) *structures.PoolStorage {
-
-	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolId]; ok {
-		return val
-	}
-
-	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(poolId), nil)
-
-	if err != nil {
-		return nil
-	}
-
-	var pool structures.PoolStorage
-
-	err = json.Unmarshal(data, &pool)
-
-	if err != nil {
-		return nil
-	}
-
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolId] = &pool
-
-	return &pool
-
-}
-
-func GetAccountFromExecThreadState(accountId string) *structures.Account {
-
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
-		return val
-	}
-
-	data, err := globals.STATE.Get([]byte(accountId), nil)
-
-	if err != nil {
-
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
-
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
-
-	}
-
-	var account structures.Account
-
-	err = json.Unmarshal(data, &account)
-
-	if err != nil {
-
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
-
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
-
-	}
-
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
-
-	return &account
-
-}
-
-func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
-
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
-		return val
-	}
-
-	data, err := globals.STATE.Get([]byte(poolId), nil)
-
-	if err != nil {
-		return nil
-	}
-
-	var poolStorage structures.PoolStorage
-
-	err = json.Unmarshal(data, &poolStorage)
-
-	if err != nil {
-		return nil
-	}
-
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
-
-	return &poolStorage
-
+	return CurrentLeaderData{IsMeLeader: false, Url: ""}
 }
 
 func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed string) {
@@ -196,7 +37,7 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 	epochHandler.LeadersSequence = []string{} // [pool0, pool1,...poolN]
 
 	// Hash of metadata from the old epoch
-	hashOfMetadataFromOldEpoch := utils.Blake3(epochSeed)
+	hashOfMetadataFromOldEpoch := Blake3(epochSeed)
 
 	// Change order of validators pseudo-randomly
 	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
@@ -226,7 +67,7 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 
 		// Generate deterministic random value using the hash of metadata
 		hashInput := hashOfMetadataFromOldEpoch + "_" + strconv.Itoa(i)
-		hashHex := utils.Blake3(hashInput)
+		hashHex := Blake3(hashInput)
 		var deterministicRandomValue uint64
 		if len(hashHex) >= 16 {
 			if b, err := hex.DecodeString(hashHex[:16]); err == nil {
@@ -312,7 +153,7 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 	quorum := []string{}
 
 	// Blake3 hash of epoch metadata (hex string)
-	hashOfMetadataFromEpoch := utils.Blake3(newEpochSeed)
+	hashOfMetadataFromEpoch := Blake3(newEpochSeed)
 
 	// Collect validator data and total stake (uint64)
 	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
@@ -344,7 +185,7 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 
 		// Deterministic "random": Blake3(hash || "_" || i) -> uint64
 		hashInput := hashOfMetadataFromEpoch + "_" + strconv.Itoa(i)
-		hashHex := utils.Blake3(hashInput) // hex string
+		hashHex := Blake3(hashInput) // hex string
 
 		// Take the first 8 bytes (16 hex chars) -> uint64 BigEndian
 		var r uint64 = 0

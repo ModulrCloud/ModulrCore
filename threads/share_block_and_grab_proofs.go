@@ -9,8 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -39,7 +38,7 @@ var PROOFS_GRABBER = ProofsGrabber{
 	EpochId: -1,
 }
 
-var BLOCK_TO_SHARE *block.Block = &block.Block{
+var BLOCK_TO_SHARE *block_pack.Block = &block_pack.Block{
 	Index: -1,
 }
 
@@ -62,7 +61,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 	blockIdThatInPointer := strconv.Itoa(epochHandler.Id) + ":" + globals.CONFIGURATION.PublicKey + ":" + strconv.Itoa(BLOCK_TO_SHARE.Index)
 
-	majority := common_functions.GetQuorumMajority(epochHandler)
+	majority := utils.GetQuorumMajority(epochHandler)
 
 	if blockIdForHunting != blockIdThatInPointer {
 

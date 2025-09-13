@@ -9,8 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -148,7 +147,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 	}
 
-	quorumUrlsAndPubkeys := common_functions.GetQuorumUrlsAndPubkeys(epochHandler)
+	quorumUrlsAndPubkeys := utils.GetQuorumUrlsAndPubkeys(epochHandler)
 
 	var quorumUrls []string
 
@@ -176,7 +175,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 	legacyEpochFullID := legacyEpochHandler.Hash + "#" + strconv.Itoa(legacyEpochHandler.Id)
 
-	legacyMajority := common_functions.GetQuorumMajority(legacyEpochHandler)
+	legacyMajority := utils.GetQuorumMajority(legacyEpochHandler)
 
 	legacyQuorum := legacyEpochHandler.Quorum
 
@@ -221,7 +220,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 				return
 			}
 
-			if common_functions.VerifyAggregatedEpochFinalizationProof(&proofCandidate, legacyQuorum, legacyMajority, legacyEpochFullID) {
+			if utils.VerifyAggregatedEpochFinalizationProof(&proofCandidate, legacyQuorum, legacyMajority, legacyEpochFullID) {
 				select {
 				case resultChan <- proofCandidate:
 					cancel() // stop other goroutines
@@ -406,7 +405,7 @@ func generateBlock() {
 
 		}
 
-		extraData := block.ExtraData{}
+		extraData := block_pack.ExtraData{}
 
 		if globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex == 0 {
 
@@ -424,7 +423,7 @@ func generateBlock() {
 
 			}
 
-			majority := common_functions.GetQuorumMajority(epochHandlerRef)
+			majority := utils.GetQuorumMajority(epochHandlerRef)
 
 			// Build the template to insert to the extraData of block. Structure is {pool0:ALRP,...,poolN:ALRP}
 
@@ -573,11 +572,11 @@ func generateBlock() {
 
 												blockIdInAfp := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + strconv.Itoa(lrpUpgrade.SkipData.Index)
 
-												proposedHeightIsValid := lrpUpgrade.SkipData.Hash == lrpUpgrade.AfpForFirstBlock.BlockHash && blockIdInAfp == lrpUpgrade.AfpForFirstBlock.BlockId && common_functions.VerifyAggregatedFinalizationProof(&lrpUpgrade.SkipData.Afp, epochHandlerRef)
+												proposedHeightIsValid := lrpUpgrade.SkipData.Hash == lrpUpgrade.AfpForFirstBlock.BlockHash && blockIdInAfp == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.SkipData.Afp, epochHandlerRef)
 
 												firstBlockID := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":0"
 
-												proposedFirstBlockIsValid := firstBlockID == lrpUpgrade.AfpForFirstBlock.BlockId && common_functions.VerifyAggregatedFinalizationProof(&lrpUpgrade.AfpForFirstBlock, epochHandlerRef)
+												proposedFirstBlockIsValid := firstBlockID == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.AfpForFirstBlock, epochHandlerRef)
 
 												if proposedFirstBlockIsValid && proposedHeightIsValid {
 
@@ -619,7 +618,7 @@ func generateBlock() {
 
 		blockDbAtomicBatch := new(leveldb.Batch)
 
-		blockCandidate := block.NewBlock(getTransactionsFromMempool(), extraData, epochFullID)
+		blockCandidate := block_pack.NewBlock(getTransactionsFromMempool(), extraData, epochFullID)
 
 		blockHash := blockCandidate.GetHash()
 

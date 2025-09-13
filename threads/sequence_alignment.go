@@ -6,8 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -15,7 +14,7 @@ import (
 
 type TargetResponse struct {
 	ProposedIndexOfLeader            int                                    `json:"proposedIndexOfLeader"`
-	FirstBlockByCurrentLeader        block.Block                            `json:"firstBlockByCurrentLeader"`
+	FirstBlockByCurrentLeader        block_pack.Block                       `json:"firstBlockByCurrentLeader"`
 	AfpForSecondBlockByCurrentLeader structures.AggregatedFinalizationProof `json:"afpForSecondBlockByCurrentLeader"`
 }
 
@@ -31,7 +30,7 @@ func SequenceAlignmentThread() {
 
 		localVersionOfCurrentLeader := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption
 
-		quorumMembers := common_functions.GetQuorumUrlsAndPubkeys(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler)
+		quorumMembers := utils.GetQuorumUrlsAndPubkeys(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler)
 
 		randomTarget := utils.GetRandomFromSlice(quorumMembers)
 
@@ -67,7 +66,7 @@ func SequenceAlignmentThread() {
 				proposedIndex := targetResponse.ProposedIndexOfLeader
 
 				sameHash := afp.PrevBlockHash == firstBlock.GetHash()
-				validProof := common_functions.VerifyAggregatedFinalizationProof(afp, epochHandlerRef)
+				validProof := utils.VerifyAggregatedFinalizationProof(afp, epochHandlerRef)
 
 				if sameHash && validProof {
 
@@ -75,7 +74,7 @@ func SequenceAlignmentThread() {
 
 					if epochHandlerRef.LeadersSequence[proposedIndex] == firstBlock.Creator {
 
-						isOk, infoAboutFinalBlocks := common_functions.ExtendedCheckAlrpChainValidity(firstBlock, epochHandlerRef, proposedIndex, true)
+						isOk, infoAboutFinalBlocks := firstBlock.ExtendedCheckAlrpChainValidity(epochHandlerRef, proposedIndex, true)
 
 						shouldChange := true
 
@@ -127,7 +126,7 @@ func SequenceAlignmentThread() {
 
 											// Ask the first block and extract next set of ALRPs
 
-											firstBlockInThisEpochByPool := common_functions.GetBlock(epochHandlerRef.Id, poolOnThisPosition, 0, epochHandlerRef)
+											firstBlockInThisEpochByPool := block_pack.GetBlock(epochHandlerRef.Id, poolOnThisPosition, 0, epochHandlerRef)
 
 											if firstBlockInThisEpochByPool != nil && firstBlockInThisEpochByPool.GetHash() == alrpForThisPoolFromCurrentSet.FirstBlockHash {
 
@@ -139,8 +138,8 @@ func SequenceAlignmentThread() {
 
 												} else {
 
-													alrpChainValidationOk, dataAboutLastBlocks = common_functions.ExtendedCheckAlrpChainValidity(
-														firstBlockInThisEpochByPool, epochHandlerRef, position, true,
+													alrpChainValidationOk, dataAboutLastBlocks = firstBlockInThisEpochByPool.ExtendedCheckAlrpChainValidity(
+														epochHandlerRef, position, true,
 													)
 
 												}

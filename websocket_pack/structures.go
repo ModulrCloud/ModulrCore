@@ -1,7 +1,7 @@
 package websocket_pack
 
 import (
-	"github.com/ModulrCloud/ModulrCore/block"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
@@ -29,7 +29,7 @@ type WsLeaderRotationProofResponseUpgrade struct {
 
 type WsFinalizationProofRequest struct {
 	Route            string                                 `json:"route"`
-	Block            block.Block                            `json:"block"`
+	Block            block_pack.Block                       `json:"block"`
 	PreviousBlockAfp structures.AggregatedFinalizationProof `json:"previousBlockAfp"`
 }
 
@@ -45,6 +45,6 @@ type WsBlockWithAfpRequest struct {
 }
 
 type WsBlockWithAfpResponse struct {
-	Block *block.Block                            `json:"block"`
+	Block *block_pack.Block                       `json:"block"`
 	Afp   *structures.AggregatedFinalizationProof `json:"afp"`
 }

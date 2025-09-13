@@ -7,8 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -113,9 +112,9 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 								legacyEpochFullID := legacyEpochHandler.Hash + "#" + strconv.Itoa(legacyEpochHandler.Id)
 
-								legacyMajority := common_functions.GetQuorumMajority(&legacyEpochHandler)
+								legacyMajority := utils.GetQuorumMajority(&legacyEpochHandler)
 
-								aefpIsOk = epochHandler.Id == 0 || common_functions.VerifyAggregatedEpochFinalizationProof(
+								aefpIsOk = epochHandler.Id == 0 || utils.VerifyAggregatedEpochFinalizationProof(
 
 									aefpFromBlock,
 
@@ -136,9 +135,9 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 					// Verify the ALRP chain validity here
 
-					alrpChainIsOk := common_functions.CheckAlrpChainValidity(
+					alrpChainIsOk := parsedRequest.Block.CheckAlrpChainValidity(
 
-						&parsedRequest.Block, epochHandler, positionOfBlockCreatorInLeadersSequence,
+						epochHandler, positionOfBlockCreatorInLeadersSequence,
 					)
 
 					if !aefpIsOk || !alrpChainIsOk {
@@ -155,7 +154,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 					// Check if AFP inside related to previous block AFP
 
-					if previousBlockId == parsedRequest.PreviousBlockAfp.BlockId && common_functions.VerifyAggregatedFinalizationProof(&parsedRequest.PreviousBlockAfp, epochHandler) {
+					if previousBlockId == parsedRequest.PreviousBlockAfp.BlockId && utils.VerifyAggregatedFinalizationProof(&parsedRequest.PreviousBlockAfp, epochHandler) {
 
 						// In case it's request for the third block, we'll receive AFP for the second block which includes .prevBlockHash field
 						// This will be the assumption of hash of the first block in epoch
@@ -359,7 +358,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 			if propSkipData.Index > -1 && propSkipData.Hash == propSkipData.Afp.BlockHash && propSkipData.Index == indexOfBlockInAfp {
 
-				afpIsOk = common_functions.VerifyAggregatedFinalizationProof(&propSkipData.Afp, epochHandler)
+				afpIsOk = utils.VerifyAggregatedFinalizationProof(&propSkipData.Afp, epochHandler)
 
 			} else {
 
@@ -386,7 +385,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 					blockIdsTheSame := parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock
 
-					if blockIdsTheSame && common_functions.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
+					if blockIdsTheSame && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
 
 						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
 
@@ -443,7 +442,7 @@ func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn
 
 	if blockBytes, err := globals.BLOCKS.Get([]byte(parsedRequest.BlockId), nil); err == nil {
 
-		var block block.Block
+		var block block_pack.Block
 
 		if err := json.Unmarshal(blockBytes, &block); err == nil {
 

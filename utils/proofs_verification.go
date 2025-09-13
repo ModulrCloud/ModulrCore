@@ -1,27 +1,20 @@
-package common_functions
+package utils
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/block"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
-func VerifyAggregatedEpochFinalizationProof(
-	proofStruct *structures.AggregatedEpochFinalizationProof,
-	quorum []string,
-	majority int,
-	epochFullID string,
-) bool {
+func VerifyAggregatedEpochFinalizationProof(proofStruct *structures.AggregatedEpochFinalizationProof, quorum []string, majority int, epochFullID string) bool {
 
 	dataThatShouldBeSigned := "EPOCH_DONE:" +
 		strconv.Itoa(int(proofStruct.LastLeader)) + ":" +
@@ -53,10 +46,7 @@ func VerifyAggregatedEpochFinalizationProof(
 
 }
 
-func VerifyAggregatedFinalizationProof(
-	proof *structures.AggregatedFinalizationProof,
-	epochHandler *structures.EpochDataHandler,
-) bool {
+func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
 
@@ -90,15 +80,11 @@ func VerifyAggregatedFinalizationProof(
 	return okSignatures >= majority
 }
 
-func VerifyAggregatedLeaderRotationProof(
-	pubKeyOfSomePreviousLeader string,
-	proof *structures.AggregatedLeaderRotationProof,
-	epochHandler *structures.EpochDataHandler,
-) bool {
+func VerifyAggregatedLeaderRotationProof(prevLeaderPubKey string, proof *structures.AggregatedLeaderRotationProof, epochHandler *structures.EpochDataHandler) bool {
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
 
-	dataThatShouldBeSigned := "LEADER_ROTATION_PROOF:" + pubKeyOfSomePreviousLeader + ":" +
+	dataThatShouldBeSigned := "LEADER_ROTATION_PROOF:" + prevLeaderPubKey + ":" +
 		proof.FirstBlockHash + ":" +
 		strconv.Itoa(proof.SkipIndex) + ":" +
 		proof.SkipHash + ":" +
@@ -130,122 +116,6 @@ func VerifyAggregatedLeaderRotationProof(
 	}
 
 	return okSignatures >= majority
-
-}
-
-func CheckAlrpChainValidity(firstBlockInThisEpochByPool *block.Block, epochHandler *structures.EpochDataHandler, position int) bool {
-
-	aggregatedLeadersRotationProofsRef := firstBlockInThisEpochByPool.ExtraData.AggregatedLeadersRotationProofs
-
-	arrayIndexer := 0
-
-	arrayForIteration := slices.Clone(epochHandler.LeadersSequence[:position])
-
-	slices.Reverse(arrayForIteration) // we need reversed version
-
-	bumpedWithPoolWhoCreatedAtLeastOneBlock := false
-
-	for _, poolPubKey := range arrayForIteration {
-
-		if alrpForThisPool, ok := aggregatedLeadersRotationProofsRef[poolPubKey]; ok {
-
-			signaIsOk := VerifyAggregatedLeaderRotationProof(poolPubKey, alrpForThisPool, epochHandler)
-
-			if signaIsOk {
-
-				arrayIndexer++
-
-				if alrpForThisPool.SkipIndex >= 0 {
-
-					bumpedWithPoolWhoCreatedAtLeastOneBlock = true
-
-					break
-
-				}
-
-			} else {
-
-				return false
-
-			}
-
-		} else {
-
-			return false
-
-		}
-
-	}
-
-	if arrayIndexer == position || bumpedWithPoolWhoCreatedAtLeastOneBlock {
-
-		return true
-
-	}
-
-	return false
-
-}
-
-func ExtendedCheckAlrpChainValidity(firstBlockInThisEpochByPool *block.Block, epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerPool) {
-
-	aggregatedLeadersRotationProofsRef := firstBlockInThisEpochByPool.ExtraData.AggregatedLeadersRotationProofs
-
-	infoAboutFinalBlocksInThisEpoch := make(map[string]structures.ExecutionStatsPerPool)
-
-	arrayIndexer := 0
-
-	arrayForIteration := slices.Clone(epochHandler.LeadersSequence[:position])
-
-	slices.Reverse(arrayForIteration) // we need reversed version
-
-	bumpedWithPoolWhoCreatedAtLeastOneBlock := false
-
-	for _, poolPubKey := range arrayForIteration {
-
-		if alrpForThisPool, ok := aggregatedLeadersRotationProofsRef[poolPubKey]; ok {
-
-			signaIsOk := dontCheckSigna || VerifyAggregatedLeaderRotationProof(poolPubKey, alrpForThisPool, epochHandler)
-
-			if signaIsOk {
-
-				infoAboutFinalBlocksInThisEpoch[poolPubKey] = structures.ExecutionStatsPerPool{
-					Index:          alrpForThisPool.SkipIndex,
-					Hash:           alrpForThisPool.SkipHash,
-					FirstBlockHash: alrpForThisPool.FirstBlockHash,
-				}
-
-				arrayIndexer++
-
-				if alrpForThisPool.SkipIndex >= 0 {
-
-					bumpedWithPoolWhoCreatedAtLeastOneBlock = true
-
-					break
-
-				}
-
-			} else {
-
-				return false, make(map[string]structures.ExecutionStatsPerPool)
-
-			}
-
-		} else {
-
-			return false, make(map[string]structures.ExecutionStatsPerPool)
-
-		}
-
-	}
-
-	if arrayIndexer == position || bumpedWithPoolWhoCreatedAtLeastOneBlock {
-
-		return true, infoAboutFinalBlocksInThisEpoch
-
-	}
-
-	return false, make(map[string]structures.ExecutionStatsPerPool)
 
 }
 

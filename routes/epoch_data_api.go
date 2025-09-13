@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -20,7 +19,7 @@ type ErrMsg struct {
 
 type AlignmentData struct {
 	ProposedIndexOfLeader            int                                    `json:"proposedIndexOfLeader"`
-	FirstBlockByCurrentLeader        block.Block                            `json:"firstBlockByCurrentLeader"`
+	FirstBlockByCurrentLeader        block_pack.Block                       `json:"firstBlockByCurrentLeader"`
 	AfpForSecondBlockByCurrentLeader structures.AggregatedFinalizationProof `json:"afpForSecondBlockByCurrentLeader"`
 }
 
@@ -116,7 +115,7 @@ func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
 
 		if dbErr == nil {
 
-			var firstBlockParsed block.Block
+			var firstBlockParsed block_pack.Block
 
 			parseErr := json.Unmarshal(firstBlockAsBytes, &firstBlockParsed)
 
@@ -124,7 +123,7 @@ func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
 
 				secondBlockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":1"
 
-				afpForSecondBlockByCurrentLeader := common_functions.GetVerifiedAggregatedFinalizationProofByBlockId(secondBlockID, epochHandler)
+				afpForSecondBlockByCurrentLeader := utils.GetVerifiedAggregatedFinalizationProofByBlockId(secondBlockID, epochHandler)
 
 				if afpForSecondBlockByCurrentLeader != nil {
 
@@ -216,7 +215,7 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 			if proposition.AfpForFirstBlock.BlockId == blockID && proposition.LastBlockProposition.Index >= 0 {
 
-				if common_functions.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
+				if utils.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
 
 					hashOfFirstBlock = proposition.AfpForFirstBlock.BlockHash
 

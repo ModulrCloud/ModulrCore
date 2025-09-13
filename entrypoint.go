@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/threads"
@@ -313,15 +312,15 @@ func setGenesisToState() error {
 
 	// Assign quorum - pseudorandomly and in deterministic way
 
-	epochHandlerForApprovementThread.Quorum = common_functions.GetCurrentEpochQuorum(&epochHandlerForApprovementThread, globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
+	epochHandlerForApprovementThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForApprovementThread, globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
 
-	epochHandlerForExecThread.Quorum = common_functions.GetCurrentEpochQuorum(&epochHandlerForExecThread, globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
+	epochHandlerForExecThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForExecThread, globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
 
 	// Now set the block generators for epoch pseudorandomly and in deterministic way
 
-	common_functions.SetLeadersSequence(&epochHandlerForApprovementThread, initEpochHash)
+	utils.SetLeadersSequence(&epochHandlerForApprovementThread, initEpochHash)
 
-	common_functions.SetLeadersSequence(&epochHandlerForExecThread, initEpochHash)
+	utils.SetLeadersSequence(&epochHandlerForExecThread, initEpochHash)
 
 	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = epochHandlerForApprovementThread
 

@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/block"
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -116,7 +115,7 @@ func ExecutionThread() {
 
 							ExecuteBlock(response.Block)
 
-						} else if common_functions.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
+						} else if utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 							ExecuteBlock(response.Block)
 
@@ -197,7 +196,7 @@ func ExecutionThread() {
 
 						ExecuteBlock(response.Block)
 
-					} else if common_functions.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
+					} else if utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 						ExecuteBlock(response.Block)
 
@@ -233,7 +232,7 @@ func ExecutionThread() {
 
 }
 
-func ExecuteBlock(block *block.Block) {
+func ExecuteBlock(block *block_pack.Block) {
 
 	epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
 
@@ -369,9 +368,9 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
 
 	*/
 
-	blockCreatorStorage := common_functions.GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
+	blockCreatorStorage := utils.GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
 
-	blockCreatorAccount := common_functions.GetAccountFromExecThreadState(blockCreatorPubkey)
+	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
 
 	// 1. Transfer part of fees to account with pubkey associated with block creator
 
@@ -387,7 +386,7 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
 
 		stakerReward := (stakerData.Stake / blockCreatorStorage.TotalStaked) * feesToShareAmongStakers
 
-		stakerAccount := common_functions.GetAccountFromExecThreadState(stakerPubkey)
+		stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
 
 		stakerAccount.Balance += stakerReward
 
@@ -403,9 +402,9 @@ func ExecuteTransaction(tx *structures.Transaction) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
-		accountFrom := common_functions.GetAccountFromExecThreadState(tx.From)
+		accountFrom := utils.GetAccountFromExecThreadState(tx.From)
 
-		accountTo := common_functions.GetAccountFromExecThreadState(tx.To)
+		accountTo := utils.GetAccountFromExecThreadState(tx.To)
 
 		totalSpend := tx.Fee + tx.Amount
 
@@ -458,7 +457,7 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 			// Get the first block in this epoch by this pool
 
-			firstBlockInThisEpochByPool := common_functions.GetBlock(epochHandler.Id, leaderPubKey, 0, epochHandler)
+			firstBlockInThisEpochByPool := block_pack.GetBlock(epochHandler.Id, leaderPubKey, 0, epochHandler)
 
 			if firstBlockInThisEpochByPool == nil {
 
@@ -468,8 +467,8 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 			// In this block we should have ALRPs for all the previous pools
 
-			alrpChainIsOk, infoAboutFinalBlocks := common_functions.ExtendedCheckAlrpChainValidity(
-				firstBlockInThisEpochByPool, epochHandler, int(position), true,
+			alrpChainIsOk, infoAboutFinalBlocks := firstBlockInThisEpochByPool.ExtendedCheckAlrpChainValidity(
+				epochHandler, int(position), true,
 			)
 
 			if alrpChainIsOk {
@@ -615,7 +614,7 @@ func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 		//____________After we get the first blocks for epoch X+1 - get the AEFP from it and build the data for VT to finish epoch X____________
 
-		firstBlockInThisEpoch := common_functions.GetBlock(nextEpochIndex, firstBlockDataOnNextEpoch.FirstBlockCreator, 0, epochHandler)
+		firstBlockInThisEpoch := block_pack.GetBlock(nextEpochIndex, firstBlockDataOnNextEpoch.FirstBlockCreator, 0, epochHandler)
 
 		if firstBlockInThisEpoch != nil && firstBlockInThisEpoch.GetHash() == firstBlockDataOnNextEpoch.FirstBlockHash {
 

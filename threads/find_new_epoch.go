@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/common_functions"
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -67,7 +67,7 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 
 	if err == nil {
 
-		if common_functions.VerifyAggregatedEpochFinalizationProof(aefp, quorum, majority, epochFullID) {
+		if utils.VerifyAggregatedEpochFinalizationProof(aefp, quorum, majority, epochFullID) {
 
 			select {
 
@@ -105,9 +105,9 @@ func EpochRotationThread() {
 
 			if utils.SignalAboutEpochRotationExists(epochHandlerRef.Id) {
 
-				majority := common_functions.GetQuorumMajority(epochHandlerRef)
+				majority := utils.GetQuorumMajority(epochHandlerRef)
 
-				quorumMembers := common_functions.GetQuorumUrlsAndPubkeys(epochHandlerRef)
+				quorumMembers := utils.GetQuorumUrlsAndPubkeys(epochHandlerRef)
 
 				haveEverything := AEFP_AND_FIRST_BLOCK_DATA.Aefp != nil && AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash != ""
 
@@ -174,7 +174,7 @@ func EpochRotationThread() {
 
 					// 1. Fetch first block
 
-					firstBlock := common_functions.GetBlock(epochHandlerRef.Id, AEFP_AND_FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
+					firstBlock := block_pack.GetBlock(epochHandlerRef.Id, AEFP_AND_FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
 
 					// 2. Compare hashes
 
@@ -306,13 +306,13 @@ func EpochRotationThread() {
 							Id:                 nextEpochId,
 							Hash:               nextEpochHash,
 							PoolsRegistry:      epochHandlerRef.PoolsRegistry,
-							Quorum:             common_functions.GetCurrentEpochQuorum(epochHandlerRef, nextEpochQuorumSize, nextEpochHash),
+							Quorum:             utils.GetCurrentEpochQuorum(epochHandlerRef, nextEpochQuorumSize, nextEpochHash),
 							LeadersSequence:    []string{},
 							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
 							CurrentLeaderIndex: 0,
 						}
 
-						common_functions.SetLeadersSequence(&nextEpochHandler, nextEpochHash)
+						utils.SetLeadersSequence(&nextEpochHandler, nextEpochHash)
 
 						atomicBatch.Put([]byte("LATEST_BATCH_INDEX:"), []byte(strconv.Itoa(int(latestBatchIndex))))
 

@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -127,7 +126,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	if context == "AT" {
 
-		poolStorage := common_functions.GetFromApprovementThreadState(poolId)
+		poolStorage := utils.GetFromApprovementThreadState(poolId)
 
 		if poolStorage != nil {
 
@@ -147,7 +146,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	} else {
 
-		poolStorage := common_functions.GetPoolFromExecThreadState(poolId)
+		poolStorage := utils.GetPoolFromExecThreadState(poolId)
 
 		if poolStorage != nil {
 
@@ -183,7 +182,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 	if context == "AT" {
 
-		poolStorage := common_functions.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
 
 		if poolStorage != nil {
 
@@ -234,7 +233,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		poolStorage := common_functions.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
 
 		if poolStorage != nil {
 
@@ -301,7 +300,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	if context == "AT" {
 
-		poolStorage := common_functions.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
 
 		if poolStorage != nil {
 
@@ -349,7 +348,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		poolStorage := common_functions.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
 
 		if poolStorage != nil {
 

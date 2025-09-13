@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/common_functions"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -74,7 +73,7 @@ func NewEpochProposerThread() {
 
 		if iAmInTheQuorum {
 
-			majority := common_functions.GetQuorumMajority(epochHandlerRef)
+			majority := utils.GetQuorumMajority(epochHandlerRef)
 
 			var localVotingData structures.PoolVotingStat
 
@@ -147,7 +146,7 @@ func NewEpochProposerThread() {
 
 			}
 
-			quorumMembers := common_functions.GetQuorumUrlsAndPubkeys(epochHandlerRef)
+			quorumMembers := utils.GetQuorumUrlsAndPubkeys(epochHandlerRef)
 
 			resultsCh := make(chan Agreement, len(quorumMembers))
 			upgradeCh := make(chan structures.EpochFinishResponseUpgrade, len(quorumMembers))
@@ -222,7 +221,7 @@ func NewEpochProposerThread() {
 
 						json.Unmarshal(responseBytes, &resultAsStruct)
 
-						if common_functions.VerifyAggregatedFinalizationProof(&resultAsStruct.LastBlockProposition.Afp, epochHandlerRef) {
+						if utils.VerifyAggregatedFinalizationProof(&resultAsStruct.LastBlockProposition.Afp, epochHandlerRef) {
 
 							blockID := strconv.Itoa(epochIndex) + ":" +
 								leadersSequence[resultAsStruct.CurrentLeader] + ":" +
@@ -279,7 +278,7 @@ func NewEpochProposerThread() {
 
 				// Make final verification before store to make sure it's indeed a valid proof
 
-				if common_functions.VerifyAggregatedEpochFinalizationProof(&aggregatedEpochFinalizationProof, epochHandlerRef.Quorum, majority, epochFullId) {
+				if utils.VerifyAggregatedEpochFinalizationProof(&aggregatedEpochFinalizationProof, epochHandlerRef.Quorum, majority, epochFullId) {
 
 					valueAsBytes, _ := json.Marshal(aggregatedEpochFinalizationProof)
 
