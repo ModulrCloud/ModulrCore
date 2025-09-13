@@ -34,7 +34,5 @@
 .DS_Store
 Thumbs.db
 
-XTESTNET
-XTESTNET_DIR
-
-TODO
+XTESTNET*
+modulr*
