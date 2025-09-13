@@ -25,10 +25,15 @@ type AlignmentData struct {
 }
 
 func sendJson(ctx *fasthttp.RequestCtx, payload any) {
+
 	ctx.SetContentType("application/json")
+
 	ctx.SetStatusCode(fasthttp.StatusOK)
+
 	jsonBytes, _ := json.Marshal(payload)
+
 	ctx.SetBody(jsonBytes)
+
 }
 
 func GetFirstBlockAssumption(ctx *fasthttp.RequestCtx) {

@@ -8,7 +8,7 @@ type NetworkParameters struct {
 	LeadershipTimeframe   int64  `json:"LEADERSHIP_TIMEFRAME"`
 	BlockTime             int64  `json:"BLOCK_TIME"`
 	MaxBlockSizeInBytes   int64  `json:"MAX_BLOCK_SIZE_IN_BYTES"`
-	TxLimitPerBlock       int    `json:"TXS_LIMIT_PER_BLOCK"`
+	TxLimitPerBlock       uint   `json:"TXS_LIMIT_PER_BLOCK"`
 }
 
 func CopyNetworkParameters(src NetworkParameters) NetworkParameters {

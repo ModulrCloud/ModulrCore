@@ -117,8 +117,10 @@ func getTransactionsFromMempool() []structures.Transaction {
 
 	limit := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.TxLimitPerBlock
 
-	if limit > len(globals.MEMPOOL.Slice) {
-		limit = len(globals.MEMPOOL.Slice)
+	mempoolSize := uint(len(globals.MEMPOOL.Slice))
+
+	if limit > mempoolSize {
+		limit = mempoolSize
 	}
 
 	transactions := make([]structures.Transaction, limit)
@@ -621,7 +623,7 @@ func generateBlock() {
 
 		blockHash := blockCandidate.GetHash()
 
-		blockCandidate.Sig = cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, blockHash)
+		blockCandidate.SignBlock()
 
 		// BlockID has the following format => epochID(epochIndex):Ed25519_Pubkey:IndexOfBlockInCurrentEpoch
 
