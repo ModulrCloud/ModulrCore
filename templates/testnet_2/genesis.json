@@ -22,16 +22,16 @@
    
     "POOLS": [
         {
-            "pubkey": "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R",
+            "pubkey": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
             "percentage": 50,
             "totalStaked": 50000000000,
             "stakers": {
-                "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R": {
+                "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK": {
                     "stake": 50000000000
                 }
             },
-            "poolURL": "http://localhost:7335",
-            "wssPoolURL": "ws://localhost:9996"
+            "poolURL": "http://localhost:7332",
+            "wssPoolURL": "ws://localhost:9999"
         },
         {
             "pubkey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
