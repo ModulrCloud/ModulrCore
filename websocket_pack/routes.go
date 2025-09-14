@@ -2,6 +2,7 @@ package websocket_pack
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -300,6 +301,10 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 		}
 
+		fmt.Println("DEBUG: Received ALRP request => ", parsedRequest)
+
+		fmt.Println("DEBUG: Local is => ", localVotingData)
+
 		propSkipData := parsedRequest.SkipData
 
 		if localVotingData.Index > propSkipData.Index {
@@ -385,6 +390,10 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 					blockIdsTheSame := parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock
 
+					fmt.Println("Mid verification: ", parsedRequest.AfpForFirstBlock)
+
+					fmt.Println("Mid 2 => ", utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler))
+
 					if blockIdsTheSame && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
 
 						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
@@ -408,6 +417,8 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 				// If proof is ok - generate LRP(leader rotation proof)
 
 				if firstBlockAfpIsOk {
+
+					fmt.Println("DEBUG: AFP FOR FIRST BLOCK IS OK ===> ")
 
 					leaderRotationProofMessage := WsLeaderRotationProofResponseOk{
 

@@ -3,6 +3,7 @@ package threads
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -77,6 +78,8 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 	mu := sync.Mutex{}
 
 	result := make(DoubleMap)
+
+	fmt.Println("DEBUG: Going to send req to ", collector.quorum)
 
 	for _, leaderID := range leaderIDs {
 		wg.Add(1)
@@ -248,6 +251,8 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey string) *structures.AggregatedLeaderRotationProof {
 
+	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+
 	alrpMetadataForPool := ALRP_METADATA[leaderPubkey]
 
 	if alrpMetadataForPool != nil {
@@ -282,21 +287,17 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 				firstBlockID := strconv.Itoa(epochIndex) + ":" + leaderPubkey + ":0"
 
-				if afpForFirstBlockRaw, errAfp := globals.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil); errAfp == nil {
+				afpForFirstBlock := utils.GetVerifiedAggregatedFinalizationProofByBlockId(firstBlockID, epochHandlerRef)
 
-					var afpForFirstBlock structures.AggregatedFinalizationProof
+				if afpForFirstBlock != nil {
 
-					if errParse := json.Unmarshal(afpForFirstBlockRaw, &afpForFirstBlock); errParse == nil {
+					ALRP_METADATA[leaderPubkey] = &structures.AlrpSkeleton{
 
-						ALRP_METADATA[leaderPubkey] = &structures.AlrpSkeleton{
+						AfpForFirstBlock: *afpForFirstBlock,
 
-							AfpForFirstBlock: afpForFirstBlock,
+						SkipData: skipDataForLeader,
 
-							SkipData: skipDataForLeader,
-
-							Proofs: make(map[string]string),
-						}
-
+						Proofs: make(map[string]string),
 					}
 
 				}
@@ -496,6 +497,8 @@ func generateBlock() {
 
 				for _, leaderID := range pubkeysOfLeadersToGetAlrps {
 
+					fmt.Println("DEBUG: Trying to get ALRP for ", leaderID)
+
 					if possibleAlrp := getAggregatedLeaderRotationProof(majority, epochIndex, leaderID); possibleAlrp != nil {
 
 						alrpsForPreviousLeaders[leaderID] = possibleAlrp
@@ -523,6 +526,8 @@ func generateBlock() {
 					resultsOfAlrpRequests := collector.AlrpForLeadersCollector(context.Background(), pubkeysOfLeadersToGetAlrps, epochHandlerRef)
 
 					// Parse results here and modify the content inside ALRP_METADATA
+
+					fmt.Println("DEBUG: Results of ALRP requests ", resultsOfAlrpRequests)
 
 					for leaderID, validatorsResponses := range resultsOfAlrpRequests {
 
