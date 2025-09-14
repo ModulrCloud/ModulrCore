@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ModulrCloud/ModulrCore/structures"
+
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
