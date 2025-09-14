@@ -3,6 +3,7 @@ package threads
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -349,6 +350,8 @@ func generateBlock() {
 
 	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
+	fmt.Println("DEBUG: Going to generate block for epoch => ", epochHandlerRef.Id)
+
 	if !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
 
 		return
@@ -365,7 +368,11 @@ func generateBlock() {
 
 	// Safe "if" branch to prevent unnecessary blocks generation
 
-	if currentLeaderPubKey == globals.CONFIGURATION.PublicKey && !(globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex > PROOFS_GRABBER.AcceptedIndex+1) {
+	shouldGenerateBlocks := currentLeaderPubKey == globals.CONFIGURATION.PublicKey && !(globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex > PROOFS_GRABBER.AcceptedIndex+1)
+
+	shouldRotateEpochOnGenerationThread := globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID
+
+	if shouldGenerateBlocks || shouldRotateEpochOnGenerationThread {
 
 		PROOFS_GRABBER_MUTEX.RUnlock()
 
@@ -373,7 +380,7 @@ func generateBlock() {
 
 		// Check if <epochFullID> is the same in APPROVEMENT_THREAD and in GENERATION_THREAD
 
-		if globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID {
+		if shouldRotateEpochOnGenerationThread {
 
 			// If new epoch - add the aggregated proof of previous epoch finalization
 
@@ -389,7 +396,7 @@ func generateBlock() {
 
 			}
 
-			// Update the index & hash of epoch
+			// Update the index & hash of epoch (by assigning new epoch full ID)
 
 			globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId = epochFullID
 
