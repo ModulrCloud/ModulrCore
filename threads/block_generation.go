@@ -3,7 +3,6 @@ package threads
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -350,8 +349,6 @@ func generateBlock() {
 
 	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-	fmt.Println("DEBUG: Going to generate block for epoch => ", epochHandlerRef.Id)
-
 	if !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
 
 		return
@@ -635,7 +632,7 @@ func generateBlock() {
 
 		blockID := strconv.Itoa(epochIndex) + ":" + globals.CONFIGURATION.PublicKey + ":" + strconv.Itoa(blockCandidate.Index)
 
-		utils.LogWithTime("New block generated "+blockID, utils.CYAN_COLOR)
+		utils.LogWithTime("New block generated "+blockID+" (hash: "+blockHash[:8]+"...)", utils.CYAN_COLOR)
 
 		if blockBytes, serializeErr := json.Marshal(blockCandidate); serializeErr == nil {
 

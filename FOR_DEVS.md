@@ -8,7 +8,6 @@ Add this snippet
 {
     "version": "0.2.0",
     "configurations": [
-
         {
             "name": "Attach to Process",
             "type": "go",
@@ -30,14 +29,15 @@ Add this snippet
             "name": "Launch Package",
             "type": "go",
             "request": "launch",
-            "mode": "auto",
-            "program": "${fileDirname}",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
             "env": {
                 "CHAINDATA_PATH": "/full/path/to/chaindata"
             }
         }
     ]
 }
+
 ```
 
 
