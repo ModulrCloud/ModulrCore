@@ -1,10 +1,10 @@
 # Launch instructions
 
-### 1. Build the core
+### 1. Download dependencies and build the core
 
 ```bash
 # Unix
-./build.sh
+chmod 700 build.sh && ./build.sh
 
 # Windows
 build.bat
