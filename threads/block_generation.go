@@ -287,7 +287,11 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 				firstBlockID := strconv.Itoa(epochIndex) + ":" + leaderPubkey + ":0"
 
+				fmt.Println("DEBUG => Calling ============================================")
+
 				afpForFirstBlock := utils.GetVerifiedAggregatedFinalizationProofByBlockId(firstBlockID, epochHandlerRef)
+
+				fmt.Printf("afpForFirstBlock: %v\n", afpForFirstBlock)
 
 				if afpForFirstBlock != nil {
 

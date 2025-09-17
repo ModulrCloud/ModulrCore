@@ -21,14 +21,30 @@ const (
 
 var WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn
 
+// Protects concurrent access to wsConnMap (map[string]*websocket.Conn)
+var wsConnMu sync.RWMutex
+
+// Ensures single writer per websocket connection (gorilla/websocket requirement)
+var wsWriteMu sync.Map // key: pubkey -> *sync.Mutex
+
+func getWriteMu(id string) *sync.Mutex {
+	if m, ok := wsWriteMu.Load(id); ok {
+		return m.(*sync.Mutex)
+	}
+	m := &sync.Mutex{}
+	actual, _ := wsWriteMu.LoadOrStore(id, m)
+	return actual.(*sync.Mutex)
+}
+
 type QuorumWaiter struct {
 	responseCh chan QuorumResponse
 	done       chan struct{}
-	answered   map[string]bool
+	answered   map[string]struct{}
 	responses  map[string][]byte
 	timer      *time.Timer
 	mu         sync.Mutex
 	buf        []string
+	failed     map[string]struct{}
 }
 
 type QuorumResponse struct {
@@ -36,10 +52,52 @@ type QuorumResponse struct {
 	msg []byte
 }
 
+func reconnectOnce(pubkey string, wsConnMap map[string]*websocket.Conn) {
+
+	// Get validator metadata
+	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(pubkey+"(POOL)_STORAGE_POOL"), nil)
+	if err != nil {
+		return
+	}
+	var pool structures.PoolStorage
+	if err := json.Unmarshal(raw, &pool); err != nil || pool.WssPoolUrl == "" {
+		return
+	}
+
+	// Try a single dial attempt
+	conn, _, err := websocket.DefaultDialer.Dial(pool.WssPoolUrl, nil)
+	if err != nil {
+		return
+	}
+
+	// Store back into the shared map under lock
+	wsConnMu.Lock()
+
+	wsConnMap[pubkey] = conn
+
+	wsConnMu.Unlock()
+
+}
+
+func (qw *QuorumWaiter) reconnectFailed(wsConnMap map[string]*websocket.Conn) {
+	qw.mu.Lock()
+	failedCopy := make([]string, 0, len(qw.failed))
+	for id := range qw.failed {
+		failedCopy = append(failedCopy, id)
+	}
+	// reset failed set for the next round
+	for k := range qw.failed {
+		delete(qw.failed, k)
+	}
+	qw.mu.Unlock()
+
+	for _, id := range failedCopy {
+		reconnectOnce(id, wsConnMap)
+	}
+}
+
 func openWebsocketConnectionWithPoD() (*websocket.Conn, error) {
-
 	u, err := url.Parse(globals.CONFIGURATION.PointOfDistributionWS)
-
 	if err != nil {
 		return nil, fmt.Errorf("invalid url: %w", err)
 	}
@@ -53,87 +111,87 @@ func openWebsocketConnectionWithPoD() (*websocket.Conn, error) {
 }
 
 func (qw *QuorumWaiter) sendMessages(targets []string, msg []byte, wsConnMap map[string]*websocket.Conn) {
-
 	for _, id := range targets {
-
+		// Read connection from the shared map under RLock
+		wsConnMu.RLock()
 		conn, ok := wsConnMap[id]
-
-		if !ok {
+		wsConnMu.RUnlock()
+		if !ok || conn == nil {
+			// Mark as failed so we try to reconnect after the round
+			qw.mu.Lock()
+			qw.failed[id] = struct{}{}
+			qw.mu.Unlock()
 			continue
 		}
 
 		go func(id string, c *websocket.Conn) {
+			// Single-writer guard for this websocket
+			wmu := getWriteMu(id)
+			wmu.Lock()
+			err := c.WriteMessage(websocket.TextMessage, msg)
+			wmu.Unlock()
+			if err != nil {
+				// Mark as failed and remove the connection safely
+				qw.mu.Lock()
+				qw.failed[id] = struct{}{}
+				qw.mu.Unlock()
 
-			if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
+				wsConnMu.Lock()
+				_ = c.Close()
+				delete(wsConnMap, id)
+				wsConnMu.Unlock()
 				return
 			}
 
+			// Short read deadline for reply
 			_ = c.SetReadDeadline(time.Now().Add(time.Second))
 			_, raw, err := c.ReadMessage()
+			if err != nil {
+				// Mark as failed and remove the connection safely
+				qw.mu.Lock()
+				qw.failed[id] = struct{}{}
+				qw.mu.Unlock()
 
-			if err == nil {
-
-				select {
-
-				case qw.responseCh <- QuorumResponse{id: id, msg: raw}:
-				case <-qw.done:
-
-				}
-
+				wsConnMu.Lock()
+				_ = c.Close()
+				delete(wsConnMap, id)
+				wsConnMu.Unlock()
+				return
 			}
 
+			select {
+			case qw.responseCh <- QuorumResponse{id: id, msg: raw}:
+			case <-qw.done:
+			}
 		}(id, conn)
-
 	}
-
 }
 
 func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
-
 	for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
-
 		if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
-
 			var err error
-
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = openWebsocketConnectionWithPoD()
-
 			if err != nil {
-
 				time.Sleep(RETRY_INTERVAL)
-
 				continue
-
 			}
-
 		}
 
 		err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, msg)
-
 		if err != nil {
-
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
-
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
-
 			time.Sleep(RETRY_INTERVAL)
-
 			continue
-
 		}
 
 		_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
-
 		if err != nil {
-
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
-
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
-
 			time.Sleep(RETRY_INTERVAL)
-
 			continue
-
 		}
 
 		return resp, nil
@@ -143,47 +201,45 @@ func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 }
 
 func OpenWebsocketConnectionsWithQuorum(quorum []string, wsConnMap map[string]*websocket.Conn) {
-
-	// Close and remove any existing connections
-
-	// For safety reasons - close connections even in case websocket handler exists for quorum member in NEW quorum
-
+	// Close and remove any existing connections (called once per your note)
+	wsConnMu.Lock()
 	for id, conn := range wsConnMap {
 		if conn != nil {
 			_ = conn.Close()
 		}
 		delete(wsConnMap, id)
 	}
+	wsConnMu.Unlock()
 
 	// Establish new connections for each validator in the quorum
 	for _, validatorPubkey := range quorum {
-		// Fetch validator metadata from LevelDB
+		// Fetch validator metadata
 		raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorPubkey+"(POOL)_STORAGE_POOL"), nil)
-
 		if err != nil {
 			continue
 		}
 
-		// Parse JSON metadata
+		// Parse metadata
 		var pool structures.PoolStorage
 		if err := json.Unmarshal(raw, &pool); err != nil {
 			continue
 		}
 
-		// Skip inactive validators or those without WebSocket URL
+		// Skip if no WS URL
 		if pool.WssPoolUrl == "" {
 			continue
 		}
 
-		// Open WebSocket connection
+		// Dial
 		conn, _, err := websocket.DefaultDialer.Dial(pool.WssPoolUrl, nil)
-
 		if err != nil {
 			continue
 		}
 
-		// Store the new connection in the map
+		// Store in the shared map under lock
+		wsConnMu.Lock()
 		wsConnMap[validatorPubkey] = conn
+		wsConnMu.Unlock()
 	}
 }
 
@@ -191,10 +247,11 @@ func NewQuorumWaiter(maxQuorumSize int) *QuorumWaiter {
 	return &QuorumWaiter{
 		responseCh: make(chan QuorumResponse, maxQuorumSize),
 		done:       make(chan struct{}),
-		answered:   make(map[string]bool, maxQuorumSize),
+		answered:   make(map[string]struct{}, maxQuorumSize),
 		responses:  make(map[string][]byte, maxQuorumSize),
 		timer:      time.NewTimer(0),
 		buf:        make([]string, 0, maxQuorumSize),
+		failed:     make(map[string]struct{}),
 	}
 }
 
@@ -214,9 +271,13 @@ func (qw *QuorumWaiter) SendAndWait(
 	for k := range qw.responses {
 		delete(qw.responses, k)
 	}
+	for k := range qw.failed {
+		delete(qw.failed, k)
+	}
 	qw.buf = qw.buf[:0]
 	qw.mu.Unlock()
 
+	// Arm/Reset timer
 	if !qw.timer.Stop() {
 		select {
 		case <-qw.timer.C:
@@ -226,14 +287,15 @@ func (qw *QuorumWaiter) SendAndWait(
 	qw.timer.Reset(time.Second)
 	qw.done = make(chan struct{})
 
+	// First send to the whole quorum
 	qw.sendMessages(quorum, message, wsConnMap)
 
 	for {
 		select {
 		case r := <-qw.responseCh:
 			qw.mu.Lock()
-			if !qw.answered[r.id] {
-				qw.answered[r.id] = true
+			if _, ok := qw.answered[r.id]; !ok {
+				qw.answered[r.id] = struct{}{}
 				qw.responses[r.id] = r.msg
 			}
 			count := len(qw.answered)
@@ -241,33 +303,39 @@ func (qw *QuorumWaiter) SendAndWait(
 
 			if count >= majority {
 				close(qw.done)
-				// Return copy of responses
+				// copy responses
 				qw.mu.Lock()
 				out := make(map[string][]byte, len(qw.responses))
 				for k, v := range qw.responses {
 					out[k] = v
 				}
 				qw.mu.Unlock()
+
+				// one-shot reconnect of failed nodes
+				qw.reconnectFailed(wsConnMap)
 				return out, true
 			}
 
 		case <-qw.timer.C:
+			// resend to unanswered
 			qw.mu.Lock()
 			qw.buf = qw.buf[:0]
 			for _, id := range quorum {
-				if !qw.answered[id] {
+				if _, ok := qw.answered[id]; !ok {
 					qw.buf = append(qw.buf, id)
 				}
 			}
 			qw.mu.Unlock()
 
 			if len(qw.buf) == 0 {
+				qw.reconnectFailed(wsConnMap)
 				return nil, false
 			}
 			qw.timer.Reset(time.Second)
 			qw.sendMessages(qw.buf, message, wsConnMap)
 
 		case <-ctx.Done():
+			qw.reconnectFailed(wsConnMap)
 			return nil, false
 		}
 	}
