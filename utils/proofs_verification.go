@@ -125,7 +125,7 @@ func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandle
 
 	if err == nil {
 
-		var localAfpParsed *structures.AggregatedFinalizationProof
+		var localAfpParsed structures.AggregatedFinalizationProof
 
 		err = json.Unmarshal(localAfpAsBytes, &localAfpParsed)
 
@@ -133,7 +133,7 @@ func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandle
 			return nil
 		}
 
-		return localAfpParsed
+		return &localAfpParsed
 
 	}
 

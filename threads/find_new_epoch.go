@@ -61,17 +61,17 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 
 	body, _ := io.ReadAll(resp.Body)
 
-	var aefp *structures.AggregatedEpochFinalizationProof
+	var aefp structures.AggregatedEpochFinalizationProof
 
-	err = json.Unmarshal(body, aefp)
+	err = json.Unmarshal(body, &aefp)
 
 	if err == nil {
 
-		if utils.VerifyAggregatedEpochFinalizationProof(aefp, quorum, majority, epochFullID) {
+		if utils.VerifyAggregatedEpochFinalizationProof(&aefp, quorum, majority, epochFullID) {
 
 			select {
 
-			case resultCh <- aefp:
+			case resultCh <- &aefp:
 			case <-ctx.Done():
 
 			}
