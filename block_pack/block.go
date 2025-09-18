@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,14 +49,22 @@ func NewBlock(transactions []structures.Transaction, extraData ExtraData, epochF
 
 func (block *Block) GetHash() string {
 
-	jsonedTransactions, _ := json.Marshal(block.Transactions)
+	jsonedTransactions, err := json.Marshal(block.Transactions)
+	if err != nil {
+		panic("GetHash: failed to marshal transactions: " + err.Error())
+	}
 
-	networkID := globals.GENESIS.NetworkId
-
-	dataToHash := block.Creator + strconv.FormatInt(block.Time, 10) + string(jsonedTransactions) + networkID + block.Epoch + strconv.FormatUint(uint64(block.Index), 10) + block.PrevHash
+	dataToHash := strings.Join([]string{
+		block.Creator,
+		strconv.FormatInt(block.Time, 10),
+		string(jsonedTransactions),
+		globals.GENESIS.NetworkId,
+		block.Epoch,
+		strconv.Itoa(block.Index),
+		block.PrevHash,
+	}, ":")
 
 	return utils.Blake3(dataToHash)
-
 }
 
 func (block *Block) SignBlock() {
