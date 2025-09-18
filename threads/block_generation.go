@@ -119,7 +119,7 @@ func getTransactionsFromMempool() []structures.Transaction {
 
 	limit := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.TxLimitPerBlock
 
-	mempoolSize := uint(len(globals.MEMPOOL.Slice))
+	mempoolSize := len(globals.MEMPOOL.Slice)
 
 	if limit > mempoolSize {
 		limit = mempoolSize
