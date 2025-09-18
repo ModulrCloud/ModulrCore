@@ -336,7 +336,9 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			if poolStorage.TotalStaked < requiredStake {
 
-				removeFromSlice(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
+				reg := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry
+
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = removeFromSlice(reg, poolPubKey)
 
 			}
 
@@ -384,7 +386,9 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			if poolStorage.TotalStaked < requiredStake {
 
-				removeFromSlice(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry, poolPubKey)
+				reg := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry
+
+				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry = removeFromSlice(reg, poolPubKey)
 
 			}
 
