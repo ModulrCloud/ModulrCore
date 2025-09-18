@@ -126,8 +126,11 @@ func NewEpochProposerThread() {
 			if _, err := globals.EPOCH_DATA.Get([]byte("AEFP:"+strconv.Itoa(epochIndex)), nil); err != nil {
 
 				firstBlockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfLeader + ":0"
+
 				afpForFirstBlockRaw, _ := globals.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
+
 				var afpForFirstBlock structures.AggregatedFinalizationProof
+
 				json.Unmarshal(afpForFirstBlockRaw, &afpForFirstBlock)
 
 				epochFinishPropositionRequest = structures.EpochFinishRequest{

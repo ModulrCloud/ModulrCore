@@ -211,7 +211,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 							// 2. Store the AFP for previous block
 
-							errStore := globals.EPOCH_DATA.Put([]byte("AFP:"+proposedBlockId), afpBytes, nil)
+							errStore := globals.EPOCH_DATA.Put([]byte("AFP:"+parsedRequest.PreviousBlockAfp.BlockId), afpBytes, nil)
 
 							votingStatBytes, errParse := json.Marshal(futureVotingDataToStore)
 
@@ -361,9 +361,13 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 				return
 			}
 
-			if propSkipData.Index > -1 && propSkipData.Hash == propSkipData.Afp.BlockHash && propSkipData.Index == indexOfBlockInAfp {
+			if propSkipData.Index > -1 {
 
-				afpIsOk = utils.VerifyAggregatedFinalizationProof(&propSkipData.Afp, epochHandler)
+				if propSkipData.Hash == propSkipData.Afp.BlockHash && propSkipData.Index == indexOfBlockInAfp {
+
+					afpIsOk = utils.VerifyAggregatedFinalizationProof(&propSkipData.Afp, epochHandler)
+
+				}
 
 			} else {
 
@@ -376,10 +380,8 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 				if parsedRequest.SkipData.Index == -1 {
 
-					dataToSignForLeaderRotation := "LEADER_ROTATION_PROOF:" + poolToRotate
-
+					dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + poolToRotate
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:-1"
-
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:" + epochFullID
 
 					firstBlockAfpIsOk = true
@@ -388,25 +390,15 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 					blockIdOfFirstBlock := strconv.Itoa(epochIndex) + ":" + poolToRotate + ":0"
 
-					blockIdsTheSame := parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock
-
-					fmt.Println("Mid verification: ", parsedRequest.AfpForFirstBlock)
-
-					fmt.Println("Mid 2 => ", utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler))
-
-					if blockIdsTheSame && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
+					if parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
 
 						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
 
-						dataToSignForLeaderRotation := "LEADER_ROTATION_PROOF:" + poolToRotate
-
-						dataToSignForLeaderRotation += ":" + firstBlockHash
-
-						dataToSignForLeaderRotation += ":" + strconv.Itoa(propSkipData.Index)
-
-						dataToSignForLeaderRotation += ":" + propSkipData.Hash
-
-						dataToSignForLeaderRotation += ":" + epochFullID
+						dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + poolToRotate +
+							":" + firstBlockHash +
+							":" + strconv.Itoa(propSkipData.Index) +
+							":" + propSkipData.Hash +
+							":" + epochFullID
 
 						firstBlockAfpIsOk = true
 
