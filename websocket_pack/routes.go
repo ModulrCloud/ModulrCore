@@ -237,7 +237,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 									}
 
-									dataToSign += prevBlockHash + proposedBlockId + proposedBlockHash + epochFullID
+									dataToSign += strings.Join([]string{prevBlockHash, proposedBlockId, proposedBlockHash, epochFullID}, ":")
 
 									response := WsFinalizationProofResponse{
 										Voter:             globals.CONFIGURATION.PublicKey,

@@ -49,7 +49,7 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
 
-	dataThatShouldBeSigned := proof.PrevBlockHash + proof.BlockId + proof.BlockHash + epochFullID
+	dataThatShouldBeSigned := strings.Join([]string{proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochFullID}, ":")
 
 	majority := GetQuorumMajority(epochHandler)
 
@@ -166,6 +166,7 @@ func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandle
 			defer resp.Body.Close()
 
 			var afp structures.AggregatedFinalizationProof
+
 			if json.NewDecoder(resp.Body).Decode(&afp) == nil && VerifyAggregatedFinalizationProof(&afp, epochHandler) {
 
 				// send the first valid result and immediately cancel all other requests
