@@ -85,7 +85,7 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 
 			cumulativeSum += validator.TotalStake
 
-			if deterministicRandomValue <= cumulativeSum {
+			if deterministicRandomValue < cumulativeSum {
 
 				// Add the chosen validator to the leaders sequence
 				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validator.ValidatorPubKey)
@@ -213,7 +213,7 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 			cumulativeSum += validator.TotalStake
 
 			// Preserve original logic: choose when r <= cumulativeSum
-			if r <= cumulativeSum {
+			if r < cumulativeSum {
 				// Add chosen validator
 				quorum = append(quorum, validator.ValidatorPubKey)
 

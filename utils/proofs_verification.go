@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/globals"
@@ -143,13 +142,17 @@ func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandle
 
 	var wg sync.WaitGroup
 
-	for _, node := range quorum {
-		wg.Add(1)
-		go func(endpoint string) {
-			defer wg.Done()
+	ctx, cancel := context.WithCancel(context.Background())
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
+	defer cancel() // ensure cancellation if function exits early
+
+	for _, node := range quorum {
+
+		wg.Add(1)
+
+		go func(endpoint string) {
+
+			defer wg.Done()
 
 			req, err := http.NewRequestWithContext(ctx, "GET", endpoint+"/aggregated_finalization_proof/"+blockID, nil)
 			if err != nil {
@@ -162,18 +165,19 @@ func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandle
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				return
-			}
-
 			var afp structures.AggregatedFinalizationProof
-			if err := json.NewDecoder(resp.Body).Decode(&afp); err != nil {
-				return
+			if json.NewDecoder(resp.Body).Decode(&afp) == nil && VerifyAggregatedFinalizationProof(&afp, epochHandler) {
+
+				// send the first valid result and immediately cancel all other requests
+				select {
+
+				case resultChan <- &afp:
+					cancel() // stop all remaining goroutines and HTTP requests
+				default:
+
+				}
 			}
 
-			if VerifyAggregatedFinalizationProof(&afp, epochHandler) {
-				resultChan <- &afp
-			}
 		}(node.Url)
 	}
 
