@@ -15,14 +15,21 @@ import (
 )
 
 const (
-	MAX_RETRIES    = 3
-	RETRY_INTERVAL = 200 * time.Millisecond
+	MAX_RETRIES             = 3
+	RETRY_INTERVAL          = 200 * time.Millisecond
+	POD_READ_WRITE_DEADLINE = 2 * time.Second // timeout for read/write operations for POD (point of distribution)
 )
 
-var WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn
+// Guards open/close & replace of PoD conn
+var podMu sync.Mutex
+
+// Single writer guarantee for PoD
+var podWriteMu sync.Mutex
 
 // Protects concurrent access to wsConnMap (map[string]*websocket.Conn)
 var wsConnMu sync.RWMutex
+
+var WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn
 
 // Ensures single writer per websocket connection (gorilla/websocket requirement)
 var wsWriteMu sync.Map // key: pubkey -> *sync.Mutex
@@ -168,28 +175,58 @@ func (qw *QuorumWaiter) sendMessages(targets []string, msg []byte, wsConnMap map
 }
 
 func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
+
 	for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
+
+		podMu.Lock()
+
 		if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == nil {
-			var err error
-			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION, err = openWebsocketConnectionWithPoD()
+
+			conn, err := openWebsocketConnectionWithPoD()
+
 			if err != nil {
+
+				podMu.Unlock()
+
 				time.Sleep(RETRY_INTERVAL)
+
 				continue
 			}
+
+			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = conn
+
 		}
 
-		err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.WriteMessage(websocket.TextMessage, msg)
+		c := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION
+
+		podMu.Unlock()
+
+		// single writer for this connection
+		podWriteMu.Lock()
+
+		_ = c.SetWriteDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
+
+		err := c.WriteMessage(websocket.TextMessage, msg)
+
+		podWriteMu.Unlock()
+
 		if err != nil {
-			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+			podMu.Lock()
+			_ = c.Close()
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			podMu.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
 
-		_, resp, err := WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.ReadMessage()
+		_ = c.SetReadDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
+		_, resp, err := c.ReadMessage()
+
 		if err != nil {
-			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION.Close()
+			podMu.Lock()
+			_ = c.Close()
 			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			podMu.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
@@ -198,6 +235,7 @@ func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("failed to send message after %d attempts", MAX_RETRIES)
+
 }
 
 func OpenWebsocketConnectionsWithQuorum(quorum []string, wsConnMap map[string]*websocket.Conn) {
