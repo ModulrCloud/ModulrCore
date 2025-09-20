@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -120,9 +121,15 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 						// Verify the finalization proof
 
-						dataThatShouldBeSigned := PROOFS_GRABBER.AcceptedHash + PROOFS_GRABBER.HuntingForBlockId + PROOFS_GRABBER.HuntingForBlockHash + epochFullId
+						dataThatShouldBeSigned := strings.Join(
 
-						finalizationProofIsOk := slices.Contains(epochHandler.Quorum, parsedFinalizationProof.Voter) && cryptography.VerifySignature(dataThatShouldBeSigned, parsedFinalizationProof.Voter, parsedFinalizationProof.FinalizationProof)
+							[]string{PROOFS_GRABBER.AcceptedHash, PROOFS_GRABBER.HuntingForBlockId, PROOFS_GRABBER.HuntingForBlockHash, epochFullId}, ":",
+						)
+
+						finalizationProofIsOk := slices.Contains(epochHandler.Quorum, parsedFinalizationProof.Voter) && cryptography.VerifySignature(
+
+							dataThatShouldBeSigned, parsedFinalizationProof.Voter, parsedFinalizationProof.FinalizationProof,
+						)
 
 						if finalizationProofIsOk {
 
