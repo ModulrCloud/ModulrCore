@@ -213,7 +213,12 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 			previousPool := epochHandler.LeadersSequence[position]
 
-			leaderRotationProof := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousPool]
+			leaderRotationProof, ok := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousPool]
+
+			if !ok {
+
+				leaderRotationProof.SkipIndex = -1
+			}
 
 			if position == 0 {
 

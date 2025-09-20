@@ -370,7 +370,7 @@ func generateBlock() {
 
 	// Safe "if" branch to prevent unnecessary blocks generation
 
-	shouldGenerateBlocks := currentLeaderPubKey == globals.CONFIGURATION.PublicKey && !(globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex > PROOFS_GRABBER.AcceptedIndex+1)
+	shouldGenerateBlocks := currentLeaderPubKey == globals.CONFIGURATION.PublicKey && globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex <= PROOFS_GRABBER.AcceptedIndex+1
 
 	shouldRotateEpochOnGenerationThread := globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID
 

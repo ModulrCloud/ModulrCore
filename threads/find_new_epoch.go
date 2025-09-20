@@ -26,6 +26,8 @@ type FirstBlockDataWithAefp struct {
 	Aefp *structures.AggregatedEpochFinalizationProof
 }
 
+var aefpHTTP = &http.Client{Timeout: 2 * time.Second}
+
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
 
 func ExecuteDelayedTransaction(delayedTransaction map[string]string, context string) {
@@ -52,34 +54,27 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 		return
 	}
 
-	resp, err := http.DefaultClient.Do(req)
-
+	resp, err := aefpHTTP.Do(req)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-
-	var aefp structures.AggregatedEpochFinalizationProof
-
-	err = json.Unmarshal(body, &aefp)
-
-	if err == nil {
-
-		if utils.VerifyAggregatedEpochFinalizationProof(&aefp, quorum, majority, epochFullID) {
-
-			select {
-
-			case resultCh <- &aefp:
-			case <-ctx.Done():
-
-			}
-
-		}
-
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return
 	}
 
+	var aefp structures.AggregatedEpochFinalizationProof
+	if err := json.NewDecoder(resp.Body).Decode(&aefp); err != nil {
+		return
+	}
+	if utils.VerifyAggregatedEpochFinalizationProof(&aefp, quorum, majority, epochFullID) {
+		select {
+		case resultCh <- &aefp:
+		case <-ctx.Done():
+		}
+	}
 }
 
 func EpochRotationThread() {
@@ -314,7 +309,7 @@ func EpochRotationThread() {
 
 						utils.SetLeadersSequence(&nextEpochHandler, nextEpochHash)
 
-						atomicBatch.Put([]byte("LATEST_BATCH_INDEX:"), []byte(strconv.Itoa(int(latestBatchIndex))))
+						atomicBatch.Put([]byte("LATEST_BATCH_INDEX"), []byte(strconv.Itoa(int(latestBatchIndex))))
 
 						globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = nextEpochHandler
 
