@@ -30,22 +30,6 @@ var aefpHTTP = &http.Client{Timeout: 2 * time.Second}
 
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
 
-func ExecuteDelayedTransaction(delayedTransaction map[string]string, context string) {
-
-	if delayedTxType, ok := delayedTransaction["type"]; ok {
-
-		// Now find the handler
-
-		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
-
-			funcHandler(delayedTransaction, context)
-
-		}
-
-	}
-
-}
-
 func fetchAefp(ctx context.Context, url string, quorum []string, majority int, epochFullID string, resultCh chan<- *structures.AggregatedEpochFinalizationProof) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -75,6 +59,61 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 		case <-ctx.Done():
 		}
 	}
+}
+
+const LATEST_BATCH_KEY = "LATEST_BATCH_INDEX"
+
+// Reads latest batch index from LevelDB.
+// Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
+func readLatestBatchIndex() int64 {
+
+	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(LATEST_BATCH_KEY), nil)
+
+	if err != nil || len(raw) == 0 {
+		return 0
+	}
+
+	if len(raw) == 8 {
+		return int64(binary.BigEndian.Uint64(raw))
+	}
+
+	// Legacy format: decimal string. Try to parse and migrate.
+	if v, perr := strconv.ParseInt(string(raw), 10, 64); perr == nil && v >= 0 {
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], uint64(v))
+		_ = globals.APPROVEMENT_THREAD_METADATA.Put([]byte(LATEST_BATCH_KEY), buf[:], nil)
+		return v
+	}
+
+	return 0
+
+}
+
+// Writes latest batch index to LevelDB as 8-byte BigEndian.
+func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
+
+	var buf [8]byte
+
+	binary.BigEndian.PutUint64(buf[:], uint64(v))
+
+	batch.Put([]byte(LATEST_BATCH_KEY), buf[:])
+
+}
+
+func ExecuteDelayedTransaction(delayedTransaction map[string]string, context string) {
+
+	if delayedTxType, ok := delayedTransaction["type"]; ok {
+
+		// Now find the handler
+
+		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
+
+			funcHandler(delayedTransaction, context)
+
+		}
+
+	}
+
 }
 
 func EpochRotationThread() {
@@ -177,13 +216,7 @@ func EpochRotationThread() {
 
 						// 3. Verify that quorum agreed batch of delayed transactions
 
-						latestBatchIndex := int64(0)
-
-						latestBatchIndexRaw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
-
-						if err == nil {
-							latestBatchIndex = int64(binary.BigEndian.Uint64(latestBatchIndexRaw))
-						}
+						latestBatchIndex := readLatestBatchIndex()
 
 						var delayedTransactionsToExecute []map[string]string
 
@@ -207,7 +240,9 @@ func EpochRotationThread() {
 
 							loweredPubKey := strings.ToLower(signerPubKey)
 
-							if isOK && quorumMap[signerPubKey] && !unique[loweredPubKey] {
+							quorumMember := quorumMap[loweredPubKey]
+
+							if isOK && quorumMember && !unique[loweredPubKey] {
 
 								unique[loweredPubKey] = true
 
@@ -309,7 +344,7 @@ func EpochRotationThread() {
 
 						utils.SetLeadersSequence(&nextEpochHandler, nextEpochHash)
 
-						atomicBatch.Put([]byte("LATEST_BATCH_INDEX"), []byte(strconv.Itoa(int(latestBatchIndex))))
+						writeLatestBatchIndexBatch(atomicBatch, latestBatchIndex)
 
 						globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = nextEpochHandler
 
