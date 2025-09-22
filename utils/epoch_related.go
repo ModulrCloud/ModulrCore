@@ -23,13 +23,20 @@ func GetCurrentLeader() CurrentLeaderData {
 
 	currentLeaderPubKey := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence[currentLeaderIndex]
 
-	if currentLeaderPubKey == globals.CONFIGURATION.PublicKey {
+	if currentLeaderPubKey != globals.CONFIGURATION.PublicKey {
 
-		return CurrentLeaderData{IsMeLeader: true, Url: ""}
+		poolStorage := GetPoolFromApprovementThreadState(currentLeaderPubKey)
+
+		if poolStorage != nil {
+
+			return CurrentLeaderData{IsMeLeader: false, Url: poolStorage.PoolUrl}
+
+		}
 
 	}
 
-	return CurrentLeaderData{IsMeLeader: false, Url: ""}
+	return CurrentLeaderData{IsMeLeader: true, Url: ""}
+
 }
 
 func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed string) {
@@ -47,7 +54,7 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 	// Populate validator data and calculate total stake sum
 	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
-		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
+		validatorData := GetPoolFromApprovementThreadState(validatorPubKey)
 
 		// Calculate total stake
 		totalStakeByThisValidator := validatorData.TotalStaked
@@ -127,7 +134,7 @@ func GetQuorumUrlsAndPubkeys(epochHandler *structures.EpochDataHandler) []struct
 
 	for _, pubKey := range epochHandler.Quorum {
 
-		poolStorage := GetFromApprovementThreadState(pubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := GetPoolFromApprovementThreadState(pubKey)
 
 		toReturn = append(toReturn, structures.QuorumMemberData{PubKey: pubKey, Url: poolStorage.PoolUrl})
 
@@ -162,7 +169,7 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 
 	for _, validatorPubKey := range epochHandler.PoolsRegistry {
 
-		validatorData := GetFromApprovementThreadState(validatorPubKey + "(POOL)_STORAGE_POOL")
+		validatorData := GetPoolFromApprovementThreadState(validatorPubKey)
 
 		totalStakeByThisValidator := validatorData.TotalStaked // uint64
 

@@ -126,7 +126,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	if context == "AT" {
 
-		poolStorage := utils.GetFromApprovementThreadState(poolId)
+		poolStorage := utils.GetPoolFromApprovementThreadState(creator)
 
 		if poolStorage != nil {
 
@@ -136,7 +136,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 			poolStorage.WssPoolUrl = wssPoolURL
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
+			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolId] = poolStorage
 
 			return true
 
@@ -156,7 +156,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 			poolStorage.WssPoolUrl = wssPoolURL
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[creator+"(POOL)_STORAGE_POOL"] = poolStorage
+			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = poolStorage
 
 			return true
 
@@ -182,7 +182,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 	if context == "AT" {
 
-		poolStorage := utils.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromApprovementThreadState(poolPubKey)
 
 		if poolStorage != nil {
 
@@ -300,7 +300,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	if context == "AT" {
 
-		poolStorage := utils.GetFromApprovementThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromApprovementThreadState(poolPubKey)
 
 		if poolStorage != nil {
 

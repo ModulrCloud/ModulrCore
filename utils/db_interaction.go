@@ -18,29 +18,31 @@ func OpenDb(dbName string) *leveldb.DB {
 	return db
 }
 
-func GetFromApprovementThreadState(poolId string) *structures.PoolStorage {
+func GetPoolFromApprovementThreadState(poolPubkey string) *structures.PoolStorage {
 
-	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolId]; ok {
+	poolStorageFullId := poolPubkey + "(POOL)_STORAGE_POOL"
+
+	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolStorageFullId]; ok {
 		return val
 	}
 
-	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(poolId), nil)
+	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(poolStorageFullId), nil)
 
 	if err != nil {
 		return nil
 	}
 
-	var pool structures.PoolStorage
+	var poolStorage structures.PoolStorage
 
-	err = json.Unmarshal(data, &pool)
+	err = json.Unmarshal(data, &poolStorage)
 
 	if err != nil {
 		return nil
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolId] = &pool
+	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolStorageFullId] = &poolStorage
 
-	return &pool
+	return &poolStorage
 
 }
 
