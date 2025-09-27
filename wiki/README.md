@@ -1,0 +1,1 @@
+# Directory with files to explain how to contribute, how the system works, etc.
