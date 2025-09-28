@@ -120,9 +120,9 @@ func SequenceAlignmentThread() {
 
 										poolOnThisPosition := epochHandlerRef.LeadersSequence[position]
 
-										alrpForThisPoolFromCurrentSet := currentAlrpSet[poolOnThisPosition]
+										alrpForThisPoolFromCurrentSet, dataExists := currentAlrpSet[poolOnThisPosition]
 
-										if alrpForThisPoolFromCurrentSet.Index != -1 {
+										if dataExists && alrpForThisPoolFromCurrentSet.Index != -1 {
 
 											// Ask the first block and extract next set of ALRPs
 
