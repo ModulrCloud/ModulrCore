@@ -531,8 +531,6 @@ func generateBlock() {
 
 					// Parse results here and modify the content inside ALRP_METADATA
 
-					fmt.Println("DEBUG: Results of ALRP requests ", resultsOfAlrpRequests)
-
 					for leaderID, validatorsResponses := range resultsOfAlrpRequests {
 
 						if alrpMetadataForPrevLeader, ok := ALRP_METADATA[leaderID]; ok {
@@ -542,6 +540,8 @@ func generateBlock() {
 								var response structures.ResponseStatus
 
 								if errParse := json.Unmarshal(validatorResponse, &response); errParse == nil {
+
+									fmt.Println("DEBUG: Parsed ALRP request is ", response)
 
 									if response.Status == "OK" {
 
@@ -579,19 +579,23 @@ func generateBlock() {
 
 										if errParse := json.Unmarshal(validatorResponse, &lrpUpgrade); errParse == nil {
 
+											fmt.Println("DEBUG: Parsed UPGRADE is ", lrpUpgrade)
+
 											ourLocalHeightIsLower := alrpMetadataForPrevLeader.SkipData.Index < lrpUpgrade.SkipData.Index
 
 											if ourLocalHeightIsLower {
 
-												blockIdInAfp := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":" + strconv.Itoa(lrpUpgrade.SkipData.Index)
+												blockIdInSkipDataAfp := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":" + strconv.Itoa(lrpUpgrade.SkipData.Index)
 
-												proposedHeightIsValid := lrpUpgrade.SkipData.Hash == lrpUpgrade.AfpForFirstBlock.BlockHash && blockIdInAfp == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.SkipData.Afp, epochHandlerRef)
+												proposedSkipDataIsValid := lrpUpgrade.SkipData.Hash == lrpUpgrade.SkipData.Afp.BlockHash && blockIdInSkipDataAfp == lrpUpgrade.SkipData.Afp.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.SkipData.Afp, epochHandlerRef)
 
 												firstBlockID := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":0"
 
 												proposedFirstBlockIsValid := firstBlockID == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.AfpForFirstBlock, epochHandlerRef)
 
-												if proposedFirstBlockIsValid && proposedHeightIsValid {
+												fmt.Println("DEBUG: Verified values are => ", proposedFirstBlockIsValid, proposedSkipDataIsValid)
+
+												if proposedFirstBlockIsValid && proposedSkipDataIsValid {
 
 													alrpMetadataForPrevLeader.AfpForFirstBlock = lrpUpgrade.AfpForFirstBlock
 
