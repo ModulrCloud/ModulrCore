@@ -107,23 +107,20 @@ func ExecutionThread() {
 
 					response := getBlockAndProofFromPoD(blockId)
 
-					if response != nil {
+					// Leave cycle if no response or no block
+					if response == nil || response.Block == nil {
+						break
+					}
 
-						if localExecMetadataForLeader.Index+1 == metadataFromAefpForLeader.Index && response.Block.GetHash() == metadataFromAefpForLeader.Hash {
+					if localExecMetadataForLeader.Index+1 == metadataFromAefpForLeader.Index && response.Block.GetHash() == metadataFromAefpForLeader.Hash {
 
-							// Let it execute without AFP verification
+						// No need to verify AFP
+						ExecuteBlock(response.Block)
 
-							ExecuteBlock(response.Block)
+					} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
-						} else if utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
-
-							ExecuteBlock(response.Block)
-
-						} else {
-
-							break
-
-						}
+						// Exec only if AFP is valid
+						ExecuteBlock(response.Block)
 
 					} else {
 
@@ -188,23 +185,20 @@ func ExecutionThread() {
 
 				response := getBlockAndProofFromPoD(blockId)
 
-				if response != nil {
+				// If no data - break
+				if response == nil || response.Block == nil {
+					break
+				}
 
-					if execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
+				if execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
 
-						// Let it execute without AFP verification
+					// Let is exec without AFP
+					ExecuteBlock(response.Block)
 
-						ExecuteBlock(response.Block)
+				} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
-					} else if utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
-
-						ExecuteBlock(response.Block)
-
-					} else {
-
-						break
-
-					}
+					// Exec only if AFP is valid
+					ExecuteBlock(response.Block)
 
 				} else {
 
@@ -449,7 +443,7 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 		// In case we know that pool on this position created 0 block - don't return from function and continue the cycle iterations
 
-		if infoAboutLastBlocksByPreviousPool[leaderPubKey].Index == -1 {
+		if prev, ok := infoAboutLastBlocksByPreviousPool[leaderPubKey]; ok && prev.Index == -1 {
 
 			continue
 
