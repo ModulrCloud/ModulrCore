@@ -19,17 +19,23 @@ var FEES_COLLECTOR uint64 = 0
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
-	request := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
+	req := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
 
-	var response websocket_pack.WsBlockWithAfpResponse
+	if reqBytes, err := json.Marshal(req); err == nil {
 
-	if requestBytes, err := json.Marshal(request); err == nil {
+		if respBytes, err := utils.SendWebsocketMessageToPoD(reqBytes); err == nil {
 
-		if responseBytes, err := utils.SendWebsocketMessageToPoD(requestBytes); err == nil {
+			var resp websocket_pack.WsBlockWithAfpResponse
 
-			if err := json.Unmarshal(responseBytes, &response); err == nil {
+			if err := json.Unmarshal(respBytes, &resp); err == nil {
 
-				return &response
+				if resp.Block == nil {
+
+					return nil
+
+				}
+
+				return &resp
 
 			}
 
@@ -37,7 +43,7 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 	}
 
-	return &response
+	return nil
 
 }
 
