@@ -31,11 +31,6 @@ const (
 	WHITE_COLOR      = "\033[37;1m"
 )
 
-type ValidatorData struct {
-	ValidatorPubKey string
-	TotalStake      uint64
-}
-
 func StrToUint8(s string) uint8 {
 	v, err := strconv.ParseUint(s, 10, 8)
 	if err != nil {

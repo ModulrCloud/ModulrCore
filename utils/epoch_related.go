@@ -13,6 +13,11 @@ type CurrentLeaderData struct {
 	Url        string
 }
 
+type ValidatorData struct {
+	ValidatorPubKey string
+	TotalStake      uint64
+}
+
 func GetCurrentLeader() CurrentLeaderData {
 
 	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
