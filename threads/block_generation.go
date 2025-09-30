@@ -409,6 +409,11 @@ func generateBlock() {
 
 		}
 
+		// Safe "if" branch to prevent unnecessary blocks generation
+		if !shouldGenerateBlocks {
+			return
+		}
+
 		extraData := block_pack.ExtraDataToBlock{}
 
 		if globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex == 0 {
