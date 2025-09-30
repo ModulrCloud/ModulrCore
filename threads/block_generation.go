@@ -37,9 +37,15 @@ func BlocksGenerationThread() {
 
 	for {
 
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+
+		blockTime := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.BlockTime
+
 		generateBlock()
 
-		time.Sleep(1 * time.Second)
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+		time.Sleep(time.Duration(blockTime) * time.Millisecond)
 
 	}
 
@@ -341,10 +347,6 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 
 func generateBlock() {
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
-
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
-
 	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
 	if !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
@@ -407,7 +409,7 @@ func generateBlock() {
 
 		}
 
-		extraData := block_pack.ExtraData{}
+		extraData := block_pack.ExtraDataToBlock{}
 
 		if globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex == 0 {
 

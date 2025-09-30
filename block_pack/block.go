@@ -16,7 +16,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
-type ExtraData struct {
+type ExtraDataToBlock struct {
 	Rest                            map[string]string                                    `json:"rest"`
 	AefpForPreviousEpoch            *structures.AggregatedEpochFinalizationProof         `json:"aefpForPreviousEpoch"`
 	DelayedTransactionsBatch        structures.DelayedTransactionsBatch                  `json:"delayedTxsBatch"`
@@ -28,13 +28,13 @@ type Block struct {
 	Time         int64                    `json:"time"`
 	Epoch        string                   `json:"epoch"`
 	Transactions []structures.Transaction `json:"transactions"`
-	ExtraData    ExtraData                `json:"extraData"`
+	ExtraData    ExtraDataToBlock         `json:"extraData"`
 	Index        int                      `json:"index"`
 	PrevHash     string                   `json:"prevHash"`
 	Sig          string                   `json:"sig"`
 }
 
-func NewBlock(transactions []structures.Transaction, extraData ExtraData, epochFullID string) *Block {
+func NewBlock(transactions []structures.Transaction, extraData ExtraDataToBlock, epochFullID string) *Block {
 	return &Block{
 		Creator:      globals.CONFIGURATION.PublicKey,
 		Time:         utils.GetUTCTimestampInMilliSeconds(),
