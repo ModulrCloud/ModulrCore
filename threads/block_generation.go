@@ -22,9 +22,9 @@ import (
 
 type DoubleMap = map[string]map[string][]byte
 
-var ALRP_METADATA = make(map[string]*structures.AlrpSkeleton) // previousLeaderPubkey => ALRP_METADATA
+var ALRP_METADATA = make(map[string]*structures.AlrpSkeleton) // previousLeaderPubkey => AlrpData
 
-var WEBSOCKET_CONNECTIONS_FOR_ALRP = make(map[string]*websocket.Conn) // quorumMember => websocket handler
+var WEBSOCKET_CONNECTIONS_FOR_ALRP = make(map[string]*websocket.Conn) // quorumMember => websocket connection handler
 
 type RotationProofCollector struct {
 	wsConnMap map[string]*websocket.Conn
@@ -85,7 +85,10 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 	result := make(DoubleMap)
 
 	for _, leaderID := range leaderIDs {
+
 		wg.Add(1)
+
+		message := alrpRequestTemplate(leaderID, epochHandler) // get message here to avoid doing it in goroutine and therefore - concurrent reads
 
 		go func(leaderID string) {
 
@@ -96,8 +99,6 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 			// Create a timeout for a call
 			leaderCtx, cancel := context.WithTimeout(ctx, collector.timeout)
 			defer cancel()
-
-			message := alrpRequestTemplate(leaderID, epochHandler)
 
 			responses, ok := waiter.SendAndWait(leaderCtx, message, collector.quorum, collector.wsConnMap, collector.majority)
 			if !ok {
