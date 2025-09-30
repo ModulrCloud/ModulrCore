@@ -3,7 +3,6 @@ package threads
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -78,8 +77,6 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 	mu := sync.Mutex{}
 
 	result := make(DoubleMap)
-
-	fmt.Println("DEBUG: Going to send req to ", collector.quorum)
 
 	for _, leaderID := range leaderIDs {
 		wg.Add(1)
@@ -287,11 +284,7 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 				firstBlockID := strconv.Itoa(epochIndex) + ":" + leaderPubkey + ":0"
 
-				fmt.Println("DEBUG => Calling ============================================")
-
 				afpForFirstBlock := utils.GetVerifiedAggregatedFinalizationProofByBlockId(firstBlockID, epochHandlerRef)
-
-				fmt.Printf("afpForFirstBlock: %v\n", afpForFirstBlock)
 
 				if afpForFirstBlock != nil {
 
@@ -501,8 +494,6 @@ func generateBlock() {
 
 				for _, leaderID := range pubkeysOfLeadersToGetAlrps {
 
-					fmt.Println("DEBUG: Trying to get ALRP for ", leaderID)
-
 					if possibleAlrp := getAggregatedLeaderRotationProof(majority, epochIndex, leaderID); possibleAlrp != nil {
 
 						alrpsForPreviousLeaders[leaderID] = possibleAlrp
@@ -541,8 +532,6 @@ func generateBlock() {
 
 								if errParse := json.Unmarshal(validatorResponse, &response); errParse == nil {
 
-									fmt.Println("DEBUG: Parsed ALRP request is ", response)
-
 									if response.Status == "OK" {
 
 										var lrpOk websocket_pack.WsLeaderRotationProofResponseOk
@@ -579,8 +568,6 @@ func generateBlock() {
 
 										if errParse := json.Unmarshal(validatorResponse, &lrpUpgrade); errParse == nil {
 
-											fmt.Println("DEBUG: Parsed UPGRADE is ", lrpUpgrade)
-
 											ourLocalHeightIsLower := alrpMetadataForPrevLeader.SkipData.Index < lrpUpgrade.SkipData.Index
 
 											if ourLocalHeightIsLower {
@@ -592,8 +579,6 @@ func generateBlock() {
 												firstBlockID := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":0"
 
 												proposedFirstBlockIsValid := firstBlockID == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.AfpForFirstBlock, epochHandlerRef)
-
-												fmt.Println("DEBUG: Verified values are => ", proposedFirstBlockIsValid, proposedSkipDataIsValid)
 
 												if proposedFirstBlockIsValid && proposedSkipDataIsValid {
 
