@@ -88,7 +88,7 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 
 		wg.Add(1)
 
-		message := alrpRequestTemplate(leaderID, epochHandler) // get message here to avoid doing it in goroutine and therefore - concurrent reads
+		message := alrpRequestTemplate(leaderID, epochHandler)
 
 		go func(leaderID string) {
 
