@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
@@ -193,6 +194,8 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 		pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
 
+		fmt.Println("DEBUG: ", epochHandler.LeadersSequence, " => ", localIndexOfLeader)
+
 		if utils.SignalAboutEpochRotationExists(epochIndex) {
 
 			votingMetadataForPool := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
@@ -209,31 +212,34 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 				_ = json.Unmarshal(votingRaw, &votingData)
 			}
 
-			blockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
-
-			var hashOfFirstBlock string
-
-			if proposition.AfpForFirstBlock.BlockId == blockID && proposition.LastBlockProposition.Index >= 0 {
-
-				if utils.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
-
-					hashOfFirstBlock = proposition.AfpForFirstBlock.BlockHash
-
-				}
-
-			}
-
-			if hashOfFirstBlock == "" {
-
-				sendJson(ctx, ErrMsg{Err: "Can't verify hash"})
-
-				return
-
-			}
+			b, _ := json.MarshalIndent(proposition, "", "  ")
+			fmt.Println(string(b))
 
 			if proposition.CurrentLeader == localIndexOfLeader {
 
 				if votingData.Index == proposition.LastBlockProposition.Index && votingData.Hash == proposition.LastBlockProposition.Hash {
+
+					var hashOfFirstBlock string
+
+					blockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
+
+					if proposition.AfpForFirstBlock.BlockId == blockID && proposition.LastBlockProposition.Index >= 0 {
+
+						if utils.VerifyAggregatedFinalizationProof(&proposition.AfpForFirstBlock, epochHandler) {
+
+							hashOfFirstBlock = proposition.AfpForFirstBlock.BlockHash
+
+						}
+
+					}
+
+					if hashOfFirstBlock == "" {
+
+						sendJson(ctx, ErrMsg{Err: "Can't verify hash"})
+
+						return
+
+					}
 
 					dataToSign := "EPOCH_DONE:" +
 						strconv.Itoa(proposition.CurrentLeader) + ":" +
@@ -257,6 +263,8 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 						LastBlockProposition: votingData,
 					}
 
+					fmt.Println("DEBUG: =================== Sending UPGRADE 1 ===================")
+
 					sendJson(ctx, response)
 
 				}
@@ -268,6 +276,8 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 					CurrentLeader:        localIndexOfLeader,
 					LastBlockProposition: votingData,
 				}
+
+				fmt.Println("DEBUG: =================== Sending UPGRADE 2 ===================")
 
 				sendJson(ctx, response)
 
