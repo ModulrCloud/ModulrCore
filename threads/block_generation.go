@@ -523,7 +523,7 @@ func generateBlock() {
 						wsConnMap: WEBSOCKET_CONNECTIONS_FOR_ALRP,
 						quorum:    epochHandlerRef.Quorum,
 						majority:  majority,
-						timeout:   5 * time.Second,
+						timeout:   2 * time.Second,
 					}
 
 					resultsOfAlrpRequests := collector.AlrpForLeadersCollector(context.Background(), pubkeysOfLeadersToGetAlrps, epochHandlerRef)

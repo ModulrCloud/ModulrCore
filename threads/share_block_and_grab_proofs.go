@@ -187,13 +187,15 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 				PROOFS_GRABBER.AcceptedHash = PROOFS_GRABBER.HuntingForBlockHash
 
 				msg := fmt.Sprintf(
-					"%sApproved height for epoch %s%d %sis %s%d %s(%.3f%% agreements)",
+					"%sApproved height for epoch %s%d %sis %s%d %s(hash:%s...) %s(%.3f%% agreements)",
 					utils.RED_COLOR,
 					utils.CYAN_COLOR,
 					epochHandler.Id,
 					utils.RED_COLOR,
 					utils.CYAN_COLOR,
 					PROOFS_GRABBER.AcceptedIndex-1,
+					utils.CYAN_COLOR,
+					PROOFS_GRABBER.AfpForPrevious.PrevBlockHash[:8],
 					utils.GREEN_COLOR,
 					float64(len(FINALIZATION_PROOFS_CACHE))/float64(len(epochHandler.Quorum))*100,
 				)
