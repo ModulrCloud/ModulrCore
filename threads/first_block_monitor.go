@@ -3,6 +3,7 @@ package threads
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -57,6 +58,22 @@ func FirstBlockInEpochMonitor() {
 
 				globals.EPOCH_DATA.Put([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochHandlerRef.Id)), serializedData, nil)
 
+				msg := fmt.Sprintf(
+					"%sFirst block for epoch %s%d %sis %s(hash:%s...) %sby %s%s",
+					utils.DEEP_GREEN_COLOR,
+					utils.CYAN_COLOR,
+					epochHandlerRef.Id,
+					utils.DEEP_GREEN_COLOR,
+					utils.CYAN_COLOR,
+					firstBlockData.FirstBlockHash[:8],
+					utils.DEEP_GREEN_COLOR,
+					utils.CYAN_COLOR,
+					firstBlockData.FirstBlockCreator,
+				)
+
+				fmt.Println()
+				utils.LogWithTime(msg, utils.WHITE_COLOR)
+				fmt.Println()
 			}
 
 		}
