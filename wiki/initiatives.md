@@ -8,3 +8,13 @@ Currently once node become a leader it starts the process of ALRP grabbing for e
 
 ###### Solution
 Add a separate independent thread which will listen the network and grab ALRPs immediately and in async way
+
+#### 2. Get rid of AEFP necessary when network tries to rotate the epoch
+
+###### Problem
+
+Quorum members generate AEFPs in a separate independent thread once epoch time is out. Another thread finds this AEFPs and include it to blocks of the next epoch to let us recover the execution thread and have a 100% guarantee of latest block in epoch `N` from the first block in epoch `N+1`
+
+###### Solution
+We can ignore it and recover execution thread sequence later, in async way. So quorum might be immediately rotated and network will move to the next epoch immediately
+
