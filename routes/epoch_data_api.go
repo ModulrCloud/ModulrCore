@@ -194,8 +194,6 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 		pubKeyOfCurrentLeader := epochHandler.LeadersSequence[localIndexOfLeader]
 
-		fmt.Println("DEBUG: ", epochHandler.LeadersSequence, " => ", localIndexOfLeader)
-
 		if utils.SignalAboutEpochRotationExists(epochIndex) {
 
 			votingMetadataForPool := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
@@ -263,8 +261,6 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 						LastBlockProposition: votingData,
 					}
 
-					fmt.Println("DEBUG: =================== Sending UPGRADE 1 ===================")
-
 					sendJson(ctx, response)
 
 				}
@@ -276,8 +272,6 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 					CurrentLeader:        localIndexOfLeader,
 					LastBlockProposition: votingData,
 				}
-
-				fmt.Println("DEBUG: =================== Sending UPGRADE 2 ===================")
 
 				sendJson(ctx, response)
 
