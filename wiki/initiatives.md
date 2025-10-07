@@ -18,3 +18,6 @@ Quorum members generate AEFPs in a separate independent thread once epoch time i
 ###### Solution
 We can ignore it and recover execution thread sequence later, in async way. So quorum might be immediately rotated and network will move to the next epoch immediately
 
+#### 3. Architecture "Plan B" - extra threads, 100% stability, no need in awaits for proofs
+
+Blueprints, in next versions
