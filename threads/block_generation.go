@@ -3,6 +3,7 @@ package threads
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -370,6 +371,8 @@ func generateBlock() {
 
 	shouldRotateEpochOnGenerationThread := globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID
 
+	fmt.Println("DEBUG: Try to generate block => ", shouldGenerateBlocks || shouldRotateEpochOnGenerationThread)
+
 	if shouldGenerateBlocks || shouldRotateEpochOnGenerationThread {
 
 		PROOFS_GRABBER_MUTEX.RUnlock()
@@ -409,6 +412,8 @@ func generateBlock() {
 			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS_FOR_ALRP)
 
 		}
+
+		fmt.Println("DEBUG: Found AEFP and new data in GT => ", aefpForPreviousEpoch)
 
 		// Safe "if" branch to prevent unnecessary blocks generation
 		if !shouldGenerateBlocks {
