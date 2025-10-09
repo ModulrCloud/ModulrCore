@@ -3,7 +3,6 @@ package threads
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -371,13 +370,9 @@ func generateBlock() {
 
 	shouldRotateEpochOnGenerationThread := globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID
 
-	fmt.Println("DEBUG: Try to generate block => ", shouldGenerateBlocks || shouldRotateEpochOnGenerationThread)
-
 	if shouldGenerateBlocks || shouldRotateEpochOnGenerationThread {
 
 		PROOFS_GRABBER_MUTEX.RUnlock()
-
-		var aefpForPreviousEpoch *structures.AggregatedEpochFinalizationProof = nil
 
 		// Check if <epochFullID> is the same in APPROVEMENT_THREAD and in GENERATION_THREAD
 
@@ -387,9 +382,13 @@ func generateBlock() {
 
 			if epochIndex != 0 {
 
-				aefpForPreviousEpoch = getAggregatedEpochFinalizationProof(epochHandlerRef)
+				aefpForPreviousEpoch := getAggregatedEpochFinalizationProof(epochHandlerRef)
 
-				if aefpForPreviousEpoch == nil {
+				if aefpForPreviousEpoch != nil {
+
+					globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch = aefpForPreviousEpoch
+
+				} else {
 
 					return
 
@@ -413,8 +412,6 @@ func generateBlock() {
 
 		}
 
-		fmt.Println("DEBUG: Found AEFP and new data in GT => ", aefpForPreviousEpoch)
-
 		// Safe "if" branch to prevent unnecessary blocks generation
 		if !shouldGenerateBlocks {
 			return
@@ -426,9 +423,9 @@ func generateBlock() {
 
 			if epochIndex > 0 {
 
-				if aefpForPreviousEpoch != nil {
+				if globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch != nil {
 
-					extraData.AefpForPreviousEpoch = aefpForPreviousEpoch
+					extraData.AefpForPreviousEpoch = globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch
 
 				} else {
 
