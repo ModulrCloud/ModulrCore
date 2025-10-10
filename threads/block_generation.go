@@ -406,6 +406,10 @@ func generateBlock() {
 
 			globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex = 0
 
+			// Nullify values in ALRP map
+
+			ALRP_METADATA = make(map[string]*structures.AlrpSkeleton)
+
 			// Open websocket connections with the quorum of new epoch
 
 			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS_FOR_ALRP)
