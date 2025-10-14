@@ -2,7 +2,6 @@ package routes
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
@@ -209,9 +208,6 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 			} else {
 				_ = json.Unmarshal(votingRaw, &votingData)
 			}
-
-			b, _ := json.MarshalIndent(proposition, "", "  ")
-			fmt.Println(string(b))
 
 			if proposition.CurrentLeader == localIndexOfLeader {
 

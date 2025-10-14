@@ -374,8 +374,6 @@ func generateBlock() {
 
 		PROOFS_GRABBER_MUTEX.RUnlock()
 
-		var aefpForPreviousEpoch *structures.AggregatedEpochFinalizationProof = nil
-
 		// Check if <epochFullID> is the same in APPROVEMENT_THREAD and in GENERATION_THREAD
 
 		if shouldRotateEpochOnGenerationThread {
@@ -384,9 +382,13 @@ func generateBlock() {
 
 			if epochIndex != 0 {
 
-				aefpForPreviousEpoch = getAggregatedEpochFinalizationProof(epochHandlerRef)
+				aefpForPreviousEpoch := getAggregatedEpochFinalizationProof(epochHandlerRef)
 
-				if aefpForPreviousEpoch == nil {
+				if aefpForPreviousEpoch != nil {
+
+					globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch = aefpForPreviousEpoch
+
+				} else {
 
 					return
 
@@ -403,6 +405,10 @@ func generateBlock() {
 			globals.GENERATION_THREAD_METADATA_HANDLER.PrevHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 			globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex = 0
+
+			// Nullify values in ALRP map
+
+			ALRP_METADATA = make(map[string]*structures.AlrpSkeleton)
 
 			// Open websocket connections with the quorum of new epoch
 
@@ -421,9 +427,9 @@ func generateBlock() {
 
 			if epochIndex > 0 {
 
-				if aefpForPreviousEpoch != nil {
+				if globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch != nil {
 
-					extraData.AefpForPreviousEpoch = aefpForPreviousEpoch
+					extraData.AefpForPreviousEpoch = globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch
 
 				} else {
 
