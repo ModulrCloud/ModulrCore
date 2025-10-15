@@ -412,9 +412,11 @@ func ExecuteTransaction(tx *structures.Transaction) {
 
 			accountFrom.Balance -= totalSpend
 
-			accountTo.Balance += totalSpend
+			accountTo.Balance += tx.Amount
 
 			FEES_COLLECTOR += tx.Fee
+
+			accountFrom.Nonce++
 
 		}
 
