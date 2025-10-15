@@ -3,6 +3,7 @@ package threads
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"time"
@@ -47,17 +48,26 @@ func SequenceAlignmentThread() {
 
 		// Network error or timeout
 		if err != nil {
+
 			time.Sleep(time.Second)
+
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
 			continue
+
 		}
 
 		// Non-200 response, close immediately
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close() // important: close response body before continuing
+
+			resp.Body.Close()
+
 			time.Sleep(time.Second)
+
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
 			continue
+
 		}
 
 		var targetResponse TargetResponse
@@ -65,17 +75,26 @@ func SequenceAlignmentThread() {
 		fmt.Println("DEBUG: Target response is => ")
 
 		// Decode JSON response
-		if err := json.NewDecoder(resp.Body).Decode(&targetResponse); err != nil {
-			resp.Body.Close() // close body if decode fails
+		dec := json.NewDecoder(io.LimitReader(resp.Body, 10<<20)) // 10 MiB limit
+
+		if err := dec.Decode(&targetResponse); err != nil {
+
+			resp.Body.Close()
+
 			time.Sleep(time.Second)
+
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
 			continue
+
 		}
 
 		// Body successfully decoded, safe to close now
 		resp.Body.Close()
 
-		if localVersionOfCurrentLeader <= targetResponse.ProposedIndexOfLeader && targetResponse.FirstBlockByCurrentLeader.Index == 0 {
+		proposedLeaderIndexIsValid := localVersionOfCurrentLeader < targetResponse.ProposedIndexOfLeader && targetResponse.ProposedIndexOfLeader < len(epochHandlerRef.LeadersSequence)
+
+		if proposedLeaderIndexIsValid && targetResponse.FirstBlockByCurrentLeader.Index == 0 {
 
 			// Verify the AFP for second block(with index 1 in epoch) to make sure that block 0(first block in epoch) was 100% accepted
 
