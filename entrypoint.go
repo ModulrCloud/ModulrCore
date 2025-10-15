@@ -38,10 +38,10 @@ func RunBlockchain() {
 	go threads.LeaderRotationThread()
 
 	//✅ 6.Logical thread to build the temporary sequence of blocks to verify them
-	//go threads.SequenceAlignmentThread()
+	go threads.SequenceAlignmentThread()
 
 	//✅ 7.Start execution process - take blocks and execute transactions
-	//go threads.ExecutionThread()
+	go threads.ExecutionThread()
 
 	//✅ 8.This thread will be responsible to find the first block in each epoch
 	go threads.FirstBlockInEpochMonitor()

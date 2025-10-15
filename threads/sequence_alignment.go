@@ -2,6 +2,7 @@ package threads
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"time"
@@ -40,7 +41,11 @@ func SequenceAlignmentThread() {
 			Timeout: 5 * time.Second,
 		}
 
-		resp, err := client.Get(randomTarget.Url)
+		resp, err := client.Get(randomTarget.Url + "/sequence_alignment")
+
+		fmt.Println("DEBUG: Have after call => ", resp)
+
+		fmt.Println("DEBUG: Have after call (err) => ", err)
 
 		if err != nil {
 			time.Sleep(time.Second)
@@ -54,6 +59,11 @@ func SequenceAlignmentThread() {
 		}
 
 		var targetResponse TargetResponse
+
+		fmt.Println("DEBUG: Target response is => ")
+
+		b, _ := json.MarshalIndent(targetResponse, "", "  ")
+		fmt.Println(string(b))
 
 		if err := json.NewDecoder(resp.Body).Decode(&targetResponse); err == nil {
 
