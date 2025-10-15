@@ -445,7 +445,7 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 	infoAboutLastBlocksByPreviousPool := make(map[string]structures.ExecutionStatsPerPool)
 
-	for position := aefp.LastLeader; position > 0; position-- {
+	for position := int(aefp.LastLeader); position >= 0; position-- {
 
 		leaderPubKey := epochHandler.LeadersSequence[position]
 
