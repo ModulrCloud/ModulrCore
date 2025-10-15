@@ -102,10 +102,9 @@ func SequenceAlignmentThread() {
 			firstBlock := &targetResponse.FirstBlockByCurrentLeader
 			proposedIndex := targetResponse.ProposedIndexOfLeader
 
-			sameHash := afp.PrevBlockHash == firstBlock.GetHash()
-			validProof := utils.VerifyAggregatedFinalizationProof(afp, epochHandlerRef)
+			sameHashAndValidAfp := afp.PrevBlockHash == firstBlock.GetHash() && utils.VerifyAggregatedFinalizationProof(afp, epochHandlerRef)
 
-			if sameHash && validProof {
+			if sameHashAndValidAfp {
 
 				// Verify all the ALRPs in block header
 				if epochHandlerRef.LeadersSequence[proposedIndex] == firstBlock.Creator {
