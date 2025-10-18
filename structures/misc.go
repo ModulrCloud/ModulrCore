@@ -1,5 +1,7 @@
 package structures
 
+import "encoding/json"
+
 type ResponseStatus struct {
 	Status string
 }
@@ -42,4 +44,20 @@ func NewExecutionStatsTemplate() ExecutionStatsPerPool {
 		FirstBlockHash: "",
 	}
 
+}
+
+func (dtb *DelayedTransactionsBatch) UnmarshalJSON(data []byte) error {
+	type alias DelayedTransactionsBatch
+	var aux alias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if aux.DelayedTransactions == nil {
+		aux.DelayedTransactions = make([]map[string]string, 0)
+	}
+	if aux.Proofs == nil {
+		aux.Proofs = make(map[string]string)
+	}
+	*dtb = DelayedTransactionsBatch(aux)
+	return nil
 }

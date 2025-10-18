@@ -21,7 +21,7 @@ type Transaction struct {
 	Payload map[string]any `json:"payload"`
 }
 
-func (t Transaction) Hash() string {
+func (t *Transaction) Hash() string {
 	payloadJSON, err := json.Marshal(t.Payload)
 	if err != nil {
 		return ""
@@ -40,4 +40,17 @@ func (t Transaction) Hash() string {
 
 	sum := blake3.Sum256([]byte(preimage))
 	return hex.EncodeToString(sum[:])
+}
+
+func (t *Transaction) UnmarshalJSON(data []byte) error {
+	type alias Transaction
+	var aux alias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if aux.Payload == nil {
+		aux.Payload = make(map[string]any)
+	}
+	*t = Transaction(aux)
+	return nil
 }
