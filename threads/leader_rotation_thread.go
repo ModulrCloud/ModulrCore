@@ -12,7 +12,7 @@ import (
 
 func timeIsOutForCurrentLeader(approvementThread *structures.ApprovementThreadMetadataHandler) bool {
 
-	// Function to check if time frame for current leader is done and we have to move to next pool in sequence
+	// Function to check if time frame for current leader is done and we have to move to next leader in sequence
 
 	leaderShipTimeframe := approvementThread.NetworkParameters.LeadershipTimeframe
 
@@ -30,6 +30,15 @@ func LeaderRotationThread() {
 
 		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
+		/*
+
+			We don't do rotation when it's the last leader. For example, if we have sequence:
+
+			[L0,L1,L2,...Ln]
+
+			If we reached Ln - no need to rotate, it's already finish
+
+		*/
 		haveNextCandidate := epochHandlerRef.CurrentLeaderIndex+1 < len(epochHandlerRef.LeadersSequence)
 
 		if haveNextCandidate && timeIsOutForCurrentLeader(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {

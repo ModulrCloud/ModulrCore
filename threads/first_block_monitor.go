@@ -88,11 +88,11 @@ func GetFirstBlockDataFromDB(epochIndex int) *structures.FirstBlockResult {
 
 	if rawBytes, err := globals.EPOCH_DATA.Get([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochIndex)), nil); err == nil {
 
-		var firstBlockData *structures.FirstBlockResult
+		var firstBlockData structures.FirstBlockResult
 
 		if err := json.Unmarshal(rawBytes, &firstBlockData); err == nil {
 
-			return firstBlockData
+			return &firstBlockData
 
 		}
 
@@ -230,12 +230,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 			previousPool := epochHandler.LeadersSequence[position]
 
-			leaderRotationProof, ok := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousPool]
-
-			if !ok {
-
-				leaderRotationProof.SkipIndex = -1
-			}
+			leaderRotationProof := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousPool]
 
 			if position == 0 {
 
