@@ -186,21 +186,25 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 				PROOFS_GRABBER.AcceptedHash = PROOFS_GRABBER.HuntingForBlockHash
 
-				msg := fmt.Sprintf(
-					"%sApproved height for epoch %s%d %sis %s%d %s(hash:%s...) %s(%.3f%% agreements)",
-					utils.RED_COLOR,
-					utils.CYAN_COLOR,
-					epochHandler.Id,
-					utils.RED_COLOR,
-					utils.CYAN_COLOR,
-					PROOFS_GRABBER.AcceptedIndex-1,
-					utils.CYAN_COLOR,
-					PROOFS_GRABBER.AfpForPrevious.PrevBlockHash[:8],
-					utils.GREEN_COLOR,
-					float64(len(FINALIZATION_PROOFS_CACHE))/float64(len(epochHandler.Quorum))*100,
-				)
+				if PROOFS_GRABBER.AcceptedIndex > 0 {
 
-				utils.LogWithTime(msg, utils.WHITE_COLOR)
+					msg := fmt.Sprintf(
+						"%sApproved height for epoch %s%d %sis %s%d %s(hash:%s...) %s(%.3f%% agreements)",
+						utils.RED_COLOR,
+						utils.CYAN_COLOR,
+						epochHandler.Id,
+						utils.RED_COLOR,
+						utils.CYAN_COLOR,
+						PROOFS_GRABBER.AcceptedIndex-1,
+						utils.CYAN_COLOR,
+						PROOFS_GRABBER.AfpForPrevious.PrevBlockHash[:8],
+						utils.GREEN_COLOR,
+						float64(len(FINALIZATION_PROOFS_CACHE))/float64(len(epochHandler.Quorum))*100,
+					)
+
+					utils.LogWithTime(msg, utils.WHITE_COLOR)
+
+				}
 
 				// Delete finalization proofs that we don't need more
 
@@ -266,6 +270,10 @@ func BlocksSharingAndProofsGrabingThread() {
 
 					AcceptedHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				}
+
+				// Also - clean the mapping with the signatures for AFP
+
+				FINALIZATION_PROOFS_CACHE = make(map[string]string)
 
 			}
 

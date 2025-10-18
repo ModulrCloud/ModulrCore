@@ -72,8 +72,6 @@ func SequenceAlignmentThread() {
 
 		var targetResponse TargetResponse
 
-		fmt.Println("DEBUG: Target response is => ")
-
 		// Decode JSON response
 		dec := json.NewDecoder(io.LimitReader(resp.Body, 10<<20)) // 10 MiB limit
 
@@ -88,6 +86,8 @@ func SequenceAlignmentThread() {
 			continue
 
 		}
+
+		fmt.Println("DEBUG: Target response is => ", dec)
 
 		// Body successfully decoded, safe to close now
 		resp.Body.Close()

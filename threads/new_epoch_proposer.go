@@ -151,8 +151,8 @@ func NewEpochProposerThread() {
 
 			quorumMembers := utils.GetQuorumUrlsAndPubkeys(epochHandlerRef)
 
-			resultsCh := make(chan Agreement, len(quorumMembers))
-			upgradeCh := make(chan structures.EpochFinishResponseUpgrade, len(quorumMembers))
+			resultsChan := make(chan Agreement, len(quorumMembers))
+			upgradeChan := make(chan structures.EpochFinishResponseUpgrade, len(quorumMembers))
 
 			var wg sync.WaitGroup
 
@@ -211,7 +211,7 @@ func NewEpochProposerThread() {
 
 						if cryptography.VerifySignature(dataToSign, desc.PubKey, resultAsStruct.Sig) {
 
-							resultsCh <- Agreement{
+							resultsChan <- Agreement{
 								PubKey: desc.PubKey,
 								Sig:    resultAsStruct.Sig,
 							}
@@ -237,7 +237,7 @@ func NewEpochProposerThread() {
 							proposedLeaderHasBiggerIndex := resultAsStruct.CurrentLeader > LAST_LEADER_PROPOSITION.LeaderIndex
 
 							if sameBlockID && sameHash && proposedLeaderHasBiggerIndex {
-								upgradeCh <- resultAsStruct
+								upgradeChan <- resultAsStruct
 							}
 
 						}
@@ -248,14 +248,14 @@ func NewEpochProposerThread() {
 
 			wg.Wait()
 
-			close(resultsCh)
-			close(upgradeCh)
+			close(resultsChan)
+			close(upgradeChan)
 
-			for result := range resultsCh {
+			for result := range resultsChan {
 				LAST_LEADER_PROPOSITION.QuorumAgreements[result.PubKey] = result.Sig
 			}
 
-			for upgradeProposition := range upgradeCh {
+			for upgradeProposition := range upgradeChan {
 
 				if upgradeProposition.CurrentLeader > LAST_LEADER_PROPOSITION.LeaderIndex {
 
