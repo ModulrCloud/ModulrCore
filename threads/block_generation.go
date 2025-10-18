@@ -88,28 +88,31 @@ func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Con
 
 		wg.Add(1)
 
-		message := alrpRequestTemplate(leaderID, epochHandler)
+		if message := alrpRequestTemplate(leaderID, epochHandler); len(message) > 0 {
 
-		go func(leaderID string) {
+			go func(leaderID string) {
 
-			defer wg.Done()
+				defer wg.Done()
 
-			waiter := utils.NewQuorumWaiter(len(collector.quorum))
+				waiter := utils.NewQuorumWaiter(len(collector.quorum))
 
-			// Create a timeout for a call
-			leaderCtx, cancel := context.WithTimeout(ctx, collector.timeout)
-			defer cancel()
+				// Create a timeout for a call
+				leaderCtx, cancel := context.WithTimeout(ctx, collector.timeout)
+				defer cancel()
 
-			responses, ok := waiter.SendAndWait(leaderCtx, message, collector.quorum, collector.wsConnMap, collector.majority)
-			if !ok {
-				return
-			}
+				responses, ok := waiter.SendAndWait(leaderCtx, message, collector.quorum, collector.wsConnMap, collector.majority)
+				if !ok {
+					return
+				}
 
-			mu.Lock()
-			result[leaderID] = responses
-			mu.Unlock()
+				mu.Lock()
+				result[leaderID] = responses
+				mu.Unlock()
 
-		}(leaderID)
+			}(leaderID)
+
+		}
+
 	}
 
 	wg.Wait()
@@ -194,6 +197,8 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 	var wg sync.WaitGroup
 
+	aefpHTTP := &http.Client{Timeout: 2 * time.Second}
+
 	for _, nodeEndpoint := range allKnownNodes {
 
 		wg.Add(1)
@@ -211,7 +216,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 				return
 			}
 
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := aefpHTTP.Do(req)
 			if err != nil {
 				return
 			}

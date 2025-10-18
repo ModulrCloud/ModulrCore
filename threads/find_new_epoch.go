@@ -100,7 +100,7 @@ func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
 
 }
 
-func ExecuteDelayedTransaction(delayedTransaction map[string]string, context string) {
+func ExecuteDelayedTransaction(delayedTransaction map[string]string, contextTag string) {
 
 	if delayedTxType, ok := delayedTransaction["type"]; ok {
 
@@ -108,7 +108,7 @@ func ExecuteDelayedTransaction(delayedTransaction map[string]string, context str
 
 		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
 
-			funcHandler(delayedTransaction, context)
+			funcHandler(delayedTransaction, contextTag)
 
 		}
 
@@ -320,7 +320,7 @@ func EpochRotationThread() {
 
 						}
 
-						utils.LogWithTime("Dealyed txs were executed for epoch on AT: "+epochFullID, utils.GREEN_COLOR)
+						utils.LogWithTime("Delayed txs were executed for epoch on AT: "+epochFullID, utils.GREEN_COLOR)
 
 						//_______________________ Update the values for new epoch _______________________
 
