@@ -49,9 +49,9 @@ func SequenceAlignmentThread() {
 		// Network error or timeout
 		if err != nil {
 
-			time.Sleep(time.Second)
-
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+			time.Sleep(time.Second)
 
 			continue
 
@@ -62,9 +62,9 @@ func SequenceAlignmentThread() {
 
 			resp.Body.Close()
 
-			time.Sleep(time.Second)
-
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+			time.Sleep(time.Second)
 
 			continue
 
@@ -81,9 +81,9 @@ func SequenceAlignmentThread() {
 
 			resp.Body.Close()
 
-			time.Sleep(time.Second)
-
 			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+			time.Sleep(time.Second)
 
 			continue
 

@@ -41,7 +41,7 @@ func RunBlockchain() {
 	go threads.SequenceAlignmentThread()
 
 	//✅ 7.Start execution process - take blocks and execute transactions
-	go threads.ExecutionThread()
+	//go threads.ExecutionThread()
 
 	//✅ 8.This thread will be responsible to find the first block in each epoch
 	go threads.FirstBlockInEpochMonitor()
