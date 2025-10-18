@@ -123,10 +123,14 @@ func ExecutionThread() {
 						// No need to verify AFP
 						ExecuteBlock(response.Block)
 
+						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
+
 					} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 						// Exec only if AFP is valid
 						ExecuteBlock(response.Block)
+
+						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
 
 					} else {
 
@@ -201,10 +205,14 @@ func ExecutionThread() {
 					// Let is exec without AFP
 					ExecuteBlock(response.Block)
 
+					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
+
 				} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 					// Exec only if AFP is valid
 					ExecuteBlock(response.Block)
+
+					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
 
 				} else {
 
