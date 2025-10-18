@@ -30,22 +30,6 @@ type DelayedTransactionsBatch struct {
 	Proofs              map[string]string   `json:"proofs"`
 }
 
-type ExecutionStatsPerPool struct {
-	Index          int
-	Hash           string
-	FirstBlockHash string
-}
-
-func NewExecutionStatsTemplate() ExecutionStatsPerPool {
-
-	return ExecutionStatsPerPool{
-		Index:          -1,
-		Hash:           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		FirstBlockHash: "",
-	}
-
-}
-
 func (dtb *DelayedTransactionsBatch) UnmarshalJSON(data []byte) error {
 	type alias DelayedTransactionsBatch
 	var aux alias
@@ -60,4 +44,20 @@ func (dtb *DelayedTransactionsBatch) UnmarshalJSON(data []byte) error {
 	}
 	*dtb = DelayedTransactionsBatch(aux)
 	return nil
+}
+
+type ExecutionStatsPerPool struct {
+	Index          int
+	Hash           string
+	FirstBlockHash string
+}
+
+func NewExecutionStatsTemplate() ExecutionStatsPerPool {
+
+	return ExecutionStatsPerPool{
+		Index:          -1,
+		Hash:           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		FirstBlockHash: "",
+	}
+
 }
