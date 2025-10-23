@@ -376,7 +376,7 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 
 	*/
 
-	blockCreatorStorage := utils.GetValidatorFromExecThreadState(blockCreatorPubkey + "_VALIDATOR_STORAGE")
+	blockCreatorStorage := utils.GetValidatorFromExecThreadState(blockCreatorPubkey)
 
 	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
 

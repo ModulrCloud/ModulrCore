@@ -59,9 +59,7 @@ func LogWithTime(msg, msgColor string) {
 
 	formattedDate := time.Now().Format("02 January 2006 at 03:04:05 PM")
 
-	var prefixColor = DEEP_GREEN_COLOR
-
-	fmt.Printf(prefixColor+"[%s]"+MAGENTA_COLOR+"(pid:%d)"+msgColor+"  %s\n"+RESET_COLOR, formattedDate, os.Getpid(), msg)
+	fmt.Printf(DEEP_GREEN_COLOR+"[%s]"+MAGENTA_COLOR+"(pid:%d)"+msgColor+"  %s\n"+RESET_COLOR, formattedDate, os.Getpid(), msg)
 
 }
 

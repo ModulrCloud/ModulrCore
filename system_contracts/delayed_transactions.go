@@ -29,35 +29,35 @@ func removeFromSlice[T comparable](s []T, v T) []T {
 
 func CreateValidator(delayedTransaction map[string]string, context string) bool {
 
-	creator := delayedTransaction["creator"]
+	validatorPubkey := delayedTransaction["creator"]
 	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	validatorURL := delayedTransaction["validatorURL"]
 	wssValidatorURL := delayedTransaction["wssValidatorURL"]
 
 	if validatorURL != "" && wssValidatorURL != "" && percentage <= 100 {
 
-		storageKey := creator + "_VALIDATOR_STORAGE"
+		validatorStorageKey := validatorPubkey + "_VALIDATOR_STORAGE"
 
 		if context == "AT" {
 
-			if _, existsInCache := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[storageKey]; existsInCache {
+			if _, existsInCache := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
 
 				return false
 
 			}
 
-			_, existErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(storageKey), nil)
+			_, existErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
 
 			// Activate this branch only in case we still don't have this validator in db
 
 			if existErr != nil {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[storageKey] = &structures.ValidatorStorage{
-					Pubkey:      creator,
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
+					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
 					Stakers: map[string]structures.Staker{
-						creator: {
+						validatorPubkey: {
 							Stake: 0,
 						},
 					},
@@ -73,22 +73,22 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 		} else {
 
-			if _, existsInCache := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[storageKey]; existsInCache {
+			if _, existsInCache := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
 
 				return false
 
 			}
 
-			_, existErr := globals.STATE.Get([]byte(storageKey), nil)
+			_, existErr := globals.STATE.Get([]byte(validatorStorageKey), nil)
 
 			if existErr != nil {
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[storageKey] = &structures.ValidatorStorage{
-					Pubkey:      creator,
+				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
+					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
 					Stakers: map[string]structures.Staker{
-						creator: {
+						validatorPubkey: {
 							Stake: 0,
 						},
 					},
@@ -111,7 +111,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 func UpdateValidator(delayedTransaction map[string]string, context string) bool {
 
-	creator := delayedTransaction["creator"]
+	validatorPubkey := delayedTransaction["creator"]
 	percentage := utils.StrToUint8(delayedTransaction["percentage"])
 	validatorURL := delayedTransaction["validatorURL"]
 	wssValidatorURL := delayedTransaction["wssValidatorURL"]
@@ -122,11 +122,11 @@ func UpdateValidator(delayedTransaction map[string]string, context string) bool 
 
 	}
 
-	validatorStorageId := creator + "_VALIDATOR_STORAGE"
+	validatorStorageId := validatorPubkey + "_VALIDATOR_STORAGE"
 
 	if context == "AT" {
 
-		validatorStorage := utils.GetValidatorFromApprovementThreadState(creator)
+		validatorStorage := utils.GetValidatorFromApprovementThreadState(validatorPubkey)
 
 		if validatorStorage != nil {
 
@@ -146,7 +146,7 @@ func UpdateValidator(delayedTransaction map[string]string, context string) bool 
 
 	} else {
 
-		validatorStorage := utils.GetValidatorFromExecThreadState(validatorStorageId)
+		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey)
 
 		if validatorStorage != nil {
 
@@ -233,7 +233,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey + "_VALIDATOR_STORAGE")
+		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey)
 
 		if validatorStorage != nil {
 
@@ -350,7 +350,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey + "_VALIDATOR_STORAGE")
+		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey)
 
 		if validatorStorage != nil {
 
