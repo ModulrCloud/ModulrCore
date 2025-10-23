@@ -53,15 +53,15 @@ func BlocksGenerationThread() {
 
 func alrpRequestTemplate(leaderID string, epochHandler *structures.EpochDataHandler) []byte {
 
-	alrpMetadataForPool := ALRP_METADATA[leaderID]
+	alrpMetadataForLeader := ALRP_METADATA[leaderID]
 
-	if alrpMetadataForPool != nil {
+	if alrpMetadataForLeader != nil {
 
 		request := websocket_pack.WsLeaderRotationProofRequest{
-			Route:               "get_leader_rotation_proof",
-			IndexOfPoolToRotate: slices.Index(epochHandler.LeadersSequence, leaderID),
-			AfpForFirstBlock:    alrpMetadataForPool.AfpForFirstBlock,
-			SkipData:            alrpMetadataForPool.SkipData,
+			Route:                 "get_leader_rotation_proof",
+			IndexOfLeaderToRotate: slices.Index(epochHandler.LeadersSequence, leaderID),
+			AfpForFirstBlock:      alrpMetadataForLeader.AfpForFirstBlock,
+			SkipData:              alrpMetadataForLeader.SkipData,
 		}
 
 		if rawMsg, err := json.Marshal(request); err == nil {
@@ -262,20 +262,20 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
 
-	alrpMetadataForPool := ALRP_METADATA[leaderPubkey]
+	alrpMetadataForLeader := ALRP_METADATA[leaderPubkey]
 
-	if alrpMetadataForPool != nil {
+	if alrpMetadataForLeader != nil {
 
-		if len(alrpMetadataForPool.Proofs) >= majority {
+		if len(alrpMetadataForLeader.Proofs) >= majority {
 
 			// 1. In case in .proofs we have 2/3 votes - return ALRP
 
 			aggregatedLeaderRotationProof := &structures.AggregatedLeaderRotationProof{
 
-				FirstBlockHash: alrpMetadataForPool.AfpForFirstBlock.BlockHash,
-				SkipIndex:      alrpMetadataForPool.SkipData.Index,
-				SkipHash:       alrpMetadataForPool.SkipData.Hash,
-				Proofs:         alrpMetadataForPool.Proofs,
+				FirstBlockHash: alrpMetadataForLeader.AfpForFirstBlock.BlockHash,
+				SkipIndex:      alrpMetadataForLeader.SkipData.Index,
+				SkipHash:       alrpMetadataForLeader.SkipData.Hash,
+				Proofs:         alrpMetadataForLeader.Proofs,
 			}
 
 			return aggregatedLeaderRotationProof
@@ -286,7 +286,7 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 		// 2. If no data in ALRP_METADATA - create empty template
 
-		skipDataForLeader := structures.PoolVotingStat{}
+		skipDataForLeader := structures.LeaderVotingStat{}
 
 		keyBytes := []byte(strconv.Itoa(epochIndex) + ":" + leaderPubkey)
 
@@ -452,11 +452,11 @@ func generateBlock() {
 
 			if myIndexInLeadersSequence > 0 {
 
-				// Get all previous pools - from zero to <my_position>
+				// Get all previous leaders - from zero to <my_position>
 
-				pubKeysOfAllThePreviousPools := slices.Clone(epochHandlerRef.LeadersSequence[:myIndexInLeadersSequence])
+				pubKeysOfAllThePreviousLeader := slices.Clone(epochHandlerRef.LeadersSequence[:myIndexInLeadersSequence])
 
-				slices.Reverse(pubKeysOfAllThePreviousPools)
+				slices.Reverse(pubKeysOfAllThePreviousLeader)
 
 				previousToMeLeaderPubKey := epochHandlerRef.LeadersSequence[myIndexInLeadersSequence-1]
 
@@ -468,19 +468,19 @@ func generateBlock() {
 
 				/*
 
-				   Here we need to fill the object with aggregated leader rotation proofs (ALRPs) for all the previous pools till the pool which was rotated on not-zero height
+				   Here we need to fill the object with aggregated leader rotation proofs (ALRPs) for all the previous leaders till the leader which was rotated on not-zero height
 
 				   If we can't find all the required ALRPs - skip this iteration to try again later
 
 				*/
 
-				// Add the ALRP for the previous pools in leaders sequence
+				// Add the ALRP for the previous leaders in leaders sequence
 
 				pubkeysOfLeadersToGetAlrps := []string{}
 
-				for _, leaderPubKey := range pubKeysOfAllThePreviousPools {
+				for _, leaderPubKey := range pubKeysOfAllThePreviousLeader {
 
-					votingFinalizationStatsPerPool := &structures.PoolVotingStat{
+					votingFinalizationStatsPerLeader := &structures.LeaderVotingStat{
 						Index: -1,
 					}
 
@@ -488,12 +488,12 @@ func generateBlock() {
 
 					if finStatsRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyBytes, nil); err == nil {
 
-						if jsonErrParse := json.Unmarshal(finStatsRaw, votingFinalizationStatsPerPool); jsonErrParse == nil {
+						if jsonErrParse := json.Unmarshal(finStatsRaw, votingFinalizationStatsPerLeader); jsonErrParse == nil {
 
-							proofThatAtLeastFirstBlockWasCreated := votingFinalizationStatsPerPool.Index >= 0
+							proofThatAtLeastFirstBlockWasCreated := votingFinalizationStatsPerLeader.Index >= 0
 
-							// We 100% need ALRP for previous pool
-							// But no need in pools who created at least one block in epoch and it's not our previous pool
+							// We 100% need ALRP for previous leader
+							// But no need in leaders who created at least one block in epoch and it's not our previous leader
 
 							if leaderPubKey != previousToMeLeaderPubKey && proofThatAtLeastFirstBlockWasCreated {
 
@@ -567,7 +567,7 @@ func generateBlock() {
 
 											dataThatShouldBeSigned += ":" + epochFullID
 
-											if validatorID == lrpOk.Voter && leaderID == lrpOk.ForPoolPubkey && cryptography.VerifySignature(dataThatShouldBeSigned, validatorID, lrpOk.Sig) {
+											if validatorID == lrpOk.Voter && leaderID == lrpOk.ForLeaderPubkey && cryptography.VerifySignature(dataThatShouldBeSigned, validatorID, lrpOk.Sig) {
 
 												alrpMetadataForPrevLeader.Proofs[validatorID] = lrpOk.Sig
 
@@ -591,11 +591,11 @@ func generateBlock() {
 
 											if ourLocalHeightIsLower {
 
-												blockIdInSkipDataAfp := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":" + strconv.Itoa(lrpUpgrade.SkipData.Index)
+												blockIdInSkipDataAfp := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForLeaderPubkey + ":" + strconv.Itoa(lrpUpgrade.SkipData.Index)
 
 												proposedSkipDataIsValid := lrpUpgrade.SkipData.Hash == lrpUpgrade.SkipData.Afp.BlockHash && blockIdInSkipDataAfp == lrpUpgrade.SkipData.Afp.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.SkipData.Afp, epochHandlerRef)
 
-												firstBlockID := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForPoolPubkey + ":0"
+												firstBlockID := strconv.Itoa(epochIndex) + ":" + lrpUpgrade.ForLeaderPubkey + ":0"
 
 												proposedFirstBlockIsValid := firstBlockID == lrpUpgrade.AfpForFirstBlock.BlockId && utils.VerifyAggregatedFinalizationProof(&lrpUpgrade.AfpForFirstBlock, epochHandlerRef)
 

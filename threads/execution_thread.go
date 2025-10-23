@@ -61,9 +61,9 @@ func ExecutionThread() {
 
 		if epochHandlerRef.LegacyEpochAlignmentData.Activated {
 
-			infoFromAefpAboutLastBlocksByPools := epochHandlerRef.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch
+			infoFromAefpAboutLastBlocksByLeaders := epochHandlerRef.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch
 
-			var localExecMetadataForLeader, metadataFromAefpForLeader structures.ExecutionStatsPerPool
+			var localExecMetadataForLeader, metadataFromAefpForLeader structures.ExecutionStatsPerLeaderSequence
 
 			dataExists := false
 
@@ -75,7 +75,7 @@ func ExecutionThread() {
 
 				localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
 
-				metadataFromAefpForLeader, dataExists = infoFromAefpAboutLastBlocksByPools[pubKeyOfLeader]
+				metadataFromAefpForLeader, dataExists = infoFromAefpAboutLastBlocksByLeaders[pubKeyOfLeader]
 
 				if !dataExists {
 
@@ -153,7 +153,7 @@ func ExecutionThread() {
 
 		} else if currentEpochIsFresh && epochHandlerRef.CurrentEpochAlignmentData.Activated {
 
-			// Take the pool by it's position
+			// Take the leader by it's position
 
 			currentEpochAlignmentData := &epochHandlerRef.CurrentEpochAlignmentData
 
@@ -260,18 +260,18 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		}
 
-		//_____________________________________SHARE FEES AMONG POOL OWNER AND STAKERS__________________________________
+		//_____________________________________SHARE FEES AMONG VALIDATOR AND STAKERS__________________________________
 
 		/*
 
 		   Distribute fees among:
 
-		       [0] Block creator itself
-		       [1] Stakers of his pool
+		       [0] Block creator itself (validator)
+		       [1] Stakers of this validator
 
 		*/
 
-		DistributeFeesAmongStakersAndPool(block.Creator)
+		DistributeFeesAmongValidatorAndStakers(block.Creator)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
@@ -287,15 +287,15 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		}
 
-		for poolID, poolStorage := range epochHandlerRef.PoolsCache {
+		for validatorPubkey, validatorStorage := range epochHandlerRef.ValidatorsStoragesCache {
 
-			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+			if dataBytes, err := json.Marshal(validatorStorage); err == nil {
 
-				stateBatch.Put([]byte(poolID), dataBytes)
+				stateBatch.Put([]byte(validatorPubkey), dataBytes)
 
 			} else {
 
-				panic("Impossible to add pool data to atomic batch")
+				panic("Impossible to add validator storage to atomic batch")
 
 			}
 
@@ -343,40 +343,40 @@ func ExecuteBlock(block *block_pack.Block) {
 
 }
 
-func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
+func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 
 	/*
 
 	   _____________________Here we perform the following logic_____________________
 
-	   [*] FEES_COLLECTOR - number of total fees received in this block
+	   [*] FEES_COLLECTOR - number of total fees received in this block (global var)
 
-	   1) Get the pool storage to extract list of stakers
+	   1) Get the validator storage to extract list of stakers
 
-	   2) In this list (poolStorage.stakers) we have structure like:
+	   2) In this list (validatorStorage.stakers) we have structure like:
 
 	       {
-	           poolCreatorPubkey:{stake},
+	           validatorPubkey:{stake},
 	           ...
 	           stakerPubkey:{stake}
 	           ...
 	       }
 
-	   3) Send <stakingPoolStorage.percentage * FEES_COLLECTOR> to block creator:
+	   3) Send <validatorStorage.percentage * FEES_COLLECTOR> to block creator:
 
-	       poolCreatorAccount.balance += stakingPoolStorage.percentage * FEES_COLLECTOR
+	       validatorCreatorAccount.balance += validatorStorage.percentage * FEES_COLLECTOR
 
 	   2) Distribute the rest among other stakers
 
 	       For this, we should:
 
-	           2.1) Go through poolStorage.stakers
+	           2.1) Go through validatorStorage.stakers
 
 	           2.2) Increase balance - stakerAccount.balance += totalStakerPowerPercentage * restOfFees
 
 	*/
 
-	blockCreatorStorage := utils.GetPoolFromExecThreadState(blockCreatorPubkey + "_VALIDATOR_STORAGE")
+	blockCreatorStorage := utils.GetValidatorFromExecThreadState(blockCreatorPubkey + "_VALIDATOR_STORAGE")
 
 	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
 
@@ -386,7 +386,7 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
 
 	blockCreatorAccount.Balance += rewardForBlockCreator
 
-	// 2. Share the rest of fees among stakers due to their % part in total pool stake
+	// 2. Share the rest of fees among stakers due to their % part in total stake
 
 	feesToShareAmongStakers := FEES_COLLECTOR - rewardForBlockCreator
 
@@ -438,54 +438,54 @@ with epoch X and move to epoch X+1
 */
 func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *structures.AggregatedEpochFinalizationProof) {
 
-	emptyTemplate := make(map[string]structures.ExecutionStatsPerPool)
+	emptyTemplate := make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
-	infoAboutFinalBlocksByPool := make(map[string]map[string]structures.ExecutionStatsPerPool)
+	infoAboutFinalBlocksByLeaders := make(map[string]map[string]structures.ExecutionStatsPerLeaderSequence)
 
 	// Start the cycle in reverse order from <aefp.lastLeader>
 
 	lastLeaderPubkey := epochHandler.LeadersSequence[aefp.LastLeader]
 
-	emptyTemplate[lastLeaderPubkey] = structures.ExecutionStatsPerPool{
+	emptyTemplate[lastLeaderPubkey] = structures.ExecutionStatsPerLeaderSequence{
 		Index: int(aefp.LastIndex),
 		Hash:  aefp.LastHash,
 	}
 
-	infoAboutLastBlocksByPreviousPool := make(map[string]structures.ExecutionStatsPerPool)
+	infoAboutLastBlocksByPreviousLeader := make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 	for position := int(aefp.LastLeader); position >= 0; position-- {
 
 		leaderPubKey := epochHandler.LeadersSequence[position]
 
-		// In case we know that pool on this position created 0 block - don't return from function and continue the cycle iterations
+		// In case we know that leader on this position created 0 block - don't return from function and continue the cycle iterations
 
-		if prev, ok := infoAboutLastBlocksByPreviousPool[leaderPubKey]; ok && prev.Index == -1 {
+		if prev, ok := infoAboutLastBlocksByPreviousLeader[leaderPubKey]; ok && prev.Index == -1 {
 
 			continue
 
 		} else {
 
-			// Get the first block in this epoch by this pool
+			// Get the first block in this epoch by this leader
 
-			firstBlockInThisEpochByPool := block_pack.GetBlock(epochHandler.Id, leaderPubKey, 0, epochHandler)
+			firstBlockInThisEpochByLeader := block_pack.GetBlock(epochHandler.Id, leaderPubKey, 0, epochHandler)
 
-			if firstBlockInThisEpochByPool == nil {
+			if firstBlockInThisEpochByLeader == nil {
 
 				return
 
 			}
 
-			// In this block we should have ALRPs for all the previous pools
+			// In this block we should have ALRPs for all the previous leaders
 
-			alrpChainIsOk, infoAboutFinalBlocks := firstBlockInThisEpochByPool.ExtendedCheckAlrpChainValidity(
+			alrpChainIsOk, infoAboutFinalBlocks := firstBlockInThisEpochByLeader.ExtendedCheckAlrpChainValidity(
 				epochHandler, int(position), true,
 			)
 
 			if alrpChainIsOk {
 
-				infoAboutFinalBlocksByPool[leaderPubKey] = infoAboutFinalBlocks
+				infoAboutFinalBlocksByLeaders[leaderPubKey] = infoAboutFinalBlocks
 
-				infoAboutLastBlocksByPreviousPool = infoAboutFinalBlocks
+				infoAboutLastBlocksByPreviousLeader = infoAboutFinalBlocks
 
 			}
 
@@ -493,15 +493,15 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 	}
 
-	for _, poolPubKey := range epochHandler.LeadersSequence {
+	for _, leaderPubkey := range epochHandler.LeadersSequence {
 
-		if finalBlocksData, ok := infoAboutFinalBlocksByPool[poolPubKey]; ok {
+		if finalBlocksData, ok := infoAboutFinalBlocksByLeaders[leaderPubkey]; ok {
 
-			for poolPub, alrpData := range finalBlocksData {
+			for leaderPub, alrpData := range finalBlocksData {
 
-				if _, exists := emptyTemplate[poolPub]; !exists {
+				if _, exists := emptyTemplate[leaderPub]; !exists {
 
-					emptyTemplate[poolPub] = alrpData
+					emptyTemplate[leaderPub] = alrpData
 
 				}
 
@@ -679,23 +679,23 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		// Prepare epoch handler for next epoch
 
 		templateForNextEpoch := &structures.EpochDataHandler{
-			Id:              nextEpochIndex,
-			Hash:            nextEpochData.NextEpochHash,
-			PoolsRegistry:   nextEpochData.NextEpochPoolsRegistry,
-			StartTimestamp:  epochHandler.StartTimestamp + uint64(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
-			Quorum:          nextEpochData.NextEpochQuorum,
-			LeadersSequence: nextEpochData.NextEpochLeadersSequence,
+			Id:                 nextEpochIndex,
+			Hash:               nextEpochData.NextEpochHash,
+			ValidatorsRegistry: nextEpochData.NextEpochValidatorsRegistry,
+			StartTimestamp:     epochHandler.StartTimestamp + uint64(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
+			Quorum:             nextEpochData.NextEpochQuorum,
+			LeadersSequence:    nextEpochData.NextEpochLeadersSequence,
 		}
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = *templateForNextEpoch
 
 		// Nullify values for the upcoming epoch
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerPool)
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
-		for _, poolPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.PoolsRegistry {
+		for _, validatorPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence {
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubkey] = structures.NewExecutionStatsTemplate()
+			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
 
 		}
 
@@ -703,11 +703,11 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData = structures.AlignmentDataHandler{
 			Activated:                  true,
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerPool),
+			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData = structures.AlignmentDataHandler{
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerPool),
+			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}
 
 		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
@@ -726,15 +726,15 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		for poolID, poolStorage := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache {
+		for validatorPubkey, validatorStorage := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache {
 
-			if dataBytes, err := json.Marshal(poolStorage); err == nil {
+			if dataBytes, err := json.Marshal(validatorStorage); err == nil {
 
-				dbBatch.Put([]byte(poolID), dataBytes)
+				dbBatch.Put([]byte(validatorPubkey), dataBytes)
 
 			} else {
 
-				panic("Impossible to add pool data to atomic batch")
+				panic("Impossible to add validator storage to atomic batch")
 
 			}
 

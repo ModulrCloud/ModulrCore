@@ -124,9 +124,9 @@ func prepareBlockchain() {
 
 		if err := json.Unmarshal(data, &atHandler); err == nil {
 
-			if atHandler.Cache == nil {
+			if atHandler.ValidatorsStoragesCache == nil {
 
-				atHandler.Cache = make(map[string]*structures.PoolStorage)
+				atHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
 
 			}
 
@@ -156,9 +156,9 @@ func prepareBlockchain() {
 
 			}
 
-			if etHandler.PoolsCache == nil {
+			if etHandler.ValidatorsStoragesCache == nil {
 
-				etHandler.PoolsCache = make(map[string]*structures.PoolStorage)
+				etHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
 
 			}
 
@@ -227,9 +227,9 @@ func setGenesisToState() error {
 
 	epochTimestamp := globals.GENESIS.FirstEpochStartTimestamp
 
-	poolsRegistryForEpochHandler := []string{}
+	validatorsRegistryForEpochHandler := []string{}
 
-	poolsRegistryForEpochHandler2 := []string{}
+	validatorsRegistryForEpochHandler2 := []string{}
 
 	// __________________________________ Load info about accounts __________________________________
 
@@ -245,9 +245,9 @@ func setGenesisToState() error {
 
 	}
 
-	// __________________________________ Load info about pools __________________________________
+	// __________________________________ Load info about validators __________________________________
 
-	for _, validatorStorage := range globals.GENESIS.Pools {
+	for _, validatorStorage := range globals.GENESIS.Validators {
 
 		validatorPubkey := validatorStorage.Pubkey
 
@@ -261,9 +261,9 @@ func setGenesisToState() error {
 
 		execThreadBatch.Put([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), serializedStorage)
 
-		poolsRegistryForEpochHandler = append(poolsRegistryForEpochHandler, validatorPubkey)
+		validatorsRegistryForEpochHandler = append(validatorsRegistryForEpochHandler, validatorPubkey)
 
-		poolsRegistryForEpochHandler2 = append(poolsRegistryForEpochHandler2, validatorPubkey)
+		validatorsRegistryForEpochHandler2 = append(validatorsRegistryForEpochHandler2, validatorPubkey)
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
 
@@ -293,7 +293,7 @@ func setGenesisToState() error {
 	epochHandlerForApprovementThread := structures.EpochDataHandler{
 		Id:                 0,
 		Hash:               initEpochHash,
-		PoolsRegistry:      poolsRegistryForEpochHandler,
+		ValidatorsRegistry: validatorsRegistryForEpochHandler,
 		StartTimestamp:     epochTimestamp,
 		Quorum:             []string{}, // will be assigned
 		LeadersSequence:    []string{}, // will be assigned
@@ -303,7 +303,7 @@ func setGenesisToState() error {
 	epochHandlerForExecThread := structures.EpochDataHandler{
 		Id:                 0,
 		Hash:               initEpochHash,
-		PoolsRegistry:      poolsRegistryForEpochHandler2,
+		ValidatorsRegistry: validatorsRegistryForEpochHandler2,
 		StartTimestamp:     epochTimestamp,
 		Quorum:             []string{}, // will be assigned
 		LeadersSequence:    []string{}, // will be assigned

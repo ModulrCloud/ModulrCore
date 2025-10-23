@@ -112,13 +112,13 @@ func SequenceAlignmentThread() {
 
 					if isOk {
 
-						collectionOfAlrpsFromAllThePreviousLeaders := []map[string]structures.ExecutionStatsPerPool{infoAboutFinalBlocks} // each element here is object like {pool:{index,hash,firstBlockHash}}
+						collectionOfAlrpsFromAllThePreviousLeaders := []map[string]structures.ExecutionStatsPerLeaderSequence{infoAboutFinalBlocks} // each element here is object like {pool:{index,hash,firstBlockHash}}
 
-						currentAlrpSet := map[string]structures.ExecutionStatsPerPool{}
+						currentAlrpSet := map[string]structures.ExecutionStatsPerLeaderSequence{}
 
-						for poolKey, execStats := range infoAboutFinalBlocks {
+						for leaderPubkey, execStats := range infoAboutFinalBlocks {
 
-							currentAlrpSet[poolKey] = structures.ExecutionStatsPerPool{
+							currentAlrpSet[leaderPubkey] = structures.ExecutionStatsPerLeaderSequence{
 								Index:          execStats.Index,
 								Hash:           execStats.Hash,
 								FirstBlockHash: execStats.FirstBlockHash,
@@ -150,23 +150,23 @@ func SequenceAlignmentThread() {
 
 								for ; position >= localVersionOfCurrentLeader; position-- {
 
-									poolOnThisPosition := epochHandlerRef.LeadersSequence[position]
+									leaderOnThisPosition := epochHandlerRef.LeadersSequence[position]
 
-									alrpForThisPoolFromCurrentSet, dataExists := currentAlrpSet[poolOnThisPosition]
+									alrpForThisLeaderFromCurrentSet, dataExists := currentAlrpSet[leaderOnThisPosition]
 
-									if dataExists && alrpForThisPoolFromCurrentSet.Index != -1 {
+									if dataExists && alrpForThisLeaderFromCurrentSet.Index != -1 {
 
 										// Ask the first block and extract next set of ALRPs
-										firstBlockInThisEpochByPool := block_pack.GetBlock(epochHandlerRef.Id, poolOnThisPosition, 0, epochHandlerRef)
+										firstBlockInThisEpochByLeader := block_pack.GetBlock(epochHandlerRef.Id, leaderOnThisPosition, 0, epochHandlerRef)
 
-										if firstBlockInThisEpochByPool != nil && firstBlockInThisEpochByPool.GetHash() == alrpForThisPoolFromCurrentSet.FirstBlockHash {
+										if firstBlockInThisEpochByLeader != nil && firstBlockInThisEpochByLeader.GetHash() == alrpForThisLeaderFromCurrentSet.FirstBlockHash {
 
-											alrpChainValidationOk, dataAboutLastBlocks := false, make(map[string]structures.ExecutionStatsPerPool)
+											alrpChainValidationOk, dataAboutLastBlocks := false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 											if position == 0 {
 												alrpChainValidationOk = true
 											} else {
-												alrpChainValidationOk, dataAboutLastBlocks = firstBlockInThisEpochByPool.ExtendedCheckAlrpChainValidity(
+												alrpChainValidationOk, dataAboutLastBlocks = firstBlockInThisEpochByLeader.ExtendedCheckAlrpChainValidity(
 													epochHandlerRef, position, true,
 												)
 											}
@@ -210,17 +210,17 @@ func SequenceAlignmentThread() {
 
 									slices.Reverse(collectionOfAlrpsFromAllThePreviousLeaders)
 
-									for _, poolsExecStats := range collectionOfAlrpsFromAllThePreviousLeaders {
+									for _, leaderExecStats := range collectionOfAlrpsFromAllThePreviousLeaders {
 
 										// collectionOfAlrpsFromAllThePreviousLeaders[i] = {pool0:{index,hash},poolN:{index,hash}}
 
-										for poolPubKey, poolExecData := range poolsExecStats {
+										for leaderPubKey, leaderExecData := range leaderExecStats {
 
-											_, dataAlreadyExists := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey]
+											_, dataAlreadyExists := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey]
 
 											if !dataAlreadyExists {
 
-												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[poolPubKey] = poolExecData
+												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
 
 											}
 

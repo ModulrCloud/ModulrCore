@@ -6,25 +6,25 @@ import (
 )
 
 type WsLeaderRotationProofRequest struct {
-	Route               string                                 `json:"route"`
-	IndexOfPoolToRotate int                                    `json:"indexOfPoolToRotate"`
-	AfpForFirstBlock    structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData            structures.PoolVotingStat              `json:"skipData"`
+	Route                 string                                 `json:"route"`
+	IndexOfLeaderToRotate int                                    `json:"indexOfLeaderToRotate"`
+	AfpForFirstBlock      structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
+	SkipData              structures.LeaderVotingStat            `json:"skipData"`
 }
 
 type WsLeaderRotationProofResponseOk struct {
-	Voter         string `json:"voter"`
-	ForPoolPubkey string `json:"forPoolPubkey"`
-	Status        string `json:"status"`
-	Sig           string `json:"sig"`
+	Voter           string `json:"voter"`
+	ForLeaderPubkey string `json:"forLeaderPubkey"`
+	Status          string `json:"status"`
+	Sig             string `json:"sig"`
 }
 
 type WsLeaderRotationProofResponseUpgrade struct {
 	Voter            string                                 `json:"voter"`
-	ForPoolPubkey    string                                 `json:"forPoolPubkey"`
+	ForLeaderPubkey  string                                 `json:"forLeaderPubkey"`
 	Status           string                                 `json:"status"`
 	AfpForFirstBlock structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData         structures.PoolVotingStat              `json:"skipData"`
+	SkipData         structures.LeaderVotingStat            `json:"skipData"`
 }
 
 type WsFinalizationProofRequest struct {

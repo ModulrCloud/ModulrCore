@@ -30,11 +30,11 @@ func GetCurrentLeader() CurrentLeaderData {
 
 	if currentLeaderPubKey != globals.CONFIGURATION.PublicKey {
 
-		poolStorage := GetPoolFromApprovementThreadState(currentLeaderPubKey)
+		validatorStorage := GetValidatorFromApprovementThreadState(currentLeaderPubKey)
 
-		if poolStorage != nil {
+		if validatorStorage != nil {
 
-			return CurrentLeaderData{IsMeLeader: false, Url: poolStorage.PoolUrl}
+			return CurrentLeaderData{IsMeLeader: false, Url: validatorStorage.ValidatorUrl}
 
 		}
 
@@ -52,14 +52,14 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 	hashOfMetadataFromOldEpoch := Blake3(epochSeed)
 
 	// Change order of validators pseudo-randomly
-	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
+	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.ValidatorsRegistry))
 
 	var totalStakeSum uint64 = 0
 
 	// Populate validator data and calculate total stake sum
-	for _, validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.ValidatorsRegistry {
 
-		validatorData := GetPoolFromApprovementThreadState(validatorPubKey)
+		validatorData := GetValidatorFromApprovementThreadState(validatorPubKey)
 
 		// Calculate total stake
 		totalStakeByThisValidator := validatorData.TotalStaked
@@ -72,8 +72,8 @@ func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed str
 		})
 	}
 
-	// Iterate over the poolsRegistry and pseudo-randomly choose leaders
-	for i := 0; i < len(epochHandler.PoolsRegistry); i++ {
+	// Iterate over the validatorsRegistry and pseudo-randomly choose leaders
+	for i := 0; i < len(epochHandler.ValidatorsRegistry); i++ {
 
 		cumulativeSum := uint64(0)
 
@@ -139,9 +139,9 @@ func GetQuorumUrlsAndPubkeys(epochHandler *structures.EpochDataHandler) []struct
 
 	for _, pubKey := range epochHandler.Quorum {
 
-		poolStorage := GetPoolFromApprovementThreadState(pubKey)
+		validatorStorage := GetValidatorFromApprovementThreadState(pubKey)
 
-		toReturn = append(toReturn, structures.QuorumMemberData{PubKey: pubKey, Url: poolStorage.PoolUrl})
+		toReturn = append(toReturn, structures.QuorumMemberData{PubKey: pubKey, Url: validatorStorage.ValidatorUrl})
 
 	}
 
@@ -151,13 +151,13 @@ func GetQuorumUrlsAndPubkeys(epochHandler *structures.EpochDataHandler) []struct
 
 func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize int, newEpochSeed string) []string {
 
-	totalNumberOfValidators := len(epochHandler.PoolsRegistry)
+	totalNumberOfValidators := len(epochHandler.ValidatorsRegistry)
 
 	if totalNumberOfValidators <= quorumSize {
 
-		futureQuorum := make([]string, len(epochHandler.PoolsRegistry))
+		futureQuorum := make([]string, len(epochHandler.ValidatorsRegistry))
 
-		copy(futureQuorum, epochHandler.PoolsRegistry)
+		copy(futureQuorum, epochHandler.ValidatorsRegistry)
 
 		return futureQuorum
 	}
@@ -168,13 +168,13 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 	hashOfMetadataFromEpoch := Blake3(newEpochSeed)
 
 	// Collect validator data and total stake (uint64)
-	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.PoolsRegistry))
+	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.ValidatorsRegistry))
 
 	var totalStakeSum uint64 = 0
 
-	for _, validatorPubKey := range epochHandler.PoolsRegistry {
+	for _, validatorPubKey := range epochHandler.ValidatorsRegistry {
 
-		validatorData := GetPoolFromApprovementThreadState(validatorPubKey)
+		validatorData := GetValidatorFromApprovementThreadState(validatorPubKey)
 
 		totalStakeByThisValidator := validatorData.TotalStaked // uint64
 

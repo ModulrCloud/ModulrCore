@@ -39,19 +39,19 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 	if itsLeader {
 
-		localVotingDataForPool := structures.NewPoolVotingStatTemplate()
+		localVotingDataForLeader := structures.NewLeaderVotingStatTemplate()
 
 		localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), nil)
 
 		if err == nil {
 
-			json.Unmarshal(localVotingDataRaw, &localVotingDataForPool)
+			json.Unmarshal(localVotingDataRaw, &localVotingDataForLeader)
 
 		}
 
 		proposedBlockHash := parsedRequest.Block.GetHash()
 
-		itsSameChainSegment := localVotingDataForPool.Index < int(parsedRequest.Block.Index) || localVotingDataForPool.Index == int(parsedRequest.Block.Index) && proposedBlockHash == localVotingDataForPool.Hash && parsedRequest.Block.Epoch == epochFullID
+		itsSameChainSegment := localVotingDataForLeader.Index < int(parsedRequest.Block.Index) || localVotingDataForLeader.Index == int(parsedRequest.Block.Index) && proposedBlockHash == localVotingDataForLeader.Hash && parsedRequest.Block.Epoch == epochFullID
 
 		if itsSameChainSegment {
 
@@ -59,7 +59,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 			previousBlockIndex := int(parsedRequest.Block.Index - 1)
 
-			var futureVotingDataToStore structures.PoolVotingStat
+			var futureVotingDataToStore structures.LeaderVotingStat
 
 			positionOfBlockCreatorInLeadersSequence := slices.Index(epochHandler.LeadersSequence, parsedRequest.Block.Creator)
 
@@ -69,13 +69,13 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 				defer BLOCK_CREATOR_REQUEST_MUTEX.Unlock()
 
-				if localVotingDataForPool.Index == int(parsedRequest.Block.Index) {
+				if localVotingDataForLeader.Index == int(parsedRequest.Block.Index) {
 
-					futureVotingDataToStore = localVotingDataForPool
+					futureVotingDataToStore = localVotingDataForLeader
 
 				} else {
 
-					futureVotingDataToStore = structures.PoolVotingStat{
+					futureVotingDataToStore = structures.LeaderVotingStat{
 
 						Index: previousBlockIndex,
 
@@ -148,7 +148,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 				} else {
 
-					// This branch related to case when block index is > 0 (so it's not the first block by pool)
+					// This branch related to case when block index is > 0 (so it's not the first block by leader)
 
 					previousBlockId := strconv.Itoa(epochIndex) + ":" + parsedRequest.Block.Creator + ":" + strconv.Itoa(previousBlockIndex)
 
@@ -286,13 +286,13 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochIndex)
 
-	poolToRotate := epochHandler.LeadersSequence[parsedRequest.IndexOfPoolToRotate]
+	leaderToRotate := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToRotate]
 
-	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfPoolToRotate {
+	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToRotate {
 
-		localVotingData := structures.NewPoolVotingStatTemplate()
+		localVotingData := structures.NewLeaderVotingStatTemplate()
 
-		localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+poolToRotate), nil)
+		localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToRotate), nil)
 
 		if err == nil {
 
@@ -306,7 +306,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 			// Try to return with AFP for the first block
 
-			firstBlockID := strconv.Itoa(epochHandler.Id) + ":" + poolToRotate + ":0"
+			firstBlockID := strconv.Itoa(epochHandler.Id) + ":" + leaderToRotate + ":0"
 
 			afpForFirstBlockBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
 
@@ -320,7 +320,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 					responseData := WsLeaderRotationProofResponseUpgrade{
 						Voter:            globals.CONFIGURATION.PublicKey,
-						ForPoolPubkey:    poolToRotate,
+						ForLeaderPubkey:  leaderToRotate,
 						Status:           "UPGRADE",
 						AfpForFirstBlock: afpForFirstBlock,
 						SkipData:         localVotingData,
@@ -375,7 +375,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 				if parsedRequest.SkipData.Index == -1 {
 
-					dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + poolToRotate
+					dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:-1"
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:" + epochFullID
 
@@ -383,13 +383,13 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 				} else if parsedRequest.SkipData.Index >= 0 {
 
-					blockIdOfFirstBlock := strconv.Itoa(epochIndex) + ":" + poolToRotate + ":0"
+					blockIdOfFirstBlock := strconv.Itoa(epochIndex) + ":" + leaderToRotate + ":0"
 
 					if parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
 
 						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
 
-						dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + poolToRotate +
+						dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate +
 							":" + firstBlockHash +
 							":" + strconv.Itoa(propSkipData.Index) +
 							":" + propSkipData.Hash +
@@ -409,7 +409,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 						Voter: globals.CONFIGURATION.PublicKey,
 
-						ForPoolPubkey: poolToRotate,
+						ForLeaderPubkey: leaderToRotate,
 
 						Status: "OK",
 

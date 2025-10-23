@@ -312,7 +312,7 @@ func EpochRotationThread() {
 
 						}
 
-						for key, value := range globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache {
+						for key, value := range globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache {
 
 							valBytes, _ := json.Marshal(value)
 
@@ -335,7 +335,7 @@ func EpochRotationThread() {
 						nextEpochHandler := structures.EpochDataHandler{
 							Id:                 nextEpochId,
 							Hash:               nextEpochHash,
-							PoolsRegistry:      epochHandlerRef.PoolsRegistry,
+							ValidatorsRegistry: epochHandlerRef.ValidatorsRegistry,
 							Quorum:             utils.GetCurrentEpochQuorum(epochHandlerRef, nextEpochQuorumSize, nextEpochHash),
 							LeadersSequence:    []string{},
 							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
@@ -354,7 +354,7 @@ func EpochRotationThread() {
 
 						// Clean cache
 
-						clear(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache)
+						clear(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache)
 
 						// Clean in-memory helpful object
 

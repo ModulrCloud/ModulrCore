@@ -75,13 +75,13 @@ func NewEpochProposerThread() {
 
 			majority := utils.GetQuorumMajority(epochHandlerRef)
 
-			var localVotingData structures.PoolVotingStat
+			var localVotingData structures.LeaderVotingStat
 
 			localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+pubKeyOfLeader), nil)
 
 			if err != nil {
 
-				localVotingData = structures.NewPoolVotingStatTemplate()
+				localVotingData = structures.NewLeaderVotingStatTemplate()
 
 			} else {
 
@@ -99,7 +99,7 @@ func NewEpochProposerThread() {
 
 					if err == nil {
 
-						var prevVotingData structures.PoolVotingStat
+						var prevVotingData structures.LeaderVotingStat
 
 						json.Unmarshal(prevVotingDataRaw, &prevVotingData)
 

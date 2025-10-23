@@ -195,15 +195,15 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 		if utils.SignalAboutEpochRotationExists(epochIndex) {
 
-			votingMetadataForPool := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
+			votingMetadataForLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
 
-			votingRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForPool), nil)
+			votingRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForLeader), nil)
 
-			var votingData structures.PoolVotingStat
+			var votingData structures.LeaderVotingStat
 
 			if err != nil || votingRaw == nil {
 
-				votingData = structures.NewPoolVotingStatTemplate()
+				votingData = structures.NewLeaderVotingStatTemplate()
 
 			} else {
 				_ = json.Unmarshal(votingRaw, &votingData)

@@ -95,9 +95,9 @@ func (block *Block) VerifySignature() bool {
 
 }
 
-func (firstBlockInThisEpochByPool *Block) CheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int) bool {
+func (block *Block) CheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int) bool {
 
-	aggregatedLeadersRotationProofsRef := firstBlockInThisEpochByPool.ExtraData.AggregatedLeadersRotationProofs
+	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
 
 	arrayIndexer := 0
 
@@ -105,21 +105,21 @@ func (firstBlockInThisEpochByPool *Block) CheckAlrpChainValidity(epochHandler *s
 
 	slices.Reverse(arrayForIteration) // we need reversed version
 
-	bumpedWithPoolWhoCreatedAtLeastOneBlock := false
+	reachedLeaderWhoCreatedAtLeastOneBlock := false
 
-	for _, poolPubKey := range arrayForIteration {
+	for _, leaderPubkey := range arrayForIteration {
 
-		if alrpForThisPool, ok := aggregatedLeadersRotationProofsRef[poolPubKey]; ok {
+		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
 
-			signaIsOk := utils.VerifyAggregatedLeaderRotationProof(poolPubKey, alrpForThisPool, epochHandler)
+			signaIsOk := utils.VerifyAggregatedLeaderRotationProof(leaderPubkey, alrpForThisLeader, epochHandler)
 
 			if signaIsOk {
 
 				arrayIndexer++
 
-				if alrpForThisPool.SkipIndex >= 0 {
+				if alrpForThisLeader.SkipIndex >= 0 {
 
-					bumpedWithPoolWhoCreatedAtLeastOneBlock = true
+					reachedLeaderWhoCreatedAtLeastOneBlock = true
 
 					break
 
@@ -139,7 +139,7 @@ func (firstBlockInThisEpochByPool *Block) CheckAlrpChainValidity(epochHandler *s
 
 	}
 
-	if arrayIndexer == position || bumpedWithPoolWhoCreatedAtLeastOneBlock {
+	if arrayIndexer == position || reachedLeaderWhoCreatedAtLeastOneBlock {
 
 		return true
 
@@ -149,11 +149,11 @@ func (firstBlockInThisEpochByPool *Block) CheckAlrpChainValidity(epochHandler *s
 
 }
 
-func (firstBlockInThisEpochByPool *Block) ExtendedCheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerPool) {
+func (block *Block) ExtendedCheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerLeaderSequence) {
 
-	aggregatedLeadersRotationProofsRef := firstBlockInThisEpochByPool.ExtraData.AggregatedLeadersRotationProofs
+	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
 
-	infoAboutFinalBlocksInThisEpoch := make(map[string]structures.ExecutionStatsPerPool)
+	infoAboutFinalBlocksInThisEpoch := make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 	arrayIndexer := 0
 
@@ -161,27 +161,27 @@ func (firstBlockInThisEpochByPool *Block) ExtendedCheckAlrpChainValidity(epochHa
 
 	slices.Reverse(arrayForIteration) // we need reversed version
 
-	bumpedWithPoolWhoCreatedAtLeastOneBlock := false
+	reachedLeaderWhoCreatedAtLeastOneBlock := false
 
-	for _, poolPubKey := range arrayForIteration {
+	for _, leaderPubkey := range arrayForIteration {
 
-		if alrpForThisPool, ok := aggregatedLeadersRotationProofsRef[poolPubKey]; ok {
+		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
 
-			signaIsOk := dontCheckSigna || utils.VerifyAggregatedLeaderRotationProof(poolPubKey, alrpForThisPool, epochHandler)
+			signaIsOk := dontCheckSigna || utils.VerifyAggregatedLeaderRotationProof(leaderPubkey, alrpForThisLeader, epochHandler)
 
 			if signaIsOk {
 
-				infoAboutFinalBlocksInThisEpoch[poolPubKey] = structures.ExecutionStatsPerPool{
-					Index:          alrpForThisPool.SkipIndex,
-					Hash:           alrpForThisPool.SkipHash,
-					FirstBlockHash: alrpForThisPool.FirstBlockHash,
+				infoAboutFinalBlocksInThisEpoch[leaderPubkey] = structures.ExecutionStatsPerLeaderSequence{
+					Index:          alrpForThisLeader.SkipIndex,
+					Hash:           alrpForThisLeader.SkipHash,
+					FirstBlockHash: alrpForThisLeader.FirstBlockHash,
 				}
 
 				arrayIndexer++
 
-				if alrpForThisPool.SkipIndex >= 0 {
+				if alrpForThisLeader.SkipIndex >= 0 {
 
-					bumpedWithPoolWhoCreatedAtLeastOneBlock = true
+					reachedLeaderWhoCreatedAtLeastOneBlock = true
 
 					break
 
@@ -189,25 +189,25 @@ func (firstBlockInThisEpochByPool *Block) ExtendedCheckAlrpChainValidity(epochHa
 
 			} else {
 
-				return false, make(map[string]structures.ExecutionStatsPerPool)
+				return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 			}
 
 		} else {
 
-			return false, make(map[string]structures.ExecutionStatsPerPool)
+			return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 		}
 
 	}
 
-	if arrayIndexer == position || bumpedWithPoolWhoCreatedAtLeastOneBlock {
+	if arrayIndexer == position || reachedLeaderWhoCreatedAtLeastOneBlock {
 
 		return true, infoAboutFinalBlocksInThisEpoch
 
 	}
 
-	return false, make(map[string]structures.ExecutionStatsPerPool)
+	return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 }
 

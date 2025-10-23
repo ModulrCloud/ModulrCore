@@ -203,7 +203,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 	if PIVOT != nil {
 
-		// In pivot we have first block created in epoch by some pool
+		// In pivot we have first block created in epoch by some leader
 
 		// Try to move closer to the beginning of the epochHandler.leadersSequence to find the real first block
 
@@ -228,9 +228,9 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 		for position := PIVOT.Position - 1; position >= 0; position-- {
 
-			previousPool := epochHandler.LeadersSequence[position]
+			previousLeader := epochHandler.LeadersSequence[position]
 
-			leaderRotationProof := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousPool]
+			leaderRotationProof := blockToEnumerateAlrp.ExtraData.AggregatedLeadersRotationProofs[previousLeader]
 
 			if position == 0 {
 
@@ -247,7 +247,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 					}
 				} else {
 					return &structures.FirstBlockResult{
-						FirstBlockCreator: previousPool,
+						FirstBlockCreator: previousLeader,
 						FirstBlockHash:    leaderRotationProof.FirstBlockHash,
 					}
 				}
@@ -256,7 +256,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 				// Found new potential pivot
 
-				firstBlockByNewPivot := block_pack.GetBlock(epochHandler.Id, previousPool, 0, epochHandler)
+				firstBlockByNewPivot := block_pack.GetBlock(epochHandler.Id, previousLeader, 0, epochHandler)
 
 				if firstBlockByNewPivot == nil {
 					return nil
@@ -266,7 +266,7 @@ func getFirstBlockInEpoch(epochHandler *structures.EpochDataHandler) *structures
 
 					PIVOT = &PivotSearchData{
 						Position:          position,
-						PivotPubKey:       previousPool,
+						PivotPubKey:       previousLeader,
 						FirstBlockByPivot: firstBlockByNewPivot,
 						FirstBlockHash:    leaderRotationProof.FirstBlockHash,
 					}

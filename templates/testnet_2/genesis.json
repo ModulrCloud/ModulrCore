@@ -20,7 +20,7 @@
     },
 
    
-    "POOLS": [
+    "VALIDATORS": [
         {
             "pubkey": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
             "percentage": 50,
@@ -30,8 +30,8 @@
                     "stake": 50000000000
                 }
             },
-            "poolURL": "http://localhost:7332",
-            "wssPoolURL": "ws://localhost:9999"
+            "validatorURL": "http://localhost:7332",
+            "wssValidatorURL": "ws://localhost:9999"
         },
         {
             "pubkey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
@@ -42,8 +42,8 @@
                     "stake": 50000000000
                 }
             },
-            "poolURL": "http://localhost:7333",
-            "wssPoolURL": "ws://localhost:9998"
+            "validatorURL": "http://localhost:7333",
+            "wssValidatorURL": "ws://localhost:9998"
         }
     ],
     

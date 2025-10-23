@@ -18,31 +18,31 @@ func OpenDb(dbName string) *leveldb.DB {
 	return db
 }
 
-func GetPoolFromApprovementThreadState(poolPubkey string) *structures.PoolStorage {
+func GetValidatorFromApprovementThreadState(validatorPubkey string) *structures.ValidatorStorage {
 
-	poolStorageFullId := poolPubkey + "_VALIDATOR_STORAGE"
+	validatorStorageKey := validatorPubkey + "_VALIDATOR_STORAGE"
 
-	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolStorageFullId]; ok {
+	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; ok {
 		return val
 	}
 
-	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(poolStorageFullId), nil)
+	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
 
 	if err != nil {
 		return nil
 	}
 
-	var poolStorage structures.PoolStorage
+	var validatorStorage structures.ValidatorStorage
 
-	err = json.Unmarshal(data, &poolStorage)
+	err = json.Unmarshal(data, &validatorStorage)
 
 	if err != nil {
 		return nil
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolStorageFullId] = &poolStorage
+	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &validatorStorage
 
-	return &poolStorage
+	return &validatorStorage
 
 }
 
@@ -80,28 +80,28 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 }
 
-func GetPoolFromExecThreadState(poolId string) *structures.PoolStorage {
+func GetValidatorFromExecThreadState(validatorId string) *structures.ValidatorStorage {
 
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId]; ok {
+	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorId]; ok {
 		return val
 	}
 
-	data, err := globals.STATE.Get([]byte(poolId), nil)
+	data, err := globals.STATE.Get([]byte(validatorId), nil)
 
 	if err != nil {
 		return nil
 	}
 
-	var poolStorage structures.PoolStorage
+	var validatorStorage structures.ValidatorStorage
 
-	err = json.Unmarshal(data, &poolStorage)
+	err = json.Unmarshal(data, &validatorStorage)
 
 	if err != nil {
 		return nil
 	}
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.PoolsCache[poolId] = &poolStorage
+	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorId] = &validatorStorage
 
-	return &poolStorage
+	return &validatorStorage
 
 }

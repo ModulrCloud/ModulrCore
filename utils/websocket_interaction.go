@@ -66,13 +66,13 @@ func reconnectOnce(pubkey string, wsConnMap map[string]*websocket.Conn) {
 	if err != nil {
 		return
 	}
-	var pool structures.PoolStorage
-	if err := json.Unmarshal(raw, &pool); err != nil || pool.WssPoolUrl == "" {
+	var validatorStorage structures.ValidatorStorage
+	if err := json.Unmarshal(raw, &validatorStorage); err != nil || validatorStorage.WssValidatorUrl == "" {
 		return
 	}
 
 	// Try a single dial attempt
-	conn, _, err := websocket.DefaultDialer.Dial(pool.WssPoolUrl, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(validatorStorage.WssValidatorUrl, nil)
 	if err != nil {
 		return
 	}
@@ -258,18 +258,18 @@ func OpenWebsocketConnectionsWithQuorum(quorum []string, wsConnMap map[string]*w
 		}
 
 		// Parse metadata
-		var pool structures.PoolStorage
-		if err := json.Unmarshal(raw, &pool); err != nil {
+		var validatorStorage structures.ValidatorStorage
+		if err := json.Unmarshal(raw, &validatorStorage); err != nil {
 			continue
 		}
 
 		// Skip if no WS URL
-		if pool.WssPoolUrl == "" {
+		if validatorStorage.WssValidatorUrl == "" {
 			continue
 		}
 
 		// Dial
-		conn, _, err := websocket.DefaultDialer.Dial(pool.WssPoolUrl, nil)
+		conn, _, err := websocket.DefaultDialer.Dial(validatorStorage.WssValidatorUrl, nil)
 		if err != nil {
 			continue
 		}

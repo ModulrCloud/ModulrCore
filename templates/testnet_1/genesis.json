@@ -14,7 +14,7 @@
         "TXS_LIMIT_PER_BLOCK": 30000
     },
     
-    "POOLS": [
+    "VALIDATORS": [
         {
             "pubkey": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
             "percentage": 50,
@@ -24,8 +24,8 @@
                     "stake": 50000000000
                 }
             },
-            "poolURL": "http://localhost:7332",
-            "wssPoolURL": "ws://localhost:9999"
+            "validatorURL": "http://localhost:7332",
+            "wssValidatorURL": "ws://localhost:9999"
         }
     ],
     

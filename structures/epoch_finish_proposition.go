@@ -3,7 +3,7 @@ package structures
 type EpochFinishRequest struct {
 	CurrentLeader        int                         `json:"currentLeader"`
 	AfpForFirstBlock     AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	LastBlockProposition PoolVotingStat              `json:"lastBlockProposition"`
+	LastBlockProposition LeaderVotingStat            `json:"lastBlockProposition"`
 }
 
 type EpochFinishResponseOk struct {
@@ -12,7 +12,7 @@ type EpochFinishResponseOk struct {
 }
 
 type EpochFinishResponseUpgrade struct {
-	Status               string         `json:"status"`
-	CurrentLeader        int            `json:"currentLeader"`
-	LastBlockProposition PoolVotingStat `json:"lastBlockProposition"`
+	Status               string           `json:"status"`
+	CurrentLeader        int              `json:"currentLeader"`
+	LastBlockProposition LeaderVotingStat `json:"lastBlockProposition"`
 }
