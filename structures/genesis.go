@@ -1,26 +1,26 @@
 package structures
 
 type NetworkParameters struct {
-	ValidatorStake        uint64 `json:"VALIDATOR_STAKE"`
-	MinimalStakePerEntity uint64 `json:"MINIMAL_STAKE_PER_ENTITY"`
-	QuorumSize            int    `json:"QUORUM_SIZE"`
-	EpochTime             int64  `json:"EPOCH_TIME"`
-	LeadershipTimeframe   int64  `json:"LEADERSHIP_TIMEFRAME"`
-	BlockTime             int64  `json:"BLOCK_TIME"`
-	MaxBlockSizeInBytes   int64  `json:"MAX_BLOCK_SIZE_IN_BYTES"`
-	TxLimitPerBlock       int    `json:"TXS_LIMIT_PER_BLOCK"`
+	ValidatorRequiredStake uint64 `json:"VALIDATOR_REQUIRED_STAKE"`
+	MinimalStakePerStaker  uint64 `json:"MINIMAL_STAKE_PER_STAKER"`
+	QuorumSize             int    `json:"QUORUM_SIZE"`
+	EpochDuration          int64  `json:"EPOCH_DURATION"`
+	LeadershipDuration     int64  `json:"LEADERSHIP_DURATION"`
+	BlockTime              int64  `json:"BLOCK_TIME"`
+	MaxBlockSizeInBytes    int64  `json:"MAX_BLOCK_SIZE_IN_BYTES"`
+	TxLimitPerBlock        int    `json:"TXS_LIMIT_PER_BLOCK"`
 }
 
 func (src *NetworkParameters) CopyNetworkParameters() NetworkParameters {
 	return NetworkParameters{
-		ValidatorStake:        src.ValidatorStake,
-		MinimalStakePerEntity: src.MinimalStakePerEntity,
-		QuorumSize:            src.QuorumSize,
-		EpochTime:             src.EpochTime,
-		LeadershipTimeframe:   src.LeadershipTimeframe,
-		BlockTime:             src.BlockTime,
-		MaxBlockSizeInBytes:   src.MaxBlockSizeInBytes,
-		TxLimitPerBlock:       src.TxLimitPerBlock,
+		ValidatorRequiredStake: src.ValidatorRequiredStake,
+		MinimalStakePerStaker:  src.MinimalStakePerStaker,
+		QuorumSize:             src.QuorumSize,
+		EpochDuration:          src.EpochDuration,
+		LeadershipDuration:     src.LeadershipDuration,
+		BlockTime:              src.BlockTime,
+		MaxBlockSizeInBytes:    src.MaxBlockSizeInBytes,
+		TxLimitPerBlock:        src.TxLimitPerBlock,
 	}
 }
 

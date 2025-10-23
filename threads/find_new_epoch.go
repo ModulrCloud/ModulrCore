@@ -338,7 +338,7 @@ func EpochRotationThread() {
 							ValidatorsRegistry: epochHandlerRef.ValidatorsRegistry,
 							Quorum:             utils.GetCurrentEpochQuorum(epochHandlerRef, nextEpochQuorumSize, nextEpochHash),
 							LeadersSequence:    []string{},
-							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
+							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochDuration),
 							CurrentLeaderIndex: 0,
 						}
 

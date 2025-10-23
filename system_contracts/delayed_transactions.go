@@ -186,7 +186,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			minStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerEntity
+			minStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerStaker
 
 			if amount < minStake {
 
@@ -211,7 +211,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			validatorStorage.Stakers[staker] = stakerData
 
-			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
+			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked >= requiredStake {
 
@@ -237,7 +237,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			minStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerEntity
+			minStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerStaker
 
 			if amount < minStake {
 
@@ -262,7 +262,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			validatorStorage.Stakers[staker] = stakerData
 
-			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
+			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked >= requiredStake {
 
@@ -332,7 +332,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
+			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked < requiredStake {
 
@@ -382,7 +382,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorStake
+			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked < requiredStake {
 

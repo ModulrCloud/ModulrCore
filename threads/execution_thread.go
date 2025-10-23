@@ -682,7 +682,7 @@ func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
 			Id:                 nextEpochIndex,
 			Hash:               nextEpochData.NextEpochHash,
 			ValidatorsRegistry: nextEpochData.NextEpochValidatorsRegistry,
-			StartTimestamp:     epochHandler.StartTimestamp + uint64(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochTime),
+			StartTimestamp:     epochHandler.StartTimestamp + uint64(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochDuration),
 			Quorum:             nextEpochData.NextEpochQuorum,
 			LeadersSequence:    nextEpochData.NextEpochLeadersSequence,
 		}

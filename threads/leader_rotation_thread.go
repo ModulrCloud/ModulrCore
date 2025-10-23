@@ -14,7 +14,7 @@ func timeIsOutForCurrentLeader(approvementThread *structures.ApprovementThreadMe
 
 	// Function to check if time frame for current leader is done and we have to move to next leader in sequence
 
-	leaderShipTimeframe := approvementThread.NetworkParameters.LeadershipTimeframe
+	leaderShipTimeframe := approvementThread.NetworkParameters.LeadershipDuration
 
 	currentIndex := int64(approvementThread.EpochDataHandler.CurrentLeaderIndex)
 

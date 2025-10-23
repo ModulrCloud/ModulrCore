@@ -93,7 +93,7 @@ func GetRandomFromSlice(arr []structures.QuorumMemberData) structures.QuorumMemb
 
 func EpochStillFresh(thread structures.LogicalThread) bool {
 
-	return (thread.GetEpochHandler().StartTimestamp + uint64(thread.GetNetworkParams().EpochTime)) > uint64(GetUTCTimestampInMilliSeconds())
+	return (thread.GetEpochHandler().StartTimestamp + uint64(thread.GetNetworkParams().EpochDuration)) > uint64(GetUTCTimestampInMilliSeconds())
 
 }
 
