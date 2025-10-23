@@ -43,9 +43,6 @@ func SequenceAlignmentThread() {
 
 		resp, err := client.Get(randomTarget.Url + "/sequence_alignment")
 
-		fmt.Println("DEBUG: Have after call => ", resp)
-		fmt.Println("DEBUG: Have after call (err) => ", err)
-
 		// Network error or timeout
 		if err != nil {
 
@@ -87,7 +84,7 @@ func SequenceAlignmentThread() {
 
 		}
 
-		fmt.Println("DEBUG: Target response is => ", dec)
+		// fmt.Println("DEBUG: Target response is => ", targetResponse)
 
 		// Body successfully decoded, safe to close now
 		resp.Body.Close()
@@ -233,6 +230,8 @@ func SequenceAlignmentThread() {
 
 									// Finally, set the <currentLeader> to the new pointer
 									globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
+
+									fmt.Println("DEBUG: Value => ", globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData)
 
 									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 

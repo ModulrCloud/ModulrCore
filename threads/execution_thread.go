@@ -376,7 +376,7 @@ func DistributeFeesAmongStakersAndPool(blockCreatorPubkey string) {
 
 	*/
 
-	blockCreatorStorage := utils.GetPoolFromExecThreadState(blockCreatorPubkey + "(POOL)_STORAGE_POOL")
+	blockCreatorStorage := utils.GetPoolFromExecThreadState(blockCreatorPubkey + "_VALIDATOR_STORAGE")
 
 	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
 

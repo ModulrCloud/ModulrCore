@@ -62,7 +62,7 @@ type QuorumResponse struct {
 func reconnectOnce(pubkey string, wsConnMap map[string]*websocket.Conn) {
 
 	// Get validator metadata
-	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(pubkey+"(POOL)_STORAGE_POOL"), nil)
+	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(pubkey+"_VALIDATOR_STORAGE"), nil)
 	if err != nil {
 		return
 	}
@@ -252,7 +252,7 @@ func OpenWebsocketConnectionsWithQuorum(quorum []string, wsConnMap map[string]*w
 	// Establish new connections for each validator in the quorum
 	for _, validatorPubkey := range quorum {
 		// Fetch validator metadata
-		raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorPubkey+"(POOL)_STORAGE_POOL"), nil)
+		raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), nil)
 		if err != nil {
 			continue
 		}

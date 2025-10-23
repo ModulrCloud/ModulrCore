@@ -247,25 +247,25 @@ func setGenesisToState() error {
 
 	// __________________________________ Load info about pools __________________________________
 
-	for _, poolStorage := range globals.GENESIS.Pools {
+	for _, validatorStorage := range globals.GENESIS.Pools {
 
-		poolPubKey := poolStorage.Pubkey
+		validatorPubkey := validatorStorage.Pubkey
 
-		serializedStorage, err := json.Marshal(poolStorage)
+		serializedStorage, err := json.Marshal(validatorStorage)
 
 		if err != nil {
 			return err
 		}
 
-		approvementThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
+		approvementThreadBatch.Put([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), serializedStorage)
 
-		execThreadBatch.Put([]byte(poolPubKey+"(POOL)_STORAGE_POOL"), serializedStorage)
+		execThreadBatch.Put([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), serializedStorage)
 
-		poolsRegistryForEpochHandler = append(poolsRegistryForEpochHandler, poolPubKey)
+		poolsRegistryForEpochHandler = append(poolsRegistryForEpochHandler, validatorPubkey)
 
-		poolsRegistryForEpochHandler2 = append(poolsRegistryForEpochHandler2, poolPubKey)
+		poolsRegistryForEpochHandler2 = append(poolsRegistryForEpochHandler2, validatorPubkey)
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[poolPubKey] = structures.NewExecutionStatsTemplate()
+		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
 
 	}
 

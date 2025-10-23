@@ -20,7 +20,7 @@ func OpenDb(dbName string) *leveldb.DB {
 
 func GetPoolFromApprovementThreadState(poolPubkey string) *structures.PoolStorage {
 
-	poolStorageFullId := poolPubkey + "(POOL)_STORAGE_POOL"
+	poolStorageFullId := poolPubkey + "_VALIDATOR_STORAGE"
 
 	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.Cache[poolStorageFullId]; ok {
 		return val

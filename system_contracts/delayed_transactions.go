@@ -36,7 +36,7 @@ func CreateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	if poolURL != "" && wssPoolURL != "" && percentage <= 100 {
 
-		storageKey := creator + "(POOL)_STORAGE_POOL"
+		storageKey := creator + "_VALIDATOR_STORAGE"
 
 		if context == "AT" {
 
@@ -122,7 +122,7 @@ func UpdateStakingPool(delayedTransaction map[string]string, context string) boo
 
 	}
 
-	poolId := creator + "(POOL)_STORAGE_POOL"
+	poolId := creator + "_VALIDATOR_STORAGE"
 
 	if context == "AT" {
 
@@ -233,7 +233,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "_VALIDATOR_STORAGE")
 
 		if poolStorage != nil {
 
@@ -350,7 +350,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	} else {
 
-		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "(POOL)_STORAGE_POOL")
+		poolStorage := utils.GetPoolFromExecThreadState(poolPubKey + "_VALIDATOR_STORAGE")
 
 		if poolStorage != nil {
 
