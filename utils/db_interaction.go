@@ -26,7 +26,7 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 	data, err := globals.STATE.Get([]byte(accountId), nil)
 
-	if err != nil {
+	if err == leveldb.ErrNotFound {
 
 		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
 
@@ -34,21 +34,23 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 	}
 
-	var account structures.Account
+	if err == nil {
 
-	err = json.Unmarshal(data, &account)
+		var account structures.Account
 
-	if err != nil {
+		parseErr := json.Unmarshal(data, &account)
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+		if parseErr == nil {
 
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+
+			return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+
+		}
 
 	}
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &account
-
-	return &account
+	return nil
 
 }
 

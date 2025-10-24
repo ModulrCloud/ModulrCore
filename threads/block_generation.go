@@ -77,7 +77,7 @@ func alrpRequestTemplate(leaderID string, epochHandler *structures.EpochDataHand
 }
 
 // To grab proofs for multiple previous leaders in a parallel way
-func (collector *RotationProofCollector) AlrpForLeadersCollector(ctx context.Context, leaderIDs []string, epochHandler *structures.EpochDataHandler) DoubleMap {
+func (collector *RotationProofCollector) alrpForLeadersCollector(ctx context.Context, leaderIDs []string, epochHandler *structures.EpochDataHandler) DoubleMap {
 
 	var wg sync.WaitGroup
 	mu := sync.Mutex{}
@@ -537,7 +537,7 @@ func generateBlock() {
 						timeout:   2 * time.Second,
 					}
 
-					resultsOfAlrpRequests := collector.AlrpForLeadersCollector(context.Background(), pubkeysOfLeadersToGetAlrps, epochHandlerRef)
+					resultsOfAlrpRequests := collector.alrpForLeadersCollector(context.Background(), pubkeysOfLeadersToGetAlrps, epochHandlerRef)
 
 					// Parse results here and modify the content inside ALRP_METADATA
 

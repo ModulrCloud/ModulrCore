@@ -15,36 +15,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
-
-	req := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
-
-	if reqBytes, err := json.Marshal(req); err == nil {
-
-		if respBytes, err := utils.SendWebsocketMessageToPoD(reqBytes); err == nil {
-
-			var resp websocket_pack.WsBlockWithAfpResponse
-
-			if err := json.Unmarshal(respBytes, &resp); err == nil {
-
-				if resp.Block == nil {
-
-					return nil
-
-				}
-
-				return &resp
-
-			}
-
-		}
-
-	}
-
-	return nil
-
-}
-
 func ExecutionThread() {
 
 	for {
@@ -119,14 +89,14 @@ func ExecutionThread() {
 					if localExecMetadataForLeader.Index+1 == metadataFromAefpForLeader.Index && response.Block.GetHash() == metadataFromAefpForLeader.Hash {
 
 						// No need to verify AFP
-						ExecuteBlock(response.Block)
+						executeBlock(response.Block)
 
 						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
 
 					} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 						// Exec only if AFP is valid
-						ExecuteBlock(response.Block)
+						executeBlock(response.Block)
 
 						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
 
@@ -169,7 +139,7 @@ func ExecutionThread() {
 
 				if !currentEpochIsFresh {
 
-					TryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
+					tryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
 
 				}
 
@@ -201,14 +171,14 @@ func ExecutionThread() {
 				if execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
 
 					// Let is exec without AFP
-					ExecuteBlock(response.Block)
+					executeBlock(response.Block)
 
 					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
 
 				} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
 					// Exec only if AFP is valid
-					ExecuteBlock(response.Block)
+					executeBlock(response.Block)
 
 					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
 
@@ -224,13 +194,13 @@ func ExecutionThread() {
 
 		if !currentEpochIsFresh && !epochHandlerRef.LegacyEpochAlignmentData.Activated {
 
-			TryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
+			tryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
 
 		}
 
 		if shouldMoveToNextEpoch {
 
-			SetupNextEpoch(&epochHandlerRef.EpochDataHandler)
+			setupNextEpoch(&epochHandlerRef.EpochDataHandler)
 
 		}
 
@@ -238,7 +208,37 @@ func ExecutionThread() {
 
 }
 
-func ExecuteBlock(block *block_pack.Block) {
+func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
+
+	req := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
+
+	if reqBytes, err := json.Marshal(req); err == nil {
+
+		if respBytes, err := utils.SendWebsocketMessageToPoD(reqBytes); err == nil {
+
+			var resp websocket_pack.WsBlockWithAfpResponse
+
+			if err := json.Unmarshal(respBytes, &resp); err == nil {
+
+				if resp.Block == nil {
+
+					return nil
+
+				}
+
+				return &resp
+
+			}
+
+		}
+
+	}
+
+	return nil
+
+}
+
+func executeBlock(block *block_pack.Block) {
 
 	epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
 
@@ -256,7 +256,7 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		for _, transaction := range block.Transactions {
 
-			_, fee := ExecuteTransaction(&transaction)
+			_, fee := executeTransaction(&transaction)
 
 			blockFees += fee
 
@@ -273,7 +273,7 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		*/
 
-		DistributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
+		distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
@@ -345,7 +345,7 @@ func ExecuteBlock(block *block_pack.Block) {
 
 }
 
-func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBlock uint64) {
+func distributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBlock uint64) {
 
 	/*
 
@@ -392,19 +392,23 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBl
 
 	feesToShareAmongStakers := feeFromBlock - rewardForBlockCreator
 
-	for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
+	if feesToShareAmongStakers != 0 {
 
-		stakerReward := (stakerData.Stake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
+		for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
 
-		stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
+			stakerReward := (stakerData.Stake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
 
-		stakerAccount.Balance += stakerReward
+			stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
+
+			stakerAccount.Balance += stakerReward
+
+		}
 
 	}
 
 }
 
-func ExecuteTransaction(tx *structures.Transaction) (bool, uint64) {
+func executeTransaction(tx *structures.Transaction) (bool, uint64) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
@@ -438,7 +442,7 @@ func ExecuteTransaction(tx *structures.Transaction) (bool, uint64) {
 The following 3 functions are responsible of final sequence alignment before we finish
 with epoch X and move to epoch X+1
 */
-func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *structures.AggregatedEpochFinalizationProof) {
+func findInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *structures.AggregatedEpochFinalizationProof) {
 
 	emptyTemplate := make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
@@ -570,7 +574,7 @@ func FindInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 }
 
-func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
+func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	epochIndex := epochHandler.Id
 
@@ -640,7 +644,7 @@ func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.Activated = true
 
-			FindInfoAboutLastBlocks(epochHandler, firstBlockDataOnNextEpoch.Aefp)
+			findInfoAboutLastBlocks(epochHandler, firstBlockDataOnNextEpoch.Aefp)
 
 		}
 
@@ -648,7 +652,7 @@ func TryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 }
 
-func SetupNextEpoch(epochHandler *structures.EpochDataHandler) {
+func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 	currentEpochIndex := epochHandler.Id
 
