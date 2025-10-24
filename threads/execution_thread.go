@@ -382,7 +382,7 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 
 	// 1. Transfer part of fees to account with pubkey associated with block creator
 
-	rewardForBlockCreator := uint64(blockCreatorStorage.Percentage) * FEES_COLLECTOR
+	rewardForBlockCreator := uint64(blockCreatorStorage.Percentage/100) * FEES_COLLECTOR
 
 	blockCreatorAccount.Balance += rewardForBlockCreator
 

@@ -116,55 +116,55 @@ func UpdateValidator(delayedTransaction map[string]string, context string) bool 
 	validatorURL := delayedTransaction["validatorURL"]
 	wssValidatorURL := delayedTransaction["wssValidatorURL"]
 
-	if percentage > 100 || validatorURL == "" || wssValidatorURL == "" {
+	if validatorURL != "" && wssValidatorURL != "" && percentage <= 100 {
 
-		return false
+		validatorStorageId := validatorPubkey + "_VALIDATOR_STORAGE"
 
-	}
+		if context == "AT" {
 
-	validatorStorageId := validatorPubkey + "_VALIDATOR_STORAGE"
+			validatorStorage := utils.GetValidatorFromApprovementThreadState(validatorPubkey)
 
-	if context == "AT" {
+			if validatorStorage != nil {
 
-		validatorStorage := utils.GetValidatorFromApprovementThreadState(validatorPubkey)
+				validatorStorage.Percentage = percentage
 
-		if validatorStorage != nil {
+				validatorStorage.ValidatorUrl = validatorURL
 
-			validatorStorage.Percentage = percentage
+				validatorStorage.WssValidatorUrl = wssValidatorURL
 
-			validatorStorage.ValidatorUrl = validatorURL
+				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
 
-			validatorStorage.WssValidatorUrl = wssValidatorURL
+				return true
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
+			}
 
-			return true
+			return false
+
+		} else {
+
+			validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey)
+
+			if validatorStorage != nil {
+
+				validatorStorage.Percentage = percentage
+
+				validatorStorage.ValidatorUrl = validatorURL
+
+				validatorStorage.WssValidatorUrl = wssValidatorURL
+
+				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
+
+				return true
+
+			}
+
+			return false
 
 		}
 
-		return false
-
-	} else {
-
-		validatorStorage := utils.GetValidatorFromExecThreadState(validatorPubkey)
-
-		if validatorStorage != nil {
-
-			validatorStorage.Percentage = percentage
-
-			validatorStorage.ValidatorUrl = validatorURL
-
-			validatorStorage.WssValidatorUrl = wssValidatorURL
-
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
-
-			return true
-
-		}
-
-		return false
-
 	}
+
+	return false
 
 }
 
