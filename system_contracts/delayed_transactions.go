@@ -18,15 +18,6 @@ var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"unstake":         Unstake,
 }
 
-func removeFromSlice[T comparable](s []T, v T) []T {
-	for i, x := range s {
-		if x == v {
-			return append(s[:i], s[i+1:]...)
-		}
-	}
-	return s
-}
-
 func CreateValidator(delayedTransaction map[string]string, context string) bool {
 
 	validatorPubkey := delayedTransaction["creator"]
@@ -400,4 +391,13 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 	}
 
+}
+
+func removeFromSlice[T comparable](s []T, v T) []T {
+	for i, x := range s {
+		if x == v {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }

@@ -23,18 +23,6 @@ type AlignmentData struct {
 	AfpForSecondBlockByCurrentLeader structures.AggregatedFinalizationProof `json:"afpForSecondBlockByCurrentLeader"`
 }
 
-func sendJson(ctx *fasthttp.RequestCtx, payload any) {
-
-	ctx.SetContentType("application/json")
-
-	ctx.SetStatusCode(fasthttp.StatusOK)
-
-	jsonBytes, _ := json.Marshal(payload)
-
-	ctx.SetBody(jsonBytes)
-
-}
-
 func GetFirstBlockAssumption(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
@@ -284,5 +272,17 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 		sendJson(ctx, ErrMsg{Err: "Try later"})
 
 	}
+
+}
+
+func sendJson(ctx *fasthttp.RequestCtx, payload any) {
+
+	ctx.SetContentType("application/json")
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+
+	jsonBytes, _ := json.Marshal(payload)
+
+	ctx.SetBody(jsonBytes)
 
 }

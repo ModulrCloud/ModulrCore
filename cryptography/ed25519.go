@@ -54,10 +54,9 @@ func GenerateKeyPair(mnemonic, mnemonicPassword string, bip44DerivePath []uint32
 	return Ed25519Box{Mnemonic: mnemonic, Bip44Path: bip44DerivePath, Pub: base58.Encode(pubKeyBytes[12:]), Prv: base64.StdEncoding.EncodeToString(privKeyBytes)}
 }
 
-// Returns signature in base64(to use it in transaction later)
-func GenerateSignature(privateKeyAsBase64, msg string) string {
+func GenerateSignature(base64PrivateKey, msg string) string {
 	// Decode private key from base64 to raw bytes
-	privateKeyAsBytes, _ := base64.StdEncoding.DecodeString(privateKeyAsBase64)
+	privateKeyAsBytes, _ := base64.StdEncoding.DecodeString(base64PrivateKey)
 
 	// Deserialize private key
 	privKeyInterface, _ := x509.ParsePKCS8PrivateKey(privateKeyAsBytes)
@@ -69,14 +68,9 @@ func GenerateSignature(privateKeyAsBase64, msg string) string {
 	return base64.StdEncoding.EncodeToString(signature)
 }
 
-/*
-0 - message that was signed
-1 - pubKey
-2 - signature
-*/
-func VerifySignature(stringMessage, base58PubKey, base64Signature string) bool {
+func VerifySignature(message, base58PubKey, base64Signature string) bool {
 	// Decode everything
-	msgAsBytes := []byte(stringMessage)
+	msgAsBytes := []byte(message)
 	publicKeyAsBytesWithNoAsnPrefix := base58.Decode(base58PubKey)
 
 	// Add ASN.1 prefix
@@ -91,7 +85,11 @@ func VerifySignature(stringMessage, base58PubKey, base64Signature string) bool {
 
 // Private inner function
 func generateKeyPairFromSeed(seed []byte) (ed25519.PublicKey, ed25519.PrivateKey) {
+
 	privateKey := ed25519.NewKeyFromSeed(seed)
+
 	pubKey, _ := privateKey.Public().(ed25519.PublicKey)
+
 	return pubKey, privateKey
+
 }

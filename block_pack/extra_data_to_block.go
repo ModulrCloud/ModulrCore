@@ -14,17 +14,25 @@ type ExtraDataToBlock struct {
 }
 
 func (ed *ExtraDataToBlock) UnmarshalJSON(data []byte) error {
+
 	type alias ExtraDataToBlock
+
 	var aux alias
+
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
+
 	if aux.Rest == nil {
 		aux.Rest = make(map[string]string)
 	}
+
 	if aux.AggregatedLeadersRotationProofs == nil {
 		aux.AggregatedLeadersRotationProofs = make(map[string]*structures.AggregatedLeaderRotationProof)
 	}
+
 	*ed = ExtraDataToBlock(aux)
+
 	return nil
+
 }

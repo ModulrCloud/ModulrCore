@@ -15,10 +15,6 @@ import (
 	"lukechampine.com/blake3"
 )
 
-var shutdownOnce sync.Once
-
-var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 // ANSI escape codes for text colors
 const (
 	RESET_COLOR      = "\033[0m"
@@ -30,6 +26,10 @@ const (
 	CYAN_COLOR       = "\033[36;1m"
 	WHITE_COLOR      = "\033[37;1m"
 )
+
+var shutdownOnce sync.Once
+
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func StrToUint8(s string) uint8 {
 	v, err := strconv.ParseUint(s, 10, 8)

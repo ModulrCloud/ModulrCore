@@ -13,13 +13,13 @@ import (
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
-func VerifyAggregatedEpochFinalizationProof(proofStruct *structures.AggregatedEpochFinalizationProof, quorum []string, majority int, epochFullID string) bool {
+func VerifyAggregatedEpochFinalizationProof(proof *structures.AggregatedEpochFinalizationProof, quorum []string, majority int, epochFullID string) bool {
 
 	dataThatShouldBeSigned := "EPOCH_DONE:" +
-		strconv.Itoa(int(proofStruct.LastLeader)) + ":" +
-		strconv.Itoa(int(proofStruct.LastIndex)) + ":" +
-		proofStruct.LastHash + ":" +
-		proofStruct.HashOfFirstBlockByLastLeader + ":" +
+		strconv.Itoa(int(proof.LastLeader)) + ":" +
+		strconv.Itoa(int(proof.LastIndex)) + ":" +
+		proof.LastHash + ":" +
+		proof.HashOfFirstBlockByLastLeader + ":" +
 		epochFullID
 
 	okSignatures := 0
@@ -30,7 +30,7 @@ func VerifyAggregatedEpochFinalizationProof(proofStruct *structures.AggregatedEp
 		quorumMap[strings.ToLower(pk)] = true
 	}
 
-	for pubKey, signature := range proofStruct.Proofs {
+	for pubKey, signature := range proof.Proofs {
 
 		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
 			loweredPubKey := strings.ToLower(pubKey)

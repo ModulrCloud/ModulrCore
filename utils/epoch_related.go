@@ -44,80 +44,6 @@ func GetCurrentLeader() CurrentLeaderData {
 
 }
 
-func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed string) {
-
-	epochHandler.LeadersSequence = []string{} // [pool0, pool1,...poolN]
-
-	// Hash of metadata from the old epoch
-	hashOfMetadataFromOldEpoch := Blake3(epochSeed)
-
-	// Change order of validators pseudo-randomly
-	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.ValidatorsRegistry))
-
-	var totalStakeSum uint64 = 0
-
-	// Populate validator data and calculate total stake sum
-	for _, validatorPubKey := range epochHandler.ValidatorsRegistry {
-
-		validatorData := GetValidatorFromApprovementThreadState(validatorPubKey)
-
-		// Calculate total stake
-		totalStakeByThisValidator := validatorData.TotalStaked
-
-		totalStakeSum += totalStakeByThisValidator
-
-		validatorsExtendedData = append(validatorsExtendedData, ValidatorData{
-			ValidatorPubKey: validatorPubKey,
-			TotalStake:      totalStakeByThisValidator,
-		})
-	}
-
-	// Iterate over the validatorsRegistry and pseudo-randomly choose leaders
-	for i := 0; i < len(epochHandler.ValidatorsRegistry); i++ {
-
-		cumulativeSum := uint64(0)
-
-		// Generate deterministic random value using the hash of metadata
-		hashInput := hashOfMetadataFromOldEpoch + "_" + strconv.Itoa(i)
-		hashHex := Blake3(hashInput)
-		var deterministicRandomValue uint64
-		if len(hashHex) >= 16 {
-			if b, err := hex.DecodeString(hashHex[:16]); err == nil {
-				for _, by := range b {
-					deterministicRandomValue = (deterministicRandomValue << 8) | uint64(by)
-				}
-			}
-		}
-		if totalStakeSum > 0 {
-			deterministicRandomValue = deterministicRandomValue % totalStakeSum
-		}
-
-		// Find the validator based on the random value
-		for idx, validator := range validatorsExtendedData {
-
-			cumulativeSum += validator.TotalStake
-
-			if deterministicRandomValue < cumulativeSum {
-
-				// Add the chosen validator to the leaders sequence
-				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validator.ValidatorPubKey)
-
-				// Update totalStakeSum and remove the chosen validator from the list
-
-				if validator.TotalStake <= totalStakeSum {
-					totalStakeSum -= validator.TotalStake
-				} else {
-					totalStakeSum = 0
-				}
-
-				validatorsExtendedData = append(validatorsExtendedData[:idx], validatorsExtendedData[idx+1:]...)
-
-				break
-			}
-		}
-	}
-}
-
 func GetQuorumMajority(epochHandler *structures.EpochDataHandler) int {
 
 	quorumSize := len(epochHandler.Quorum)
@@ -248,4 +174,78 @@ func GetCurrentEpochQuorum(epochHandler *structures.EpochDataHandler, quorumSize
 	}
 
 	return quorum
+}
+
+func SetLeadersSequence(epochHandler *structures.EpochDataHandler, epochSeed string) {
+
+	epochHandler.LeadersSequence = []string{} // [pool0, pool1,...poolN]
+
+	// Hash of metadata from the old epoch
+	hashOfMetadataFromOldEpoch := Blake3(epochSeed)
+
+	// Change order of validators pseudo-randomly
+	validatorsExtendedData := make([]ValidatorData, 0, len(epochHandler.ValidatorsRegistry))
+
+	var totalStakeSum uint64 = 0
+
+	// Populate validator data and calculate total stake sum
+	for _, validatorPubKey := range epochHandler.ValidatorsRegistry {
+
+		validatorData := GetValidatorFromApprovementThreadState(validatorPubKey)
+
+		// Calculate total stake
+		totalStakeByThisValidator := validatorData.TotalStaked
+
+		totalStakeSum += totalStakeByThisValidator
+
+		validatorsExtendedData = append(validatorsExtendedData, ValidatorData{
+			ValidatorPubKey: validatorPubKey,
+			TotalStake:      totalStakeByThisValidator,
+		})
+	}
+
+	// Iterate over the validatorsRegistry and pseudo-randomly choose leaders
+	for i := 0; i < len(epochHandler.ValidatorsRegistry); i++ {
+
+		cumulativeSum := uint64(0)
+
+		// Generate deterministic random value using the hash of metadata
+		hashInput := hashOfMetadataFromOldEpoch + "_" + strconv.Itoa(i)
+		hashHex := Blake3(hashInput)
+		var deterministicRandomValue uint64
+		if len(hashHex) >= 16 {
+			if b, err := hex.DecodeString(hashHex[:16]); err == nil {
+				for _, by := range b {
+					deterministicRandomValue = (deterministicRandomValue << 8) | uint64(by)
+				}
+			}
+		}
+		if totalStakeSum > 0 {
+			deterministicRandomValue = deterministicRandomValue % totalStakeSum
+		}
+
+		// Find the validator based on the random value
+		for idx, validator := range validatorsExtendedData {
+
+			cumulativeSum += validator.TotalStake
+
+			if deterministicRandomValue < cumulativeSum {
+
+				// Add the chosen validator to the leaders sequence
+				epochHandler.LeadersSequence = append(epochHandler.LeadersSequence, validator.ValidatorPubKey)
+
+				// Update totalStakeSum and remove the chosen validator from the list
+
+				if validator.TotalStake <= totalStakeSum {
+					totalStakeSum -= validator.TotalStake
+				} else {
+					totalStakeSum = 0
+				}
+
+				validatorsExtendedData = append(validatorsExtendedData[:idx], validatorsExtendedData[idx+1:]...)
+
+				break
+			}
+		}
+	}
 }
