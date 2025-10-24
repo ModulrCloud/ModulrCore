@@ -35,7 +35,7 @@ func GenerateKeyPair(mnemonic, mnemonicPassword string, bip44DerivePath []uint32
 	// Now, to derive appropriate keypair - run the cycle over uint32 path-milestones and derive child keypairs
 	// In case bip44Path empty - set the default one
 	if len(bip44DerivePath) == 0 {
-		bip44DerivePath = []uint32{44, 7331, 0, 0}
+		bip44DerivePath = []uint32{44, 7337, 0, 0}
 	}
 
 	// Start derivation from master private key
