@@ -15,8 +15,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var FEES_COLLECTOR uint64 = 0
-
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
 	req := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
@@ -254,9 +252,13 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		stateBatch := new(leveldb.Batch)
 
+		blockFees := uint64(0)
+
 		for _, transaction := range block.Transactions {
 
-			ExecuteTransaction(&transaction)
+			_, fee := ExecuteTransaction(&transaction)
+
+			blockFees += fee
 
 		}
 
@@ -271,7 +273,7 @@ func ExecuteBlock(block *block_pack.Block) {
 
 		*/
 
-		DistributeFeesAmongValidatorAndStakers(block.Creator)
+		DistributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
@@ -343,13 +345,13 @@ func ExecuteBlock(block *block_pack.Block) {
 
 }
 
-func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
+func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBlock uint64) {
 
 	/*
 
 	   _____________________Here we perform the following logic_____________________
 
-	   [*] FEES_COLLECTOR - number of total fees received in this block (global var)
+	   [*] feeFromBlock - amount of total fees received in this block
 
 	   1) Get the validator storage to extract list of stakers
 
@@ -362,9 +364,9 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 	           ...
 	       }
 
-	   3) Send <validatorStorage.percentage * FEES_COLLECTOR> to block creator:
+	   3) Send <validatorStorage.percentage * feeFromBlock> to block creator:
 
-	       validatorCreatorAccount.balance += validatorStorage.percentage * FEES_COLLECTOR
+	       validatorCreatorAccount.balance += validatorStorage.percentage * feeFromBlock
 
 	   2) Distribute the rest among other stakers
 
@@ -382,17 +384,17 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 
 	// 1. Transfer part of fees to account with pubkey associated with block creator
 
-	rewardForBlockCreator := uint64(blockCreatorStorage.Percentage/100) * FEES_COLLECTOR
+	rewardForBlockCreator := (uint64(blockCreatorStorage.Percentage) * feeFromBlock) / 100
 
 	blockCreatorAccount.Balance += rewardForBlockCreator
 
 	// 2. Share the rest of fees among stakers due to their % part in total stake
 
-	feesToShareAmongStakers := FEES_COLLECTOR - rewardForBlockCreator
+	feesToShareAmongStakers := feeFromBlock - rewardForBlockCreator
 
 	for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
 
-		stakerReward := (stakerData.Stake / blockCreatorStorage.TotalStaked) * feesToShareAmongStakers
+		stakerReward := (stakerData.Stake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
 
 		stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
 
@@ -400,13 +402,9 @@ func DistributeFeesAmongValidatorAndStakers(blockCreatorPubkey string) {
 
 	}
 
-	// 3. Finally - nullify the global counter
-
-	FEES_COLLECTOR = 0
-
 }
 
-func ExecuteTransaction(tx *structures.Transaction) {
+func ExecuteTransaction(tx *structures.Transaction) (bool, uint64) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
@@ -422,13 +420,17 @@ func ExecuteTransaction(tx *structures.Transaction) {
 
 			accountTo.Balance += tx.Amount
 
-			FEES_COLLECTOR += tx.Fee
-
 			accountFrom.Nonce++
+
+			return true, tx.Fee
 
 		}
 
+		return false, 0
+
 	}
+
+	return false, 0
 
 }
 
