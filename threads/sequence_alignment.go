@@ -14,7 +14,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
-type TargetResponse struct {
+type AlignmentDataResponse struct {
 	ProposedIndexOfLeader            int                                    `json:"proposedIndexOfLeader"`
 	FirstBlockByCurrentLeader        block_pack.Block                       `json:"firstBlockByCurrentLeader"`
 	AfpForSecondBlockByCurrentLeader structures.AggregatedFinalizationProof `json:"afpForSecondBlockByCurrentLeader"`
@@ -67,7 +67,7 @@ func SequenceAlignmentThread() {
 
 		}
 
-		var targetResponse TargetResponse
+		var targetResponse AlignmentDataResponse
 
 		// Decode JSON response
 		dec := json.NewDecoder(io.LimitReader(resp.Body, 10<<20)) // 10 MiB limit

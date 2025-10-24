@@ -22,16 +22,16 @@ import (
 
 type DoubleMap = map[string]map[string][]byte
 
-var ALRP_METADATA = make(map[string]*structures.AlrpSkeleton) // previousLeaderPubkey => AlrpData
-
-var WEBSOCKET_CONNECTIONS_FOR_ALRP = make(map[string]*websocket.Conn) // quorumMember => websocket connection handler
-
 type RotationProofCollector struct {
 	wsConnMap map[string]*websocket.Conn
 	quorum    []string
 	majority  int
 	timeout   time.Duration
 }
+
+var ALRP_METADATA = make(map[string]*structures.AlrpSkeleton) // previousLeaderPubkey => AlrpData
+
+var WEBSOCKET_CONNECTIONS_FOR_ALRP = make(map[string]*websocket.Conn) // quorumMember => websocket connection handler
 
 func BlocksGenerationThread() {
 

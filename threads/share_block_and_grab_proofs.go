@@ -20,8 +20,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var PROOFS_GRABBER_MUTEX = sync.RWMutex{}
-
 type ProofsGrabber struct {
 	EpochId             int
 	AcceptedIndex       int
@@ -30,6 +28,8 @@ type ProofsGrabber struct {
 	HuntingForBlockId   string
 	HuntingForBlockHash string
 }
+
+var PROOFS_GRABBER_MUTEX = sync.RWMutex{}
 
 var WEBSOCKET_CONNECTIONS = make(map[string]*websocket.Conn) // quorumMember => websocket handler
 
@@ -44,6 +44,93 @@ var BLOCK_TO_SHARE *block_pack.Block = &block_pack.Block{
 }
 
 var QUORUM_WAITER_FOR_FINALIZATION_PROOFS *utils.QuorumWaiter
+
+func BlocksSharingAndProofsGrabingThread() {
+
+	for {
+
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+
+		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+
+		currentLeaderPubKey := epochHandlerRef.LeadersSequence[epochHandlerRef.CurrentLeaderIndex]
+
+		if currentLeaderPubKey != globals.CONFIGURATION.PublicKey || !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+
+			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+			time.Sleep(200 * time.Millisecond)
+
+			continue
+
+		}
+
+		PROOFS_GRABBER_MUTEX.RLock()
+
+		if PROOFS_GRABBER.EpochId != epochHandlerRef.Id {
+
+			PROOFS_GRABBER_MUTEX.RUnlock()
+
+			PROOFS_GRABBER_MUTEX.Lock()
+
+			// Try to get stored proofs grabber from db
+
+			dbKey := []byte(strconv.Itoa(epochHandlerRef.Id) + ":PROOFS_GRABBER")
+
+			if rawGrabber, err := globals.FINALIZATION_VOTING_STATS.Get(dbKey, nil); err == nil {
+
+				json.Unmarshal(rawGrabber, &PROOFS_GRABBER)
+
+			} else {
+
+				// Assign initial value of proofs grabber for each new epoch
+
+				PROOFS_GRABBER = ProofsGrabber{
+
+					EpochId: epochHandlerRef.Id,
+
+					AcceptedIndex: -1,
+
+					AcceptedHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				}
+
+				// Also - clean the mapping with the signatures for AFP
+
+				FINALIZATION_PROOFS_CACHE = make(map[string]string)
+
+			}
+
+			// And store new descriptor
+
+			if serialized, err := json.Marshal(PROOFS_GRABBER); err == nil {
+
+				globals.FINALIZATION_VOTING_STATS.Put(dbKey, serialized, nil)
+
+			}
+
+			PROOFS_GRABBER_MUTEX.Unlock()
+
+			// Also, open connections with quorum here. Create QuorumWaiter etc.
+
+			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS)
+
+			// Create new QuorumWaiter
+
+			QUORUM_WAITER_FOR_FINALIZATION_PROOFS = utils.NewQuorumWaiter(len(epochHandlerRef.Quorum))
+
+		} else {
+
+			PROOFS_GRABBER_MUTEX.RUnlock()
+
+		}
+
+		runFinalizationProofsGrabbing(epochHandlerRef)
+
+		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+	}
+
+}
 
 func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
@@ -217,93 +304,6 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 		} else {
 			return
 		}
-
-	}
-
-}
-
-func BlocksSharingAndProofsGrabingThread() {
-
-	for {
-
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
-
-		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
-
-		currentLeaderPubKey := epochHandlerRef.LeadersSequence[epochHandlerRef.CurrentLeaderIndex]
-
-		if currentLeaderPubKey != globals.CONFIGURATION.PublicKey || !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
-
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
-
-			time.Sleep(200 * time.Millisecond)
-
-			continue
-
-		}
-
-		PROOFS_GRABBER_MUTEX.RLock()
-
-		if PROOFS_GRABBER.EpochId != epochHandlerRef.Id {
-
-			PROOFS_GRABBER_MUTEX.RUnlock()
-
-			PROOFS_GRABBER_MUTEX.Lock()
-
-			// Try to get stored proofs grabber from db
-
-			dbKey := []byte(strconv.Itoa(epochHandlerRef.Id) + ":PROOFS_GRABBER")
-
-			if rawGrabber, err := globals.FINALIZATION_VOTING_STATS.Get(dbKey, nil); err == nil {
-
-				json.Unmarshal(rawGrabber, &PROOFS_GRABBER)
-
-			} else {
-
-				// Assign initial value of proofs grabber for each new epoch
-
-				PROOFS_GRABBER = ProofsGrabber{
-
-					EpochId: epochHandlerRef.Id,
-
-					AcceptedIndex: -1,
-
-					AcceptedHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-				}
-
-				// Also - clean the mapping with the signatures for AFP
-
-				FINALIZATION_PROOFS_CACHE = make(map[string]string)
-
-			}
-
-			// And store new descriptor
-
-			if serialized, err := json.Marshal(PROOFS_GRABBER); err == nil {
-
-				globals.FINALIZATION_VOTING_STATS.Put(dbKey, serialized, nil)
-
-			}
-
-			PROOFS_GRABBER_MUTEX.Unlock()
-
-			// Also, open connections with quorum here. Create QuorumWaiter etc.
-
-			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS)
-
-			// Create new QuorumWaiter
-
-			QUORUM_WAITER_FOR_FINALIZATION_PROOFS = utils.NewQuorumWaiter(len(epochHandlerRef.Quorum))
-
-		} else {
-
-			PROOFS_GRABBER_MUTEX.RUnlock()
-
-		}
-
-		runFinalizationProofsGrabbing(epochHandlerRef)
-
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
 	}
 

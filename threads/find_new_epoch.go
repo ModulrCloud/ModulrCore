@@ -26,6 +26,8 @@ type FirstBlockDataWithAefp struct {
 	Aefp *structures.AggregatedEpochFinalizationProof
 }
 
+const LATEST_BATCH_KEY = "LATEST_BATCH_INDEX"
+
 var aefpHTTP = &http.Client{Timeout: 2 * time.Second}
 
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
@@ -60,8 +62,6 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 		}
 	}
 }
-
-const LATEST_BATCH_KEY = "LATEST_BATCH_INDEX"
 
 // Reads latest batch index from LevelDB.
 // Supports legacy decimal-string format and migrates it to 8-byte BigEndian.

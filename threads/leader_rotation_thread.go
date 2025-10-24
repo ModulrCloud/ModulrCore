@@ -10,18 +10,6 @@ import (
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
 
-func timeIsOutForCurrentLeader(approvementThread *structures.ApprovementThreadMetadataHandler) bool {
-
-	// Function to check if time frame for current leader is done and we have to move to next leader in sequence
-
-	leaderShipTimeframe := approvementThread.NetworkParameters.LeadershipDuration
-
-	currentIndex := int64(approvementThread.EpochDataHandler.CurrentLeaderIndex)
-
-	return utils.GetUTCTimestampInMilliSeconds() >= int64(approvementThread.EpochDataHandler.StartTimestamp)+(currentIndex+1)*leaderShipTimeframe
-
-}
-
 func LeaderRotationThread() {
 
 	for {
@@ -88,5 +76,17 @@ func LeaderRotationThread() {
 		time.Sleep(200 * time.Millisecond)
 
 	}
+
+}
+
+func timeIsOutForCurrentLeader(approvementThread *structures.ApprovementThreadMetadataHandler) bool {
+
+	// Function to check if time frame for current leader is done and we have to move to next leader in sequence
+
+	leaderShipTimeframe := approvementThread.NetworkParameters.LeadershipDuration
+
+	currentIndex := int64(approvementThread.EpochDataHandler.CurrentLeaderIndex)
+
+	return utils.GetUTCTimestampInMilliSeconds() >= int64(approvementThread.EpochDataHandler.StartTimestamp)+(currentIndex+1)*leaderShipTimeframe
 
 }
