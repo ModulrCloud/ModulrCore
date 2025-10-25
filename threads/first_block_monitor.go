@@ -59,20 +59,18 @@ func FirstBlockInEpochMonitor() {
 				globals.EPOCH_DATA.Put([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochHandlerRef.Id)), serializedData, nil)
 
 				msg := fmt.Sprintf(
-					"%sFirst block for epoch %s%d %sis %s(hash:%s...) %sby %s%s",
+					"%sFirst block for epoch %s%d %sis created by %s%s%s",
 					utils.DEEP_GREEN_COLOR,
 					utils.CYAN_COLOR,
 					epochHandlerRef.Id,
 					utils.DEEP_GREEN_COLOR,
 					utils.CYAN_COLOR,
-					firstBlockData.FirstBlockHash[:8],
-					utils.DEEP_GREEN_COLOR,
-					utils.CYAN_COLOR,
 					firstBlockData.FirstBlockCreator,
+					utils.RESET_COLOR,
 				)
 
 				fmt.Println()
-				utils.LogWithTime(msg, utils.WHITE_COLOR)
+				utils.LogWithTime2(msg, utils.WHITE_COLOR)
 				fmt.Println()
 			}
 

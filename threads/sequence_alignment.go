@@ -233,6 +233,8 @@ func SequenceAlignmentThread() {
 
 									fmt.Println("DEBUG: Value => ", globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData)
 
+									utils.LogWithTime2("Seems new leader on exec thread => ", utils.GREEN_COLOR)
+
 									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 
 									time.Sleep(time.Second)

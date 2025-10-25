@@ -20,6 +20,9 @@ const (
 	RESET_COLOR      = "\033[0m"
 	RED_COLOR        = "\033[31;1m"
 	DEEP_GREEN_COLOR = "\u001b[38;5;23m"
+	DEEP_GRAY        = "\u001b[38;5;240m"
+	DEEP_MAGENTA     = "\u001b[38;5;90m"
+	DEEP_YELLOW      = "\u001b[38;5;214m"
 	GREEN_COLOR      = "\033[32;1m"
 	YELLOW_COLOR     = "\033[33m"
 	MAGENTA_COLOR    = "\033[38;5;99m"
@@ -60,6 +63,14 @@ func LogWithTime(msg, msgColor string) {
 	formattedDate := time.Now().Format("02 January 2006 at 03:04:05 PM")
 
 	fmt.Printf(DEEP_GREEN_COLOR+"[%s]"+MAGENTA_COLOR+"(pid:%d)"+msgColor+"  %s\n"+RESET_COLOR, formattedDate, os.Getpid(), msg)
+
+}
+
+func LogWithTime2(msg, msgColor string) {
+
+	formattedDate := time.Now().Format("02 January 2006 at 03:04:05 PM")
+
+	fmt.Printf(DEEP_YELLOW+"[%s]"+MAGENTA_COLOR+"(pid:%d)"+msgColor+"  %s\n"+RESET_COLOR, formattedDate, os.Getpid(), msg)
 
 }
 
