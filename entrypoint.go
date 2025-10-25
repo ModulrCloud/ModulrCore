@@ -177,7 +177,11 @@ func prepareBlockchain() {
 	// Init genesis if version is -1
 	if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CoreMajorVersion == -1 {
 
-		setGenesisToState()
+		if genesisWriteErr := setGenesisToState(); genesisWriteErr != nil {
+
+			panic("Error with writing genesis to state. Try to delete chaindata and repeat node launch")
+
+		}
 
 		serializedApprovementThread, err := json.Marshal(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler)
 

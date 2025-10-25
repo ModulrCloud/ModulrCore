@@ -360,7 +360,11 @@ func EpochRotationThread() {
 
 						AEFP_AND_FIRST_BLOCK_DATA = FirstBlockDataWithAefp{}
 
-						globals.APPROVEMENT_THREAD_METADATA.Write(atomicBatch, nil)
+						if batchCommitErr := globals.APPROVEMENT_THREAD_METADATA.Write(atomicBatch, nil); batchCommitErr != nil {
+
+							panic("Error with writing batch to approvement thread db. Try to launch again")
+
+						}
 
 						utils.LogWithTime("Epoch on approvement thread was updated => "+nextEpochHash+"#"+strconv.Itoa(nextEpochId), utils.GREEN_COLOR)
 
