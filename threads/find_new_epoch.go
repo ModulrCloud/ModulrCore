@@ -26,8 +26,6 @@ type FirstBlockDataWithAefp struct {
 	Aefp *structures.AggregatedEpochFinalizationProof
 }
 
-const LATEST_BATCH_KEY = "LATEST_BATCH_INDEX"
-
 var AEFP_HTTP_CLIENT = &http.Client{Timeout: 2 * time.Second}
 
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
@@ -67,7 +65,7 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 // Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
 func readLatestBatchIndex() int64 {
 
-	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(LATEST_BATCH_KEY), nil)
+	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
 
 	if err != nil || len(raw) == 0 {
 		return 0
@@ -81,7 +79,7 @@ func readLatestBatchIndex() int64 {
 	if v, perr := strconv.ParseInt(string(raw), 10, 64); perr == nil && v >= 0 {
 		var buf [8]byte
 		binary.BigEndian.PutUint64(buf[:], uint64(v))
-		_ = globals.APPROVEMENT_THREAD_METADATA.Put([]byte(LATEST_BATCH_KEY), buf[:], nil)
+		_ = globals.APPROVEMENT_THREAD_METADATA.Put([]byte("LATEST_BATCH_INDEX"), buf[:], nil)
 		return v
 	}
 
@@ -96,7 +94,7 @@ func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
 
 	binary.BigEndian.PutUint64(buf[:], uint64(v))
 
-	batch.Put([]byte(LATEST_BATCH_KEY), buf[:])
+	batch.Put([]byte("LATEST_BATCH_INDEX"), buf[:])
 
 }
 
