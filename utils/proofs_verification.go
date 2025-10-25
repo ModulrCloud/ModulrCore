@@ -79,7 +79,7 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 	return okSignatures >= majority
 }
 
-func VerifyAggregatedLeaderRotationProof(prevLeaderPubKey string, proof *structures.AggregatedLeaderRotationProof, epochHandler *structures.EpochDataHandler) bool {
+func VerifyAggregatedLeaderRotationProof(proof *structures.AggregatedLeaderRotationProof, prevLeaderPubKey string, epochHandler *structures.EpochDataHandler) bool {
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
 

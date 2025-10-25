@@ -43,6 +43,7 @@ func NewBlock(transactions []structures.Transaction, extraData ExtraDataToBlock,
 func (block *Block) GetHash() string {
 
 	jsonedTransactions, err := json.Marshal(block.Transactions)
+
 	if err != nil {
 		panic("GetHash: failed to marshal transactions: " + err.Error())
 	}
@@ -72,7 +73,7 @@ func (block *Block) VerifySignature() bool {
 
 }
 
-func (block *Block) CheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int) bool {
+func (block *Block) VerifyAlrpChain(epochHandler *structures.EpochDataHandler, position int) bool {
 
 	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
 
@@ -88,7 +89,7 @@ func (block *Block) CheckAlrpChainValidity(epochHandler *structures.EpochDataHan
 
 		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
 
-			signaIsOk := utils.VerifyAggregatedLeaderRotationProof(leaderPubkey, alrpForThisLeader, epochHandler)
+			signaIsOk := utils.VerifyAggregatedLeaderRotationProof(alrpForThisLeader, leaderPubkey, epochHandler)
 
 			if signaIsOk {
 
@@ -126,7 +127,7 @@ func (block *Block) CheckAlrpChainValidity(epochHandler *structures.EpochDataHan
 
 }
 
-func (block *Block) ExtendedCheckAlrpChainValidity(epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerLeaderSequence) {
+func (block *Block) VerifyAlrpChainExtended(epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerLeaderSequence) {
 
 	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
 
@@ -144,7 +145,7 @@ func (block *Block) ExtendedCheckAlrpChainValidity(epochHandler *structures.Epoc
 
 		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
 
-			signaIsOk := dontCheckSigna || utils.VerifyAggregatedLeaderRotationProof(leaderPubkey, alrpForThisLeader, epochHandler)
+			signaIsOk := dontCheckSigna || utils.VerifyAggregatedLeaderRotationProof(alrpForThisLeader, leaderPubkey, epochHandler)
 
 			if signaIsOk {
 

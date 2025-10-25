@@ -483,7 +483,7 @@ func findInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 			// In this block we should have ALRPs for all the previous leaders
 
-			alrpChainIsOk, infoAboutFinalBlocks := firstBlockInThisEpochByLeader.ExtendedCheckAlrpChainValidity(
+			alrpChainIsOk, infoAboutFinalBlocks := firstBlockInThisEpochByLeader.VerifyAlrpChainExtended(
 				epochHandler, int(position), true,
 			)
 

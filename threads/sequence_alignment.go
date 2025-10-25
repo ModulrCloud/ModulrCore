@@ -106,7 +106,7 @@ func SequenceAlignmentThread() {
 				// Verify all the ALRPs in block header
 				if epochHandlerRef.LeadersSequence[proposedIndex] == firstBlock.Creator {
 
-					isOk, infoAboutFinalBlocks := firstBlock.ExtendedCheckAlrpChainValidity(epochHandlerRef, proposedIndex, true)
+					isOk, infoAboutFinalBlocks := firstBlock.VerifyAlrpChainExtended(epochHandlerRef, proposedIndex, true)
 
 					shouldChange := true
 
@@ -166,7 +166,7 @@ func SequenceAlignmentThread() {
 											if position == 0 {
 												alrpChainValidationOk = true
 											} else {
-												alrpChainValidationOk, dataAboutLastBlocks = firstBlockInThisEpochByLeader.ExtendedCheckAlrpChainValidity(
+												alrpChainValidationOk, dataAboutLastBlocks = firstBlockInThisEpochByLeader.VerifyAlrpChainExtended(
 													epochHandlerRef, position, true,
 												)
 											}

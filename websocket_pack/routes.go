@@ -135,7 +135,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 					// Verify the ALRP chain validity here
 
-					alrpChainIsOk := parsedRequest.Block.CheckAlrpChainValidity(
+					alrpChainIsOk := parsedRequest.Block.VerifyAlrpChain(
 
 						epochHandler, positionOfBlockCreatorInLeadersSequence,
 					)
