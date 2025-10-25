@@ -28,7 +28,7 @@ type FirstBlockDataWithAefp struct {
 
 const LATEST_BATCH_KEY = "LATEST_BATCH_INDEX"
 
-var aefpHTTP = &http.Client{Timeout: 2 * time.Second}
+var AEFP_HTTP_CLIENT = &http.Client{Timeout: 2 * time.Second}
 
 var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
 
@@ -40,7 +40,7 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 		return
 	}
 
-	resp, err := aefpHTTP.Do(req)
+	resp, err := AEFP_HTTP_CLIENT.Do(req)
 	if err != nil {
 		return
 	}

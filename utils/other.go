@@ -27,9 +27,9 @@ const (
 	WHITE_COLOR      = "\033[37;1m"
 )
 
-var shutdownOnce sync.Once
+var SHUTDOWN_ONCE sync.Once
 
-var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+var RANDOM_GENERATOR = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func StrToUint8(s string) uint8 {
 	v, err := strconv.ParseUint(s, 10, 8)
@@ -41,7 +41,7 @@ func StrToUint8(s string) uint8 {
 
 func GracefulShutdown() {
 
-	shutdownOnce.Do(func() {
+	SHUTDOWN_ONCE.Do(func() {
 
 		LogWithTime("Stop signal has been initiated.Keep waiting...", CYAN_COLOR)
 
@@ -85,7 +85,7 @@ func IsMyCoreVersionOld(thread structures.LogicalThread) bool {
 
 func GetRandomFromSlice(arr []structures.QuorumMemberData) structures.QuorumMemberData {
 
-	return arr[rng.Intn(len(arr))]
+	return arr[RANDOM_GENERATOR.Intn(len(arr))]
 
 }
 
