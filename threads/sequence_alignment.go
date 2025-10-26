@@ -2,7 +2,6 @@ package threads
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -222,6 +221,8 @@ func SequenceAlignmentThread() {
 
 												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
 
+												utils.LogWithTime2("Resolved last block index for "+utils.CYAN_COLOR+leaderPubKey, utils.DEEP_GRAY)
+
 											}
 
 										}
@@ -229,11 +230,12 @@ func SequenceAlignmentThread() {
 									}
 
 									// Finally, set the <currentLeader> to the new pointer
+
 									globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
 
-									fmt.Println("DEBUG: Value => ", globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData)
+									leaderPubkey := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence[targetResponse.ProposedIndexOfLeader]
 
-									utils.LogWithTime2("Seems new leader on exec thread => ", utils.GREEN_COLOR)
+									utils.LogWithTime2("New leader on exec thread detected "+utils.CYAN_COLOR+leaderPubkey, utils.GREEN_COLOR)
 
 									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 
