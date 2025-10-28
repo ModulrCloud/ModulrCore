@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
@@ -219,7 +220,7 @@ func SequenceAlignmentThread() {
 
 												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
 
-												utils.LogWithTime2("Resolved last block index for "+utils.CYAN_COLOR+leaderPubKey, utils.DEEP_GRAY)
+												utils.LogWithTime2("Resolved last block index for "+utils.CYAN_COLOR+leaderPubKey+" => "+strconv.Itoa(leaderExecData.Index), utils.DEEP_GRAY)
 
 											}
 

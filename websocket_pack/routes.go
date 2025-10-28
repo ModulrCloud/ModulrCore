@@ -446,13 +446,31 @@ func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn
 
 			// Now try to get AFP for block
 
-			if afpBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+parsedRequest.BlockId), nil); err == nil {
+			parts := strings.Split(parsedRequest.BlockId, ":")
 
-				var afp structures.AggregatedFinalizationProof
+			if len(parts) > 0 {
 
-				if err := json.Unmarshal(afpBytes, &afp); err == nil {
+				last := parts[len(parts)-1]
 
-					resp.Afp = &afp
+				if idx, err := strconv.ParseUint(last, 10, 64); err == nil {
+
+					parts[len(parts)-1] = strconv.FormatUint(idx+1, 10)
+
+					nextBlockId := strings.Join(parts, ":")
+
+					// Remark: To make sure block with index X is 100% approved we need to get the AFP for next block
+
+					if afpBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+nextBlockId), nil); err == nil {
+
+						var afp structures.AggregatedFinalizationProof
+
+						if err := json.Unmarshal(afpBytes, &afp); err == nil {
+
+							resp.Afp = &afp
+
+						}
+
+					}
 
 				}
 
