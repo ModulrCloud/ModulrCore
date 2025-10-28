@@ -165,8 +165,6 @@ func ExecutionThread() {
 
 				response := getBlockAndProofFromPoD(blockId)
 
-				//fmt.Println("DEBUG: Response is ======> ", response)
-
 				// If no data - break
 				if response == nil || response.Block == nil {
 					break
@@ -229,8 +227,6 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 			if err := json.Unmarshal(respBytes, &resp); err == nil {
 
-				fmt.Println("DEBUG: Received feedback => ", resp)
-
 				if resp.Block == nil {
 
 					return nil
@@ -240,10 +236,6 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 				return &resp
 
 			}
-
-		} else {
-
-			fmt.Println("DEBUG: Err is => ", err)
 
 		}
 
@@ -348,7 +340,7 @@ func executeBlock(block *block_pack.Block) {
 
 		if err := globals.STATE.Write(stateBatch, nil); err == nil {
 
-			utils.LogWithTime(fmt.Sprintf("Executed block %s ✅", currentBlockId), utils.CYAN_COLOR)
+			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅", currentBlockId), utils.CYAN_COLOR)
 
 		} else {
 
