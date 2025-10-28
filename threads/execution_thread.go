@@ -165,6 +165,8 @@ func ExecutionThread() {
 
 				response := getBlockAndProofFromPoD(blockId)
 
+				//fmt.Println("DEBUG: Response is ======> ", response)
+
 				// If no data - break
 				if response == nil || response.Block == nil {
 					break
@@ -214,7 +216,10 @@ func ExecutionThread() {
 
 func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
-	req := websocket_pack.WsBlockWithAfpRequest{BlockId: blockID}
+	req := websocket_pack.WsBlockWithAfpRequest{
+		Route:   "get_block_with_afp",
+		BlockId: blockID,
+	}
 
 	if reqBytes, err := json.Marshal(req); err == nil {
 
@@ -223,6 +228,8 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 			var resp websocket_pack.WsBlockWithAfpResponse
 
 			if err := json.Unmarshal(respBytes, &resp); err == nil {
+
+				fmt.Println("DEBUG: Received feedback => ", resp)
 
 				if resp.Block == nil {
 
@@ -233,6 +240,10 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 				return &resp
 
 			}
+
+		} else {
+
+			fmt.Println("DEBUG: Err is => ", err)
 
 		}
 

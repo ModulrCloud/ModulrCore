@@ -83,8 +83,6 @@ func SequenceAlignmentThread() {
 
 		}
 
-		// fmt.Println("DEBUG: Target response is => ", targetResponse)
-
 		// Body successfully decoded, safe to close now
 		resp.Body.Close()
 

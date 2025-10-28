@@ -62,6 +62,8 @@ func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 
 			if err != nil {
 
+				fmt.Println("DEBUG: Receive err => ", err)
+
 				POD_MUTEX.Unlock()
 
 				time.Sleep(RETRY_INTERVAL)
