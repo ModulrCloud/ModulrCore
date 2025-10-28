@@ -19,7 +19,7 @@ func ExecutionThread() {
 
 	for {
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Lock()
 
 		epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
 
@@ -145,7 +145,9 @@ func ExecutionThread() {
 
 				// Here we need to skip the following logic and start next iteration
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+				// globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+
+				globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 
 				continue
 
@@ -203,6 +205,8 @@ func ExecutionThread() {
 			setupNextEpoch(&epochHandlerRef.EpochDataHandler)
 
 		}
+
+		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
 
 	}
 
