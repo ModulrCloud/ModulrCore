@@ -196,8 +196,6 @@ func ExecutionThread() {
 
 		if !currentEpochIsFresh && !epochHandlerRef.LegacyEpochAlignmentData.Activated {
 
-			fmt.Println("DEBUG: Try to finish current epoch")
-
 			tryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
 
 		}
@@ -601,8 +599,6 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	if nextEpochData != nil {
 
-		fmt.Println("DEBUG: Next epoch data not null")
-
 		// Find the first blocks for epoch X+1
 
 		var firstBlockDataOnNextEpoch structures.FirstBlockDataForNextEpoch
@@ -615,15 +611,11 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		fmt.Println("DEBUG: Try to get first block data => ", firstBlockDataOnNextEpoch)
-
 		if firstBlockDataOnNextEpoch.FirstBlockCreator == "" {
 
 			findResult := GetFirstBlockDataFromDB(nextEpochIndex)
 
 			if findResult != nil {
-
-				fmt.Println("DEBUG: Found the first block data => ", findResult)
 
 				firstBlockDataOnNextEpoch.FirstBlockCreator = findResult.FirstBlockCreator
 
