@@ -342,9 +342,25 @@ func EpochRotationThread() {
 
 						utils.SetLeadersSequence(&nextEpochHandler, nextEpochHash)
 
+						nextEpochDataHandler := structures.NextEpochDataHandler{
+							NextEpochHash:               nextEpochHash,
+							NextEpochValidatorsRegistry: nextEpochHandler.ValidatorsRegistry,
+							NextEpochQuorum:             nextEpochHandler.Quorum,
+							NextEpochLeadersSequence:    nextEpochHandler.LeadersSequence,
+							DelayedTransactions:         delayedTransactionsOrderByPriority,
+						}
+
+						jsonedNextEpochDataHandler, _ := json.Marshal(nextEpochDataHandler)
+
+						atomicBatch.Put([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochId)), jsonedNextEpochDataHandler)
+
 						writeLatestBatchIndexBatch(atomicBatch, latestBatchIndex)
 
+						// Finally - assign new handler
+
 						globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = nextEpochHandler
+
+						// And commit all the changes on AT as a single atomic batch
 
 						jsonedHandler, _ := json.Marshal(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler)
 
