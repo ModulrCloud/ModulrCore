@@ -598,8 +598,6 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	}
 
-	fmt.Println("DEBUG: Next epoch data => ", nextEpochData)
-
 	if nextEpochData != nil {
 
 		// Find the first blocks for epoch X+1
