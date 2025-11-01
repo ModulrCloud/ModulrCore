@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -37,7 +38,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 			}
 
-			_, existErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
+			_, existErr := databases.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
 
 			// Activate this branch only in case we still don't have this validator in db
 
@@ -70,7 +71,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 			}
 
-			_, existErr := globals.STATE.Get([]byte(validatorStorageKey), nil)
+			_, existErr := databases.STATE.Get([]byte(validatorStorageKey), nil)
 
 			if existErr != nil {
 

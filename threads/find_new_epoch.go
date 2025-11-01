@@ -12,6 +12,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/system_contracts"
@@ -65,7 +66,7 @@ func fetchAefp(ctx context.Context, url string, quorum []string, majority int, e
 // Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
 func readLatestBatchIndex() int64 {
 
-	raw, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
+	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
 
 	if err != nil || len(raw) == 0 {
 		return 0
@@ -79,7 +80,7 @@ func readLatestBatchIndex() int64 {
 	if v, perr := strconv.ParseInt(string(raw), 10, 64); perr == nil && v >= 0 {
 		var buf [8]byte
 		binary.BigEndian.PutUint64(buf[:], uint64(v))
-		_ = globals.APPROVEMENT_THREAD_METADATA.Put([]byte("LATEST_BATCH_INDEX"), buf[:], nil)
+		_ = databases.APPROVEMENT_THREAD_METADATA.Put([]byte("LATEST_BATCH_INDEX"), buf[:], nil)
 		return v
 	}
 
@@ -131,7 +132,7 @@ func EpochRotationThread() {
 				// If epoch is not fresh - send the signal to persistent db that we finish it - not to create AFPs, ALRPs anymore
 				keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochHandlerRef.Id))
 
-				globals.FINALIZATION_VOTING_STATS.Put(keyValue, []byte("TRUE"), nil)
+				databases.FINALIZATION_VOTING_STATS.Put(keyValue, []byte("TRUE"), nil)
 
 			}
 
@@ -153,7 +154,7 @@ func EpochRotationThread() {
 
 						keyValue := []byte("AEFP:" + strconv.Itoa(epochHandlerRef.Id))
 
-						aefpRaw, err := globals.EPOCH_DATA.Get(keyValue, nil)
+						aefpRaw, err := databases.EPOCH_DATA.Get(keyValue, nil)
 
 						var aefp structures.AggregatedEpochFinalizationProof
 
@@ -276,7 +277,7 @@ func EpochRotationThread() {
 
 						valBytes, _ := json.Marshal(epochHandlerRef)
 
-						globals.EPOCH_DATA.Put(keyBytes, valBytes, nil)
+						databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
 
 						var daoVotingContractCalls, allTheRestContractCalls []map[string]string
 
@@ -374,7 +375,7 @@ func EpochRotationThread() {
 
 						AEFP_AND_FIRST_BLOCK_DATA = FirstBlockDataWithAefp{}
 
-						if batchCommitErr := globals.APPROVEMENT_THREAD_METADATA.Write(atomicBatch, nil); batchCommitErr != nil {
+						if batchCommitErr := databases.APPROVEMENT_THREAD_METADATA.Write(atomicBatch, nil); batchCommitErr != nil {
 
 							panic("Error with writing batch to approvement thread db. Try to launch again")
 

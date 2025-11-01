@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -193,7 +194,7 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 
 	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
 
-	blockAsBytes, err := globals.BLOCKS.Get([]byte(blockID), nil)
+	blockAsBytes, err := databases.BLOCKS.Get([]byte(blockID), nil)
 
 	if err == nil {
 

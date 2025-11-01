@@ -9,6 +9,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -41,7 +42,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 		localVotingDataForLeader := structures.NewLeaderVotingStatTemplate()
 
-		localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), nil)
+		localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), nil)
 
 		if err == nil {
 
@@ -100,7 +101,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 						prevEpochIndex := epochHandler.Id - 1
 
-						legacyEpochHandlerRaw, err := globals.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(prevEpochIndex)), nil)
+						legacyEpochHandlerRaw, err := databases.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(prevEpochIndex)), nil)
 
 						if err == nil {
 
@@ -163,7 +164,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 							keyBytes := []byte("FIRST_BLOCK_ASSUMPTION:" + strconv.Itoa(epochIndex))
 
-							_, err := globals.EPOCH_DATA.Get(keyBytes, nil)
+							_, err := databases.EPOCH_DATA.Get(keyBytes, nil)
 
 							// We need to store first block assumption only in case we don't have it yet
 
@@ -178,7 +179,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 								valBytes, _ := json.Marshal(assumption)
 
-								globals.EPOCH_DATA.Put(keyBytes, valBytes, nil)
+								databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
 
 							}
 
@@ -200,7 +201,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 					// 1. Store the block
 
-					err = globals.BLOCKS.Put([]byte(proposedBlockId), blockBytes, nil)
+					err = databases.BLOCKS.Put([]byte(proposedBlockId), blockBytes, nil)
 
 					if err == nil {
 
@@ -210,7 +211,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 							// 2. Store the AFP for previous block
 
-							errStore := globals.EPOCH_DATA.Put([]byte("AFP:"+parsedRequest.PreviousBlockAfp.BlockId), afpBytes, nil)
+							errStore := databases.EPOCH_DATA.Put([]byte("AFP:"+parsedRequest.PreviousBlockAfp.BlockId), afpBytes, nil)
 
 							votingStatBytes, errParse := json.Marshal(futureVotingDataToStore)
 
@@ -218,7 +219,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 								// 3. Store the voting stats
 
-								err := globals.FINALIZATION_VOTING_STATS.Put([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), votingStatBytes, nil)
+								err := databases.FINALIZATION_VOTING_STATS.Put([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), votingStatBytes, nil)
 
 								if err == nil {
 
@@ -292,7 +293,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 		localVotingData := structures.NewLeaderVotingStatTemplate()
 
-		localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToRotate), nil)
+		localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToRotate), nil)
 
 		if err == nil {
 
@@ -308,7 +309,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 			firstBlockID := strconv.Itoa(epochHandler.Id) + ":" + leaderToRotate + ":0"
 
-			afpForFirstBlockBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
+			afpForFirstBlockBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
 
 			if err == nil {
 
@@ -436,7 +437,7 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn) {
 
-	if blockBytes, err := globals.BLOCKS.Get([]byte(parsedRequest.BlockId), nil); err == nil {
+	if blockBytes, err := databases.BLOCKS.Get([]byte(parsedRequest.BlockId), nil); err == nil {
 
 		var block block_pack.Block
 
@@ -460,7 +461,7 @@ func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn
 
 					// Remark: To make sure block with index X is 100% approved we need to get the AFP for next block
 
-					if afpBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+nextBlockId), nil); err == nil {
+					if afpBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+nextBlockId), nil); err == nil {
 
 						var afp structures.AggregatedFinalizationProof
 

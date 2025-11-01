@@ -11,6 +11,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -147,7 +148,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 	// Try to find locally
 
-	aefpProofRaw, err := globals.EPOCH_DATA.Get([]byte("AEFP:"+strconv.Itoa(previousEpochIndex)), nil)
+	aefpProofRaw, err := databases.EPOCH_DATA.Get([]byte("AEFP:"+strconv.Itoa(previousEpochIndex)), nil)
 
 	aefpParsed := new(structures.AggregatedEpochFinalizationProof)
 
@@ -169,7 +170,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
 
-	legacyEpochHandlerRaw, err := globals.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(previousEpochIndex)), nil)
+	legacyEpochHandlerRaw, err := databases.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(previousEpochIndex)), nil)
 
 	if err != nil {
 		return nil
@@ -290,7 +291,7 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 		keyBytes := []byte(strconv.Itoa(epochIndex) + ":" + leaderPubkey)
 
-		if finStatsRaw, dbErr := globals.FINALIZATION_VOTING_STATS.Get(keyBytes, nil); dbErr == nil {
+		if finStatsRaw, dbErr := databases.FINALIZATION_VOTING_STATS.Get(keyBytes, nil); dbErr == nil {
 
 			if jsonErrParse := json.Unmarshal(finStatsRaw, &skipDataForLeader); jsonErrParse == nil {
 
@@ -486,7 +487,7 @@ func generateBlock() {
 
 					keyBytes := []byte(strconv.Itoa(epochIndex) + ":" + leaderPubKey)
 
-					if finStatsRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyBytes, nil); err == nil {
+					if finStatsRaw, err := databases.FINALIZATION_VOTING_STATS.Get(keyBytes, nil); err == nil {
 
 						if jsonErrParse := json.Unmarshal(finStatsRaw, votingFinalizationStatsPerLeader); jsonErrParse == nil {
 
@@ -667,7 +668,7 @@ func generateBlock() {
 
 				blockDbAtomicBatch.Put([]byte("GT"), gtBytes)
 
-				if err := globals.BLOCKS.Write(blockDbAtomicBatch, nil); err != nil {
+				if err := databases.BLOCKS.Write(blockDbAtomicBatch, nil); err != nil {
 
 					panic("Can't store GT and block candidate")
 

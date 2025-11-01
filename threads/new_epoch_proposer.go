@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -77,7 +78,7 @@ func NewEpochProposerThread() {
 
 			var localVotingData structures.LeaderVotingStat
 
-			localVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+pubKeyOfLeader), nil)
+			localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+pubKeyOfLeader), nil)
 
 			if err != nil {
 
@@ -95,7 +96,7 @@ func NewEpochProposerThread() {
 
 					prevLeader := epochHandlerRef.LeadersSequence[position]
 
-					prevVotingDataRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+prevLeader), nil)
+					prevVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+prevLeader), nil)
 
 					if err == nil {
 
@@ -123,11 +124,11 @@ func NewEpochProposerThread() {
 
 			var epochFinishPropositionRequest structures.EpochFinishRequest
 
-			if _, err := globals.EPOCH_DATA.Get([]byte("AEFP:"+strconv.Itoa(epochIndex)), nil); err != nil {
+			if _, err := databases.EPOCH_DATA.Get([]byte("AEFP:"+strconv.Itoa(epochIndex)), nil); err != nil {
 
 				firstBlockID := strconv.Itoa(epochIndex) + ":" + pubKeyOfLeader + ":0"
 
-				afpForFirstBlockRaw, _ := globals.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
+				afpForFirstBlockRaw, _ := databases.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
 
 				var afpForFirstBlock structures.AggregatedFinalizationProof
 
@@ -285,7 +286,7 @@ func NewEpochProposerThread() {
 
 					valueAsBytes, _ := json.Marshal(aggregatedEpochFinalizationProof)
 
-					globals.EPOCH_DATA.Put([]byte("AEFP:"+strconv.Itoa(epochIndex)), valueAsBytes, nil)
+					databases.EPOCH_DATA.Put([]byte("AEFP:"+strconv.Itoa(epochIndex)), valueAsBytes, nil)
 
 				}
 

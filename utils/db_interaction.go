@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 
@@ -24,7 +25,7 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 		return val
 	}
 
-	data, err := globals.STATE.Get([]byte(accountId), nil)
+	data, err := databases.STATE.Get([]byte(accountId), nil)
 
 	if err == leveldb.ErrNotFound {
 
@@ -62,7 +63,7 @@ func GetValidatorFromApprovementThreadState(validatorPubkey string) *structures.
 		return val
 	}
 
-	data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
+	data, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte(validatorStorageKey), nil)
 
 	if err != nil {
 		return nil
@@ -90,7 +91,7 @@ func GetValidatorFromExecThreadState(validatorPubkey string) *structures.Validat
 		return val
 	}
 
-	data, err := globals.STATE.Get([]byte(validatorStorageKey), nil)
+	data, err := databases.STATE.Get([]byte(validatorStorageKey), nil)
 
 	if err != nil {
 		return nil

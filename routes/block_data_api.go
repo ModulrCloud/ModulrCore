@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -24,7 +25,7 @@ func GetBlockById(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	block, err := globals.BLOCKS.Get([]byte(blockId), nil)
+	block, err := databases.BLOCKS.Get([]byte(blockId), nil)
 
 	if err == nil && block != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -52,7 +53,7 @@ func GetAggregatedFinalizationProof(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	afp, err := globals.EPOCH_DATA.Get([]byte("AFP:"+blockId), nil)
+	afp, err := databases.EPOCH_DATA.Get([]byte("AFP:"+blockId), nil)
 
 	if err == nil && afp != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)

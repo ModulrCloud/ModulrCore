@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/ModulrCloud/ModulrCore/cryptography"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
@@ -120,7 +120,7 @@ func VerifyAggregatedLeaderRotationProof(proof *structures.AggregatedLeaderRotat
 
 func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandler *structures.EpochDataHandler) *structures.AggregatedFinalizationProof {
 
-	localAfpAsBytes, err := globals.EPOCH_DATA.Get([]byte("AFP:"+blockID), nil)
+	localAfpAsBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+blockID), nil)
 
 	if err == nil {
 

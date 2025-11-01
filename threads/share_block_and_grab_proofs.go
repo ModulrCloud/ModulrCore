@@ -12,6 +12,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -77,7 +78,7 @@ func BlocksSharingAndProofsGrabingThread() {
 
 			dbKey := []byte(strconv.Itoa(epochHandlerRef.Id) + ":PROOFS_GRABBER")
 
-			if rawGrabber, err := globals.FINALIZATION_VOTING_STATS.Get(dbKey, nil); err == nil {
+			if rawGrabber, err := databases.FINALIZATION_VOTING_STATS.Get(dbKey, nil); err == nil {
 
 				json.Unmarshal(rawGrabber, &PROOFS_GRABBER)
 
@@ -104,7 +105,7 @@ func BlocksSharingAndProofsGrabingThread() {
 
 			if serialized, err := json.Marshal(PROOFS_GRABBER); err == nil {
 
-				globals.FINALIZATION_VOTING_STATS.Put(dbKey, serialized, nil)
+				databases.FINALIZATION_VOTING_STATS.Put(dbKey, serialized, nil)
 
 			}
 
@@ -153,7 +154,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 	if blockIdForHunting != blockIdThatInPointer {
 
-		blockDataRaw, errDB := globals.BLOCKS.Get([]byte(blockIdForHunting), nil)
+		blockDataRaw, errDB := databases.BLOCKS.Get([]byte(blockIdForHunting), nil)
 
 		if errDB == nil {
 
@@ -253,7 +254,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 		// Store AFP locally
 
-		globals.EPOCH_DATA.Put(keyBytes, valueBytes, nil)
+		databases.EPOCH_DATA.Put(keyBytes, valueBytes, nil)
 
 		// Repeat procedure for the next block and store the progress
 
@@ -263,7 +264,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 		if marshalErr == nil {
 
-			proofsGrabberStoreErr := globals.FINALIZATION_VOTING_STATS.Put(proofGrabberKeyBytes, proofGrabberValueBytes, nil)
+			proofsGrabberStoreErr := databases.FINALIZATION_VOTING_STATS.Put(proofGrabberKeyBytes, proofGrabberValueBytes, nil)
 
 			if proofsGrabberStoreErr == nil {
 

@@ -9,8 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ModulrCloud/ModulrCore/structures"
-
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var CORE_MAJOR_VERSION = func() int {
@@ -105,8 +103,6 @@ var EXECUTION_THREAD_METADATA_HANDLER = struct {
 		},
 	},
 }
-
-var BLOCKS, STATE, EPOCH_DATA, APPROVEMENT_THREAD_METADATA, FINALIZATION_VOTING_STATS *leveldb.DB
 
 // Flag to use in websocket & http routes to prevent flood of .RLock() calls on mutexes
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -338,7 +339,7 @@ func executeBlock(block *block_pack.Block) {
 
 		}
 
-		if err := globals.STATE.Write(stateBatch, nil); err == nil {
+		if err := databases.STATE.Write(stateBatch, nil); err == nil {
 
 			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅", currentBlockId), utils.CYAN_COLOR)
 
@@ -589,7 +590,7 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	var nextEpochData *structures.NextEpochDataHandler
 
-	rawHandler, dbErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
+	rawHandler, dbErr := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
 
 	if dbErr == nil {
 
@@ -605,7 +606,7 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 		var firstBlockDataOnNextEpoch structures.FirstBlockDataForNextEpoch
 
-		rawHandler, dbErr := globals.EPOCH_DATA.Get([]byte("FIRST_BLOCKS_IN_NEXT_EPOCH:"+strconv.Itoa(epochIndex)), nil)
+		rawHandler, dbErr := databases.EPOCH_DATA.Get([]byte("FIRST_BLOCKS_IN_NEXT_EPOCH:"+strconv.Itoa(epochIndex)), nil)
 
 		if dbErr == nil {
 
@@ -631,7 +632,7 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 			if serialErr == nil {
 
-				globals.EPOCH_DATA.Put([]byte("FIRST_BLOCKS_IN_NEXT_EPOCH:"+strconv.Itoa(epochIndex)), serializedData, nil)
+				databases.EPOCH_DATA.Put([]byte("FIRST_BLOCKS_IN_NEXT_EPOCH:"+strconv.Itoa(epochIndex)), serializedData, nil)
 
 			}
 
@@ -671,7 +672,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 	// Take from DB
 
-	rawHandler, dbErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
+	rawHandler, dbErr := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
 
 	if dbErr == nil {
 
@@ -755,7 +756,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		if err := globals.STATE.Write(dbBatch, nil); err != nil {
+		if err := databases.STATE.Write(dbBatch, nil); err != nil {
 
 			panic("Impossible to modify the state when epoch finished")
 

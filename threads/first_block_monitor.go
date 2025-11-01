@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -56,7 +57,7 @@ func FirstBlockInEpochMonitor() {
 
 			if serialErr == nil {
 
-				globals.EPOCH_DATA.Put([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochHandlerRef.Id)), serializedData, nil)
+				databases.EPOCH_DATA.Put([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochHandlerRef.Id)), serializedData, nil)
 
 				msg := fmt.Sprintf(
 					"%sFirst block for epoch %s%d %sis created by %s%s%s",
@@ -84,7 +85,7 @@ func FirstBlockInEpochMonitor() {
 
 func GetFirstBlockDataFromDB(epochIndex int) *structures.FirstBlockResult {
 
-	if rawBytes, err := globals.EPOCH_DATA.Get([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochIndex)), nil); err == nil {
+	if rawBytes, err := databases.EPOCH_DATA.Get([]byte("FIRST_BLOCK_IN_EPOCH:"+strconv.Itoa(epochIndex)), nil); err == nil {
 
 		var firstBlockData structures.FirstBlockResult
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/threads"
@@ -81,14 +82,14 @@ func prepareBlockchain() {
 
 	}
 
-	globals.BLOCKS = utils.OpenDb("BLOCKS")
-	globals.STATE = utils.OpenDb("STATE")
-	globals.EPOCH_DATA = utils.OpenDb("EPOCH_DATA")
-	globals.APPROVEMENT_THREAD_METADATA = utils.OpenDb("APPROVEMENT_THREAD_METADATA")
-	globals.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")
+	databases.BLOCKS = utils.OpenDb("BLOCKS")
+	databases.STATE = utils.OpenDb("STATE")
+	databases.EPOCH_DATA = utils.OpenDb("EPOCH_DATA")
+	databases.APPROVEMENT_THREAD_METADATA = utils.OpenDb("APPROVEMENT_THREAD_METADATA")
+	databases.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")
 
 	// Load GT - Generation Thread handler
-	if data, err := globals.BLOCKS.Get([]byte("GT"), nil); err == nil {
+	if data, err := databases.BLOCKS.Get([]byte("GT"), nil); err == nil {
 
 		var gtHandler structures.GenerationThreadMetadataHandler
 
@@ -118,7 +119,7 @@ func prepareBlockchain() {
 
 	// Load AT - Approvement Thread handler
 
-	if data, err := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("AT"), nil); err == nil {
+	if data, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("AT"), nil); err == nil {
 
 		var atHandler structures.ApprovementThreadMetadataHandler
 
@@ -144,7 +145,7 @@ func prepareBlockchain() {
 
 	// Load ET - Execution Thread handler
 
-	if data, err := globals.STATE.Get([]byte("ET"), nil); err == nil {
+	if data, err := databases.STATE.Get([]byte("ET"), nil); err == nil {
 
 		var etHandler structures.ExecutionThreadMetadataHandler
 
@@ -195,7 +196,7 @@ func prepareBlockchain() {
 
 		}
 
-		if err := globals.APPROVEMENT_THREAD_METADATA.Put([]byte("AT"), serializedApprovementThread, nil); err != nil {
+		if err := databases.APPROVEMENT_THREAD_METADATA.Put([]byte("AT"), serializedApprovementThread, nil); err != nil {
 
 			fmt.Printf("failed to save APPROVEMENT_THREAD: %v\n", err)
 
@@ -203,7 +204,7 @@ func prepareBlockchain() {
 
 		}
 
-		if err := globals.STATE.Put([]byte("ET"), serializedExecutionThread, nil); err != nil {
+		if err := databases.STATE.Put([]byte("ET"), serializedExecutionThread, nil); err != nil {
 
 			fmt.Printf("failed to save EXECUTION_THREAD: %v\n", err)
 
@@ -282,11 +283,11 @@ func setGenesisToState() error {
 	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
 	// Commit changes
-	if err := globals.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
+	if err := databases.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
 		return err
 	}
 
-	if err := globals.STATE.Write(execThreadBatch, nil); err != nil {
+	if err := databases.STATE.Write(execThreadBatch, nil); err != nil {
 		return err
 	}
 

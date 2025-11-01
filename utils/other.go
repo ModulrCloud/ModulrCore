@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 
@@ -110,7 +111,7 @@ func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
 
-	if readyToChangeEpochRaw, err := globals.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
+	if readyToChangeEpochRaw, err := databases.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
 
 		return true
 

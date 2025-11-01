@@ -6,6 +6,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
+	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -37,7 +38,7 @@ func GetFirstBlockAssumption(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	value, err := globals.EPOCH_DATA.Get([]byte("FIRST_BLOCK_ASSUMPTION:"+epochIndex), nil)
+	value, err := databases.EPOCH_DATA.Get([]byte("FIRST_BLOCK_ASSUMPTION:"+epochIndex), nil)
 
 	if err == nil && value != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -65,7 +66,7 @@ func GetAggregatedEpochFinalizationProof(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	value, err := globals.EPOCH_DATA.Get([]byte("AEFP:"+epochIndex), nil)
+	value, err := databases.EPOCH_DATA.Get([]byte("AEFP:"+epochIndex), nil)
 
 	if err == nil && value != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -99,7 +100,7 @@ func GetSequenceAlignmentData(ctx *fasthttp.RequestCtx) {
 
 		firstBlockIdByThisLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader + ":0"
 
-		firstBlockAsBytes, dbErr := globals.BLOCKS.Get([]byte(firstBlockIdByThisLeader), nil)
+		firstBlockAsBytes, dbErr := databases.BLOCKS.Get([]byte(firstBlockIdByThisLeader), nil)
 
 		if dbErr == nil {
 
@@ -185,7 +186,7 @@ func EpochProposition(ctx *fasthttp.RequestCtx) {
 
 			votingMetadataForLeader := strconv.Itoa(epochIndex) + ":" + pubKeyOfCurrentLeader
 
-			votingRaw, err := globals.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForLeader), nil)
+			votingRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(votingMetadataForLeader), nil)
 
 			var votingData structures.LeaderVotingStat
 
