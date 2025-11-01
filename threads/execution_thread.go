@@ -589,13 +589,15 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 	var nextEpochData *structures.NextEpochDataHandler
 
-	rawHandler, dbErr := globals.EPOCH_DATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
+	rawHandler, dbErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
 
 	if dbErr == nil {
 
 		json.Unmarshal(rawHandler, &nextEpochData)
 
 	}
+
+	fmt.Println("DEBUG: Next epoch data => ", nextEpochData)
 
 	if nextEpochData != nil {
 
@@ -669,7 +671,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 	// Take from DB
 
-	rawHandler, dbErr := globals.EPOCH_DATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
+	rawHandler, dbErr := globals.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_DATA:"+strconv.Itoa(nextEpochIndex)), nil)
 
 	if dbErr == nil {
 
