@@ -11,6 +11,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 
@@ -26,11 +27,11 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 		return
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+	defer handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
-	epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+	epochHandler := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	epochIndex := epochHandler.Id
 
@@ -277,11 +278,11 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 		return
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+	defer handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
-	epochHandler := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+	epochHandler := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	epochIndex := epochHandler.Id
 

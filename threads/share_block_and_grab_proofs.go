@@ -14,6 +14,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
@@ -50,15 +51,15 @@ func BlocksSharingAndProofsGrabingThread() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 		currentLeaderPubKey := epochHandlerRef.LeadersSequence[epochHandlerRef.CurrentLeaderIndex]
 
-		if currentLeaderPubKey != globals.CONFIGURATION.PublicKey || !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+		if currentLeaderPubKey != globals.CONFIGURATION.PublicKey || !utils.EpochStillFresh(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(200 * time.Millisecond)
 
@@ -127,7 +128,7 @@ func BlocksSharingAndProofsGrabingThread() {
 
 		runFinalizationProofsGrabbing(epochHandlerRef)
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 	}
 

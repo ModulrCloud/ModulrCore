@@ -13,6 +13,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
@@ -38,13 +39,13 @@ func BlocksGenerationThread() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		blockTime := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.BlockTime
+		blockTime := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.BlockTime
 
 		generateBlock()
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 		time.Sleep(time.Duration(blockTime) * time.Millisecond)
 
@@ -125,7 +126,7 @@ func getTransactionsFromMempool() []structures.Transaction {
 	globals.MEMPOOL.Mutex.Lock()
 	defer globals.MEMPOOL.Mutex.Unlock()
 
-	limit := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.TxLimitPerBlock
+	limit := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.TxLimitPerBlock
 
 	mempoolSize := len(globals.MEMPOOL.Slice)
 
@@ -261,7 +262,7 @@ func getAggregatedEpochFinalizationProof(epochHandler *structures.EpochDataHandl
 
 func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey string) *structures.AggregatedLeaderRotationProof {
 
-	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+	epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	alrpMetadataForLeader := ALRP_METADATA[leaderPubkey]
 
@@ -332,7 +333,7 @@ func getAggregatedLeaderRotationProof(majority, epochIndex int, leaderPubkey str
 
 func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedTransactionsBatch {
 
-	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+	epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	prevEpochIndex := epochHandlerRef.Id - 2
 
@@ -354,9 +355,9 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 
 func generateBlock() {
 
-	epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+	epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
-	if !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+	if !utils.EpochStillFresh(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
 		return
 
@@ -372,9 +373,9 @@ func generateBlock() {
 
 	// Safe "if" branch to prevent unnecessary blocks generation
 
-	shouldGenerateBlocks := currentLeaderPubKey == globals.CONFIGURATION.PublicKey && globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex <= PROOFS_GRABBER.AcceptedIndex+1
+	shouldGenerateBlocks := currentLeaderPubKey == globals.CONFIGURATION.PublicKey && handlers.GENERATION_THREAD_METADATA.NextIndex <= PROOFS_GRABBER.AcceptedIndex+1
 
-	shouldRotateEpochOnGenerationThread := globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId != epochFullID
+	shouldRotateEpochOnGenerationThread := handlers.GENERATION_THREAD_METADATA.EpochFullId != epochFullID
 
 	if shouldGenerateBlocks || shouldRotateEpochOnGenerationThread {
 
@@ -392,7 +393,7 @@ func generateBlock() {
 
 				if aefpForPreviousEpoch != nil {
 
-					globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch = aefpForPreviousEpoch
+					handlers.GENERATION_THREAD_METADATA.AefpForPreviousEpoch = aefpForPreviousEpoch
 
 				} else {
 
@@ -404,13 +405,13 @@ func generateBlock() {
 
 			// Update the index & hash of epoch (by assigning new epoch full ID)
 
-			globals.GENERATION_THREAD_METADATA_HANDLER.EpochFullId = epochFullID
+			handlers.GENERATION_THREAD_METADATA.EpochFullId = epochFullID
 
 			// Nullish the index & hash in generation thread for new epoch
 
-			globals.GENERATION_THREAD_METADATA_HANDLER.PrevHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+			handlers.GENERATION_THREAD_METADATA.PrevHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-			globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex = 0
+			handlers.GENERATION_THREAD_METADATA.NextIndex = 0
 
 			// Nullify values in ALRP map
 
@@ -429,13 +430,13 @@ func generateBlock() {
 
 		extraData := block_pack.ExtraDataToBlock{}
 
-		if globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex == 0 {
+		if handlers.GENERATION_THREAD_METADATA.NextIndex == 0 {
 
 			if epochIndex > 0 {
 
-				if globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch != nil {
+				if handlers.GENERATION_THREAD_METADATA.AefpForPreviousEpoch != nil {
 
-					extraData.AefpForPreviousEpoch = globals.GENERATION_THREAD_METADATA_HANDLER.AefpForPreviousEpoch
+					extraData.AefpForPreviousEpoch = handlers.GENERATION_THREAD_METADATA.AefpForPreviousEpoch
 
 				} else {
 
@@ -654,11 +655,11 @@ func generateBlock() {
 
 		if blockBytes, serializeErr := json.Marshal(blockCandidate); serializeErr == nil {
 
-			globals.GENERATION_THREAD_METADATA_HANDLER.PrevHash = blockHash
+			handlers.GENERATION_THREAD_METADATA.PrevHash = blockHash
 
-			globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex++
+			handlers.GENERATION_THREAD_METADATA.NextIndex++
 
-			if gtBytes, serializeErr2 := json.Marshal(globals.GENERATION_THREAD_METADATA_HANDLER); serializeErr2 == nil {
+			if gtBytes, serializeErr2 := json.Marshal(handlers.GENERATION_THREAD_METADATA); serializeErr2 == nil {
 
 				// Store block locally
 

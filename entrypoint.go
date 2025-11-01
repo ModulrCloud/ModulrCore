@@ -8,6 +8,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/threads"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -95,7 +96,7 @@ func prepareBlockchain() {
 
 		if err := json.Unmarshal(data, &gtHandler); err == nil {
 
-			globals.GENERATION_THREAD_METADATA_HANDLER = gtHandler
+			handlers.GENERATION_THREAD_METADATA = gtHandler
 
 		} else {
 
@@ -108,7 +109,7 @@ func prepareBlockchain() {
 
 		// Create initial generation thread handler
 
-		globals.GENERATION_THREAD_METADATA_HANDLER = structures.GenerationThreadMetadataHandler{
+		handlers.GENERATION_THREAD_METADATA = structures.GenerationThreadMetadataHandler{
 
 			EpochFullId: utils.Blake3("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"+globals.GENESIS.NetworkId) + "#-1",
 			PrevHash:    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -131,7 +132,7 @@ func prepareBlockchain() {
 
 			}
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler = atHandler
+			handlers.APPROVEMENT_THREAD_METADATA.Handler = atHandler
 
 		} else {
 
@@ -163,7 +164,7 @@ func prepareBlockchain() {
 
 			}
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler = etHandler
+			handlers.EXECUTION_THREAD_METADATA.Handler = etHandler
 
 		} else {
 
@@ -176,7 +177,7 @@ func prepareBlockchain() {
 	}
 
 	// Init genesis if version is -1
-	if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CoreMajorVersion == -1 {
+	if handlers.EXECUTION_THREAD_METADATA.Handler.CoreMajorVersion == -1 {
 
 		if genesisWriteErr := setGenesisToState(); genesisWriteErr != nil {
 
@@ -184,9 +185,9 @@ func prepareBlockchain() {
 
 		}
 
-		serializedApprovementThread, err := json.Marshal(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler)
+		serializedApprovementThread, err := json.Marshal(handlers.APPROVEMENT_THREAD_METADATA.Handler)
 
-		serializedExecutionThread, err2 := json.Marshal(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler)
+		serializedExecutionThread, err2 := json.Marshal(handlers.EXECUTION_THREAD_METADATA.Handler)
 
 		if err != nil || err2 != nil {
 
@@ -214,7 +215,7 @@ func prepareBlockchain() {
 	}
 
 	// Version check
-	if utils.IsMyCoreVersionOld(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+	if utils.IsMyCoreVersionOld(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
 		utils.LogWithTime("New version detected on APPROVEMENT_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
 
@@ -270,17 +271,17 @@ func setGenesisToState() error {
 
 		validatorsRegistryForEpochHandler2 = append(validatorsRegistryForEpochHandler2, validatorPubkey)
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
+		handlers.EXECUTION_THREAD_METADATA.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
 
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
+	handlers.EXECUTION_THREAD_METADATA.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
+	handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
 	// Commit changes
 	if err := databases.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
@@ -317,9 +318,9 @@ func setGenesisToState() error {
 
 	// Assign quorum - pseudorandomly and in deterministic way
 
-	epochHandlerForApprovementThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForApprovementThread, globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
+	epochHandlerForApprovementThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForApprovementThread, handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize, initEpochHash)
 
-	epochHandlerForExecThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForExecThread, globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize, initEpochHash)
+	epochHandlerForExecThread.Quorum = utils.GetCurrentEpochQuorum(&epochHandlerForExecThread, handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.QuorumSize, initEpochHash)
 
 	// Now set the block generators for epoch pseudorandomly and in deterministic way
 
@@ -327,9 +328,9 @@ func setGenesisToState() error {
 
 	utils.SetLeadersSequence(&epochHandlerForExecThread, initEpochHash)
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = epochHandlerForApprovementThread
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = epochHandlerForApprovementThread
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = epochHandlerForExecThread
+	handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler = epochHandlerForExecThread
 
 	return nil
 

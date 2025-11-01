@@ -8,7 +8,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
@@ -20,9 +20,9 @@ func ExecutionThread() {
 
 	for {
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Lock()
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
 
-		epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
+		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler
 
 		currentEpochIsFresh := utils.EpochStillFresh(epochHandlerRef)
 
@@ -146,9 +146,9 @@ func ExecutionThread() {
 
 				// Here we need to skip the following logic and start next iteration
 
-				// globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+				// handlers.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+				handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
 				continue
 
@@ -207,7 +207,7 @@ func ExecutionThread() {
 
 		}
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
 	}
 
@@ -248,7 +248,7 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 func executeBlock(block *block_pack.Block) {
 
-	epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler
+	epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler
 
 	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
 
@@ -525,18 +525,18 @@ func findInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 	}
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch = emptyTemplate
+	handlers.EXECUTION_THREAD_METADATA.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch = emptyTemplate
 
 	/*
 
 
 		   After execution of this function we have:
 
-		   [0] globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence with structure: [Pool0A,Pool1A,....,PoolNA]
+		   [0] handlers.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence with structure: [Pool0A,Pool1A,....,PoolNA]
 
 		   Using this chains we'll finish the sequence alignment process
 
-		   [1] globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch with structure:
+		   [1] handlers.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch with structure:
 
 		   {
 
@@ -555,7 +555,7 @@ func findInfoAboutLastBlocks(epochHandler *structures.EpochDataHandler, aefp *st
 
 		   	1) We have LeadersSequence: [Validator12, Validator3 , Validator7]
 
-			2) Take the data from globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch
+			2) Take the data from handlers.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch
 
 			3) Imagine it looks like this:
 
@@ -652,7 +652,7 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 			// Activate to start get data from it
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData.Activated = true
+			handlers.EXECUTION_THREAD_METADATA.Handler.LegacyEpochAlignmentData.Activated = true
 
 			findInfoAboutLastBlocks(epochHandler, firstBlockDataOnNextEpoch.Aefp)
 
@@ -698,37 +698,37 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 			Id:                 nextEpochIndex,
 			Hash:               nextEpochData.NextEpochHash,
 			ValidatorsRegistry: nextEpochData.NextEpochValidatorsRegistry,
-			StartTimestamp:     epochHandler.StartTimestamp + uint64(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochDuration),
+			StartTimestamp:     epochHandler.StartTimestamp + uint64(handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.EpochDuration),
 			Quorum:             nextEpochData.NextEpochQuorum,
 			LeadersSequence:    nextEpochData.NextEpochLeadersSequence,
 		}
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = *templateForNextEpoch
+		handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler = *templateForNextEpoch
 
 		// Nullify values for the upcoming epoch
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerLeaderSequence)
+		handlers.EXECUTION_THREAD_METADATA.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
-		for _, validatorPubkey := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence {
+		for _, validatorPubkey := range handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence {
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
+			handlers.EXECUTION_THREAD_METADATA.Handler.ExecutionData[validatorPubkey] = structures.NewExecutionStatsTemplate()
 
 		}
 
 		// Finally, clean useless data
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData = structures.AlignmentDataHandler{
+		handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData = structures.AlignmentDataHandler{
 			Activated:                  true,
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.LegacyEpochAlignmentData = structures.AlignmentDataHandler{
+		handlers.EXECUTION_THREAD_METADATA.Handler.LegacyEpochAlignmentData = structures.AlignmentDataHandler{
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}
 
 		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
 
-		for accountID, accountData := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache {
+		for accountID, accountData := range handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache {
 
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
 
@@ -742,7 +742,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		for validatorPubkey, validatorStorage := range globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache {
+		for validatorPubkey, validatorStorage := range handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache {
 
 			if dataBytes, err := json.Marshal(validatorStorage); err == nil {
 
@@ -764,7 +764,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		// Version check once new epoch started
 
-		if utils.IsMyCoreVersionOld(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler) {
+		if utils.IsMyCoreVersionOld(&handlers.EXECUTION_THREAD_METADATA.Handler) {
 
 			utils.LogWithTime("New version detected on EXECUTION_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
 

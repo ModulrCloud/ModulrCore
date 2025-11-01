@@ -5,6 +5,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -21,7 +22,7 @@ func OpenDb(dbName string) *leveldb.DB {
 
 func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]; ok {
+	if val, ok := handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId]; ok {
 		return val
 	}
 
@@ -29,9 +30,9 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 	if err == leveldb.ErrNotFound {
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+		handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId] = &structures.Account{}
 
-		return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+		return handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId]
 
 	}
 
@@ -43,9 +44,9 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 		if parseErr == nil {
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId] = &structures.Account{}
+			handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId] = &structures.Account{}
 
-			return globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.AccountsCache[accountId]
+			return handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId]
 
 		}
 
@@ -59,7 +60,7 @@ func GetValidatorFromApprovementThreadState(validatorPubkey string) *structures.
 
 	validatorStorageKey := validatorPubkey + "_VALIDATOR_STORAGE"
 
-	if val, ok := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; ok {
+	if val, ok := handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey]; ok {
 		return val
 	}
 
@@ -77,7 +78,7 @@ func GetValidatorFromApprovementThreadState(validatorPubkey string) *structures.
 		return nil
 	}
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &validatorStorage
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey] = &validatorStorage
 
 	return &validatorStorage
 
@@ -87,7 +88,7 @@ func GetValidatorFromExecThreadState(validatorPubkey string) *structures.Validat
 
 	validatorStorageKey := validatorPubkey + "_VALIDATOR_STORAGE"
 
-	if val, ok := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; ok {
+	if val, ok := handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey]; ok {
 		return val
 	}
 
@@ -105,7 +106,7 @@ func GetValidatorFromExecThreadState(validatorPubkey string) *structures.Validat
 		return nil
 	}
 
-	globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &validatorStorage
+	handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey] = &validatorStorage
 
 	return &validatorStorage
 

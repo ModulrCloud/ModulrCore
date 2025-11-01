@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -26,13 +26,13 @@ func SequenceAlignmentThread() {
 
 	for {
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
 
-		epochHandlerRef := &globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
 
-		localVersionOfCurrentLeader := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption
+		localVersionOfCurrentLeader := handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption
 
-		quorumMembers := utils.GetQuorumUrlsAndPubkeys(&globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler)
+		quorumMembers := utils.GetQuorumUrlsAndPubkeys(&handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler)
 
 		randomTarget := utils.GetRandomFromSlice(quorumMembers)
 
@@ -46,7 +46,7 @@ func SequenceAlignmentThread() {
 		// Network error or timeout
 		if err != nil {
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(time.Second)
 
@@ -59,7 +59,7 @@ func SequenceAlignmentThread() {
 
 			resp.Body.Close()
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(time.Second)
 
@@ -76,7 +76,7 @@ func SequenceAlignmentThread() {
 
 			resp.Body.Close()
 
-			globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(time.Second)
 
@@ -198,13 +198,13 @@ func SequenceAlignmentThread() {
 							if shouldChange {
 
 								// Release read mutex and immediately acquire mutex to write operation
-								storedEpochIndex := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id
+								storedEpochIndex := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id
 
-								globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+								handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-								globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Lock()
+								handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
 
-								if globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.Id == storedEpochIndex {
+								if handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id == storedEpochIndex {
 
 									slices.Reverse(collectionOfAlrpsFromAllThePreviousLeaders)
 
@@ -214,11 +214,11 @@ func SequenceAlignmentThread() {
 
 										for leaderPubKey, leaderExecData := range leaderExecStats {
 
-											_, dataAlreadyExists := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey]
+											_, dataAlreadyExists := handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey]
 
 											if !dataAlreadyExists {
 
-												globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
+												handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
 
 												utils.LogWithTime2("Resolved last block index for "+utils.CYAN_COLOR+leaderPubKey+" => "+strconv.Itoa(leaderExecData.Index), utils.DEEP_GRAY)
 
@@ -230,13 +230,13 @@ func SequenceAlignmentThread() {
 
 									// Finally, set the <currentLeader> to the new pointer
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
+									handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
 
-									leaderPubkey := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence[targetResponse.ProposedIndexOfLeader]
+									leaderPubkey := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence[targetResponse.ProposedIndexOfLeader]
 
 									utils.LogWithTime2("New leader on exec thread detected "+utils.CYAN_COLOR+leaderPubkey, utils.GREEN_COLOR)
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+									handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
 									time.Sleep(time.Second)
 
@@ -244,7 +244,7 @@ func SequenceAlignmentThread() {
 
 								} else {
 
-									globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+									handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
 									time.Sleep(time.Second)
 
@@ -264,7 +264,7 @@ func SequenceAlignmentThread() {
 
 		}
 
-		globals.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 		// Add some delay before next alignment request
 		time.Sleep(time.Second)

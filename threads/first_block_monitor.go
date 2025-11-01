@@ -11,7 +11,7 @@ import (
 
 	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -29,9 +29,9 @@ func FirstBlockInEpochMonitor() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 		firstBlockData := GetFirstBlockDataFromDB(epochHandlerRef.Id)
 
@@ -39,7 +39,7 @@ func FirstBlockInEpochMonitor() {
 
 		if firstBlockData != nil {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(time.Second)
 
@@ -77,7 +77,7 @@ func FirstBlockInEpochMonitor() {
 
 		}
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 	}
 

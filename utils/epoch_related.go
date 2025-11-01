@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 )
 
@@ -20,13 +21,13 @@ type ValidatorData struct {
 
 func GetCurrentLeader() CurrentLeaderData {
 
-	globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-	defer globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+	defer handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
-	currentLeaderIndex := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.CurrentLeaderIndex
+	currentLeaderIndex := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.CurrentLeaderIndex
 
-	currentLeaderPubKey := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.LeadersSequence[currentLeaderIndex]
+	currentLeaderPubKey := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence[currentLeaderIndex]
 
 	if currentLeaderPubKey != globals.CONFIGURATION.PublicKey {
 

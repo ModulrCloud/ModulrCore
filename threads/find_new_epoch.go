@@ -14,6 +14,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/system_contracts"
 	"github.com/ModulrCloud/ModulrCore/utils"
@@ -119,11 +120,11 @@ func EpochRotationThread() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		if !utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+		if !utils.EpochStillFresh(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
-			epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+			epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 			epochFullID := epochHandlerRef.Hash + "#" + strconv.Itoa(epochHandlerRef.Id)
 
@@ -254,7 +255,7 @@ func EpochRotationThread() {
 						// 5. Finally - check if this batch has bigger index than already executed
 						// 6. Only in case it's indeed new batch - execute it
 
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+						handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 						// Before acquiring .Lock() for modification, disable route reads.
 						// This prevents HTTP/WebSocket handlers from calling RLock() during update,
@@ -263,7 +264,7 @@ func EpochRotationThread() {
 
 						globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(false)
 
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.Lock()
+						handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Lock()
 
 						if okSignatures >= majority && int64(epochHandlerRef.Id) > latestBatchIndex {
 
@@ -311,7 +312,7 @@ func EpochRotationThread() {
 
 						}
 
-						for key, value := range globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache {
+						for key, value := range handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache {
 
 							valBytes, _ := json.Marshal(value)
 
@@ -329,7 +330,7 @@ func EpochRotationThread() {
 
 						nextEpochHash := utils.Blake3(AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash)
 
-						nextEpochQuorumSize := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.QuorumSize
+						nextEpochQuorumSize := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize
 
 						nextEpochHandler := structures.EpochDataHandler{
 							Id:                 nextEpochId,
@@ -337,7 +338,7 @@ func EpochRotationThread() {
 							ValidatorsRegistry: epochHandlerRef.ValidatorsRegistry,
 							Quorum:             utils.GetCurrentEpochQuorum(epochHandlerRef, nextEpochQuorumSize, nextEpochHash),
 							LeadersSequence:    []string{},
-							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.EpochDuration),
+							StartTimestamp:     epochHandlerRef.StartTimestamp + uint64(handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.EpochDuration),
 							CurrentLeaderIndex: 0,
 						}
 
@@ -359,17 +360,17 @@ func EpochRotationThread() {
 
 						// Finally - assign new handler
 
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler = nextEpochHandler
+						handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = nextEpochHandler
 
 						// And commit all the changes on AT as a single atomic batch
 
-						jsonedHandler, _ := json.Marshal(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler)
+						jsonedHandler, _ := json.Marshal(handlers.APPROVEMENT_THREAD_METADATA.Handler)
 
 						atomicBatch.Put([]byte("AT"), jsonedHandler)
 
 						// Clean cache
 
-						clear(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache)
+						clear(handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache)
 
 						// Clean in-memory helpful object
 
@@ -383,7 +384,7 @@ func EpochRotationThread() {
 
 						utils.LogWithTime("Epoch on approvement thread was updated => "+nextEpochHash+"#"+strconv.Itoa(nextEpochId), utils.GREEN_COLOR)
 
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+						handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Unlock()
 
 						// Re-enable route reads after modification is complete.
 						// New HTTP/WebSocket handlers can now call RLock() as usual
@@ -392,7 +393,7 @@ func EpochRotationThread() {
 
 						//_______________________Check the version required for the next epoch________________________
 
-						if utils.IsMyCoreVersionOld(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+						if utils.IsMyCoreVersionOld(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
 							utils.LogWithTime("New version detected on APPROVEMENT_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
 
@@ -402,25 +403,25 @@ func EpochRotationThread() {
 
 					} else {
 
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+						handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 					}
 
 				} else {
 
-					globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+					handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 				}
 
 			} else {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+				handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 			}
 
 		} else {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 		}
 

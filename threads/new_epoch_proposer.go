@@ -14,6 +14,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -37,18 +38,18 @@ func NewEpochProposerThread() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		if utils.EpochStillFresh(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+		if utils.EpochStillFresh(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 			time.Sleep(1 * time.Second)
 
 			continue
 		}
 
-		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 		epochIndex := epochHandlerRef.Id
 
@@ -142,7 +143,7 @@ func NewEpochProposerThread() {
 
 			} else {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+				handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 				time.Sleep(1 * time.Second)
 
@@ -294,7 +295,7 @@ func NewEpochProposerThread() {
 
 		}
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 	}
 

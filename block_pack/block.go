@@ -13,6 +13,7 @@ import (
 	"github.com/ModulrCloud/ModulrCore/cryptography"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -35,8 +36,8 @@ func NewBlock(transactions []structures.Transaction, extraData ExtraDataToBlock,
 		Epoch:        epochFullID,
 		Transactions: transactions,
 		ExtraData:    extraData,
-		Index:        globals.GENERATION_THREAD_METADATA_HANDLER.NextIndex,
-		PrevHash:     globals.GENERATION_THREAD_METADATA_HANDLER.PrevHash,
+		Index:        handlers.GENERATION_THREAD_METADATA.NextIndex,
+		PrevHash:     handlers.GENERATION_THREAD_METADATA.PrevHash,
 		Sig:          "",
 	}
 }

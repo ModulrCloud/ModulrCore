@@ -72,38 +72,6 @@ var MEMPOOL struct {
 	Mutex sync.Mutex
 }
 
-var GENERATION_THREAD_METADATA_HANDLER structures.GenerationThreadMetadataHandler
-
-var APPROVEMENT_THREAD_METADATA_HANDLER = struct {
-	RWMutex sync.RWMutex
-	Handler structures.ApprovementThreadMetadataHandler
-}{
-	Handler: structures.ApprovementThreadMetadataHandler{
-		CoreMajorVersion:        -1,
-		ValidatorsStoragesCache: make(map[string]*structures.ValidatorStorage),
-	},
-}
-
-var EXECUTION_THREAD_METADATA_HANDLER = struct {
-	RWMutex sync.RWMutex
-	Handler structures.ExecutionThreadMetadataHandler
-}{
-	Handler: structures.ExecutionThreadMetadataHandler{
-		CoreMajorVersion:        -1,
-		AccountsCache:           make(map[string]*structures.Account),
-		ValidatorsStoragesCache: make(map[string]*structures.ValidatorStorage),
-		LastHeight:              -1,
-		ExecutionData:           make(map[string]structures.ExecutionStatsPerLeaderSequence),
-		CurrentEpochAlignmentData: structures.AlignmentDataHandler{
-			Activated:                  true,
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
-		},
-		LegacyEpochAlignmentData: structures.AlignmentDataHandler{
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
-		},
-	},
-}
-
 // Flag to use in websocket & http routes to prevent flood of .RLock() calls on mutexes
 
 var FLOOD_PREVENTION_FLAG_FOR_ROUTES atomic.Bool

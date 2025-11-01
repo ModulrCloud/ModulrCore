@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -32,7 +32,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 		if context == "AT" {
 
-			if _, existsInCache := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
+			if _, existsInCache := handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
 
 				return false
 
@@ -44,7 +44,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 			if existErr != nil {
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
+				handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
 					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
@@ -65,7 +65,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 		} else {
 
-			if _, existsInCache := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
+			if _, existsInCache := handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey]; existsInCache {
 
 				return false
 
@@ -75,7 +75,7 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 
 			if existErr != nil {
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
+				handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageKey] = &structures.ValidatorStorage{
 					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
@@ -124,7 +124,7 @@ func UpdateValidator(delayedTransaction map[string]string, context string) bool 
 
 				validatorStorage.WssValidatorUrl = wssValidatorURL
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
+				handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
 
 				return true
 
@@ -144,7 +144,7 @@ func UpdateValidator(delayedTransaction map[string]string, context string) bool 
 
 				validatorStorage.WssValidatorUrl = wssValidatorURL
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
+				handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[validatorStorageId] = validatorStorage
 
 				return true
 
@@ -178,7 +178,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			minStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerStaker
+			minStake := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.MinimalStakePerStaker
 
 			if amount < minStake {
 
@@ -203,14 +203,14 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			validatorStorage.Stakers[staker] = stakerData
 
-			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
+			requiredStake := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked >= requiredStake {
 
-				if !slices.Contains(globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey) {
+				if !slices.Contains(handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey) {
 
-					globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry = append(
-						globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey,
+					handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry = append(
+						handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey,
 					)
 
 				}
@@ -229,7 +229,7 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			minStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.MinimalStakePerStaker
+			minStake := handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.MinimalStakePerStaker
 
 			if amount < minStake {
 
@@ -254,14 +254,14 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			validatorStorage.Stakers[staker] = stakerData
 
-			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
+			requiredStake := handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked >= requiredStake {
 
-				if !slices.Contains(globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey) {
+				if !slices.Contains(handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey) {
 
-					globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry = append(
-						globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey,
+					handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry = append(
+						handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry, validatorPubkey,
 					)
 
 				}
@@ -324,13 +324,13 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			requiredStake := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
+			requiredStake := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked < requiredStake {
 
-				reg := globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry
+				reg := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry
 
-				globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry = removeFromSlice(reg, validatorPubkey)
+				handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry = removeFromSlice(reg, validatorPubkey)
 
 			}
 
@@ -374,13 +374,13 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			requiredStake := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.NetworkParameters.ValidatorRequiredStake
+			requiredStake := handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
 			if validatorStorage.TotalStaked < requiredStake {
 
-				reg := globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry
+				reg := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry
 
-				globals.EXECUTION_THREAD_METADATA_HANDLER.Handler.EpochDataHandler.ValidatorsRegistry = removeFromSlice(reg, validatorPubkey)
+				handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry = removeFromSlice(reg, validatorPubkey)
 
 			}
 

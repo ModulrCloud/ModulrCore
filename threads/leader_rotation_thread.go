@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
+	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
 )
@@ -15,9 +15,9 @@ func LeaderRotationThread() {
 
 	for {
 
-		globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RLock()
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 
-		epochHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler.EpochDataHandler
+		epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 		/*
 
@@ -30,15 +30,15 @@ func LeaderRotationThread() {
 		*/
 		haveNextCandidate := epochHandlerRef.CurrentLeaderIndex+1 < len(epochHandlerRef.LeadersSequence)
 
-		if haveNextCandidate && timeIsOutForCurrentLeader(&globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler) {
+		if haveNextCandidate && timeIsOutForCurrentLeader(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
 			storedEpochIndex := epochHandlerRef.Id
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.Lock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Lock()
 
-			threadMetadataHandlerRef := &globals.APPROVEMENT_THREAD_METADATA_HANDLER.Handler
+			threadMetadataHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler
 
 			if storedEpochIndex == threadMetadataHandlerRef.EpochDataHandler.Id {
 
@@ -66,11 +66,11 @@ func LeaderRotationThread() {
 
 			}
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.Unlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Unlock()
 
 		} else {
 
-			globals.APPROVEMENT_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
+			handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 		}
 
