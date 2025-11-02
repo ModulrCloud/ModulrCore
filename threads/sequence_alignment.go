@@ -172,8 +172,7 @@ func SequenceAlignmentThread() {
 											if alrpChainValidationOk {
 												collectionOfAlrpsFromAllThePreviousLeaders = append(collectionOfAlrpsFromAllThePreviousLeaders, dataAboutLastBlocks)
 												currentAlrpSet = dataAboutLastBlocks
-												position--
-												break
+												continue // maybe position-- ; break
 											} else {
 												shouldChange = false
 												break
