@@ -341,7 +341,7 @@ func executeBlock(block *block_pack.Block) {
 
 		if err := databases.STATE.Write(stateBatch, nil); err == nil {
 
-			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅", currentBlockId), utils.CYAN_COLOR)
+			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, epochHandlerRef.LastHeight), utils.CYAN_COLOR)
 
 		} else {
 
