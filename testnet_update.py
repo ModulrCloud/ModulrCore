@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 # Absolute path to the root directory that contains V1, V2, ... Vn subfolders
-ROOT_DIR = Path("/Users/vladchernenko/MyProjects/Modulr/ModulrCore/XTESTNET_2")
+ROOT_DIR = Path("/Users/vladchernenko/MyProjects/Modulr/ModulrCore/XTESTNET_5")
 
 V_DIR_PATTERN = re.compile(r"^V\d+$")
 GENESIS_FILENAME = "genesis.json"
