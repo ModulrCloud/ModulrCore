@@ -270,18 +270,9 @@ func executeBlock(block *block_pack.Block) {
 
 		}
 
-		//_____________________________________SHARE FEES AMONG VALIDATOR AND STAKERS__________________________________
+		// distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 
-		/*
-
-		   Distribute fees among:
-
-		       [0] Block creator itself (validator)
-		       [1] Stakers of this validator
-
-		*/
-
-		distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
+		sendFeesToValidatorAccount(block.Creator, blockFees)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
 
@@ -413,6 +404,16 @@ func distributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBl
 		}
 
 	}
+
+}
+
+func sendFeesToValidatorAccount(blockCreatorPubkey string, feeFromBlock uint64) {
+
+	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
+
+	// Transfer fees to account with pubkey associated with block creator
+
+	blockCreatorAccount.Balance += feeFromBlock
 
 }
 
