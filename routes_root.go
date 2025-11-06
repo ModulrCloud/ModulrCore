@@ -12,16 +12,12 @@ func NewRouter() fasthttp.RequestHandler {
 	r := router.New()
 
 	r.GET("/block/{id}", routes.GetBlockById)
-	r.GET("/account/{accountId}", routes.GetAccountById)
 	r.GET("/height/{absoluteHeightIndex}", routes.GetBlockByHeight)
 
-	/*
+	r.GET("/account/{accountId}", routes.GetAccountById)
 
-		TODO:
-
-		GET /epoch_data/{epochIndex}
-
-	*/
+	r.GET("/epoch_data/{epochIndex}", routes.GetEpochData)
+	r.POST("/epoch_proposition", routes.EpochProposition)
 
 	r.GET("/aggregated_finalization_proof/{blockId}", routes.GetAggregatedFinalizationProof)
 	r.GET("/aggregated_epoch_finalization_proof/{epochIndex}", routes.GetAggregatedEpochFinalizationProof)
@@ -31,7 +27,6 @@ func NewRouter() fasthttp.RequestHandler {
 	r.GET("/sequence_alignment", routes.GetSequenceAlignmentData)
 
 	r.POST("/transaction", routes.AcceptTransaction)
-	r.POST("/epoch_proposition", routes.EpochProposition)
 
 	return r.Handler
 }

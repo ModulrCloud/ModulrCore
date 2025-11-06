@@ -332,6 +332,14 @@ func setGenesisToState() error {
 
 	handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler = epochHandlerForExecThread
 
+	// Store epoch data for API
+
+	currentEpochDataHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+
+	jsonedCurrentEpochDataHandler, _ := json.Marshal(currentEpochDataHandler)
+
+	databases.EPOCH_DATA.Put([]byte("EPOCH_HANDLER:"+strconv.Itoa(currentEpochDataHandler.Id)), jsonedCurrentEpochDataHandler, nil)
+
 	return nil
 
 }
