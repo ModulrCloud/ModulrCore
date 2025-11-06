@@ -13,6 +13,17 @@ func NewRouter() fasthttp.RequestHandler {
 
 	r.GET("/block/{id}", routes.GetBlockById)
 
+	/*
+
+		TODO:
+
+		GET /account/{accountId}
+		GET /height/{absoluteHeightIndex
+		GET /epoch_data/{epochIndex}
+
+
+	*/
+
 	r.GET("/aggregated_finalization_proof/{blockId}", routes.GetAggregatedFinalizationProof)
 	r.GET("/aggregated_epoch_finalization_proof/{epochIndex}", routes.GetAggregatedEpochFinalizationProof)
 

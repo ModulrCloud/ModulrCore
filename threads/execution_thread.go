@@ -270,7 +270,7 @@ func executeBlock(block *block_pack.Block) {
 
 		}
 
-		// distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
+		//distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 
 		sendFeesToValidatorAccount(block.Creator, blockFees)
 
