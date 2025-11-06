@@ -97,6 +97,12 @@ func prepareBlockchain() {
 	databases.APPROVEMENT_THREAD_METADATA = utils.OpenDb("APPROVEMENT_THREAD_METADATA")
 	databases.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")
 
+	// Anchors databases
+
+	databases.ANCHOR_BLOCKS = utils.OpenDb("ANCHOR_BLOCKS")
+	databases.ANCHOR_EPOCH_DATA = utils.OpenDb("ANCHOR_EPOCH_DATA")
+	databases.ANCHOR_FINALIZATION_VOTING_STATS = utils.OpenDb("ANCHOR_FINALIZATION_VOTING_STATS")
+
 	// Load GT - Generation Thread handler
 	if data, err := databases.BLOCKS.Get([]byte("GT"), nil); err == nil {
 
