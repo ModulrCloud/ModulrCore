@@ -48,6 +48,14 @@ func RunBlockchain() {
 	//✅ 8.Start execution process - take blocks and execute transactions
 	go threads.ExecutionThread()
 
+	// ------------------ Anchors subnetwork related stuff ------------------
+
+	//✅ 9.Start to generate anchor blocks
+	go threads.AnchorBlocksGenerationThread()
+
+	//✅ 10.Start to generate
+	go threads.AnchorBlocksSharingAndProofsGrabingThread()
+
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
 	// Set the atomic flag to true
