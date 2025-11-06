@@ -262,15 +262,25 @@ func executeBlock(block *block_pack.Block) {
 
 		blockFees := uint64(0)
 
-		for _, transaction := range block.Transactions {
+		for index, transaction := range block.Transactions {
 
 			_, fee := executeTransaction(&transaction)
 
 			blockFees += fee
 
+			if locationBytes, err := json.Marshal(structures.TransactionLocation{Block: currentBlockId, Position: index}); err == nil {
+
+				stateBatch.Put([]byte("TX:"+transaction.Hash()), locationBytes)
+
+			} else {
+
+				panic("Impossible to add transaction location data to atomic batch")
+
+			}
+
 		}
 
-		//distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
+		// distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 
 		sendFeesToValidatorAccount(block.Creator, blockFees)
 
