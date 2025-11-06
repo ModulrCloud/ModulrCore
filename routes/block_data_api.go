@@ -2,11 +2,13 @@ package routes
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/valyala/fasthttp"
 )
@@ -37,6 +39,79 @@ func GetBlockById(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusNotFound)
 	ctx.SetContentType("application/json")
 	ctx.Write([]byte(`{"err": "Not found"}`))
+}
+
+func GetBlockByHeight(ctx *fasthttp.RequestCtx) {
+
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	absoluteHeightRaw := ctx.UserValue("absoluteHeightIndex")
+	absoluteHeight, ok := absoluteHeightRaw.(string)
+
+	if !ok || absoluteHeight == "" {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Invalid height"}`))
+		return
+	}
+
+	if _, err := strconv.ParseInt(absoluteHeight, 10, 64); err != nil {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Invalid height"}`))
+		return
+	}
+
+	blockIndexKey := "BLOCK_INDEX:" + absoluteHeight
+	blockID, err := databases.STATE.Get([]byte(blockIndexKey), nil)
+
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetContentType("application/json")
+			ctx.Write([]byte(`{"err": "Not found"}`))
+			return
+		}
+
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to load block id"}`))
+		return
+	}
+
+	if len(blockID) == 0 {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Not found"}`))
+		return
+	}
+
+	block, err := databases.BLOCKS.Get(blockID, nil)
+
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetContentType("application/json")
+			ctx.Write([]byte(`{"err": "Not found"}`))
+			return
+		}
+
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to load block"}`))
+		return
+	}
+
+	if len(block) == 0 {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Not found"}`))
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/json")
+	ctx.Write(block)
 }
 
 func GetAggregatedFinalizationProof(ctx *fasthttp.RequestCtx) {
