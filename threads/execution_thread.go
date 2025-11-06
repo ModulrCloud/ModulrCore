@@ -320,6 +320,8 @@ func executeBlock(block *block_pack.Block) {
 
 		epochHandlerRef.LastBlockHash = blockHash
 
+		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.LastHeight)), []byte(currentBlockId))
+
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
 
 			stateBatch.Put([]byte("ET"), execThreadRawBytes)
