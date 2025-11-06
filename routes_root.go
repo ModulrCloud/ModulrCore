@@ -12,12 +12,12 @@ func NewRouter() fasthttp.RequestHandler {
 	r := router.New()
 
 	r.GET("/block/{id}", routes.GetBlockById)
+	r.GET("/account/{accountId}", routes.GetAccountById)
 
 	/*
 
 		TODO:
 
-		GET /account/{accountId}
 		GET /height/{absoluteHeightIndex
 		GET /epoch_data/{epochIndex}
 
