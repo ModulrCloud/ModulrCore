@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/ModulrCloud/ModulrCore/block_pack"
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/structures"
@@ -140,6 +141,98 @@ func GetAggregatedFinalizationProof(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusNotFound)
 	ctx.SetContentType("application/json")
 	ctx.Write([]byte(`{"err": "Not found"}`))
+}
+
+func GetTransactionByHash(ctx *fasthttp.RequestCtx) {
+
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	hashRaw := ctx.UserValue("hash")
+	hash, ok := hashRaw.(string)
+
+	if !ok || hash == "" {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Invalid value"}`))
+		return
+	}
+
+	locationBytes, err := databases.STATE.Get([]byte("TX:"+hash), nil)
+
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetContentType("application/json")
+			ctx.Write([]byte(`{"err": "Not found"}`))
+			return
+		}
+
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to load transaction location"}`))
+		return
+	}
+
+	var location structures.TransactionLocation
+
+	if err := json.Unmarshal(locationBytes, &location); err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to parse transaction location"}`))
+		return
+	}
+
+	if location.Block == "" {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Not found"}`))
+		return
+	}
+
+	blockBytes, err := databases.BLOCKS.Get([]byte(location.Block), nil)
+
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetContentType("application/json")
+			ctx.Write([]byte(`{"err": "Not found"}`))
+			return
+		}
+
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to load block"}`))
+		return
+	}
+
+	var block block_pack.Block
+
+	if err := json.Unmarshal(blockBytes, &block); err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to parse block"}`))
+		return
+	}
+
+	if location.Position < 0 || location.Position >= len(block.Transactions) {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Not found"}`))
+		return
+	}
+
+	transactionBytes, err := json.Marshal(block.Transactions[location.Position])
+
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to serialize transaction"}`))
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/json")
+	ctx.Write(transactionBytes)
 }
 
 func AcceptTransaction(ctx *fasthttp.RequestCtx) {

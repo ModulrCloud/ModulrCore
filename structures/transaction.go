@@ -9,6 +9,11 @@ import (
 	"lukechampine.com/blake3"
 )
 
+type TransactionLocation struct {
+	Block    string `json:"block"`
+	Position int    `json:"position"`
+}
+
 type Transaction struct {
 	V       uint           `json:"v"`
 	Type    string         `json:"type"`

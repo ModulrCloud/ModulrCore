@@ -26,6 +26,7 @@ func NewRouter() fasthttp.RequestHandler {
 
 	r.GET("/sequence_alignment", routes.GetSequenceAlignmentData)
 
+	r.GET("/transaction/{hash}", routes.GetTransactionByHash)
 	r.POST("/transaction", routes.AcceptTransaction)
 
 	return r.Handler
