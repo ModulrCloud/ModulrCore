@@ -1,4 +1,4 @@
-package threads
+package anchor_threads
 
 func AnchorBlocksGenerationThread() {
 }

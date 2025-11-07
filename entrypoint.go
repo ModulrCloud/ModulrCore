@@ -10,7 +10,8 @@ import (
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/handlers"
 	"github.com/ModulrCloud/ModulrCore/structures"
-	"github.com/ModulrCloud/ModulrCore/threads"
+	"github.com/ModulrCloud/ModulrCore/threads/anchor_threads"
+	"github.com/ModulrCloud/ModulrCore/threads/default_threads"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
 
@@ -25,36 +26,39 @@ func RunBlockchain() {
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
 	//✅ 1.Thread to find AEFPs and change the epoch for AT
-	go threads.EpochRotationThread()
+	go default_threads.EpochRotationThread()
 
 	//✅ 2.Share our blocks within quorum members and get the finalization proofs
-	go threads.BlocksSharingAndProofsGrabingThread()
+	go default_threads.BlocksSharingAndProofsGrabingThread()
 
 	//✅ 3.Thread to propose AEFPs to move to next epoch
-	go threads.NewEpochProposerThread()
+	go default_threads.NewEpochProposerThread()
 
 	//✅ 4.Start to generate blocks
-	go threads.BlocksGenerationThread()
+	go default_threads.BlocksGenerationThread()
 
 	//✅ 5.Start a separate thread to work with voting for blocks in a sync way (for security)
-	go threads.LeaderRotationThread()
+	go default_threads.LeaderRotationThread()
 
 	//✅ 6.This thread will be responsible to find the first block in each epoch
-	go threads.FirstBlockInEpochMonitor()
+	go default_threads.FirstBlockInEpochMonitor()
 
 	//✅ 7.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
-	go threads.SequenceAlignmentThread()
+	go default_threads.SequenceAlignmentThread()
 
 	//✅ 8.Start execution process - take blocks and execute transactions
-	go threads.ExecutionThread()
+	go default_threads.ExecutionThread()
 
 	// ------------------ Anchors subnetwork related stuff ------------------
 
 	//✅ 9.Start to generate anchor blocks
-	go threads.AnchorBlocksGenerationThread()
+	go anchor_threads.AnchorBlocksGenerationThread()
 
-	//✅ 10.Start to generate
-	go threads.AnchorBlocksSharingAndProofsGrabingThread()
+	//✅ 10.Start to share anchor blocks and grab approvements
+	go anchor_threads.AnchorBlocksSharingAndProofsGrabingThread()
+
+	//✅ 10.Start monitor anchors health
+	go anchor_threads.AnchorsHealthChecker()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
