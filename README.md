@@ -1,3 +1,4 @@
+![alt text](images/img_modulr.png)
 # Launch instructions
 
 ### 1. Download dependencies and build the core
@@ -80,7 +81,7 @@ In the same shell where you stored the env variable - run
 
 **This should run the local testnet with a single validator which generates blocks**
 
-![alt text](images/image.png)
+![alt text](images/shell.png)
 
 
 # Restarting network
