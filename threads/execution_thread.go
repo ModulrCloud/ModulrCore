@@ -405,9 +405,9 @@ func distributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBl
 
 	if feesToShareAmongStakers != 0 {
 
-		for stakerPubkey, stakerData := range blockCreatorStorage.Stakers {
+		for stakerPubkey, stakerStake := range blockCreatorStorage.Stakers {
 
-			stakerReward := (stakerData.Stake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
+			stakerReward := (stakerStake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
 
 			stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
 
