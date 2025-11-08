@@ -44,7 +44,7 @@ func GetAccountFromExecThreadState(accountId string) *structures.Account {
 
 		if parseErr == nil {
 
-			handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId] = &structures.Account{}
+			handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId] = &account
 
 			return handlers.EXECUTION_THREAD_METADATA.Handler.AccountsCache[accountId]
 
