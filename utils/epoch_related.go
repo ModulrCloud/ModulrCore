@@ -39,6 +39,8 @@ func GetCurrentLeader() CurrentLeaderData {
 
 		}
 
+		return CurrentLeaderData{IsMeLeader: false, Url: ""}
+
 	}
 
 	return CurrentLeaderData{IsMeLeader: true, Url: ""}
