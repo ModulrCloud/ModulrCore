@@ -48,10 +48,8 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
-					Stakers: map[string]structures.Staker{
-						validatorPubkey: {
-							Stake: 0,
-						},
+					Stakers: map[string]uint64{
+						validatorPubkey: 0,
 					},
 					ValidatorUrl:    validatorURL,
 					WssValidatorUrl: wssValidatorURL,
@@ -79,10 +77,8 @@ func CreateValidator(delayedTransaction map[string]string, context string) bool 
 					Pubkey:      validatorPubkey,
 					Percentage:  percentage,
 					TotalStaked: 0,
-					Stakers: map[string]structures.Staker{
-						validatorPubkey: {
-							Stake: 0,
-						},
+					Stakers: map[string]uint64{
+						validatorPubkey: 0,
 					},
 					ValidatorUrl:    validatorURL,
 					WssValidatorUrl: wssValidatorURL,
@@ -186,22 +182,13 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			if _, exists := validatorStorage.Stakers[staker]; !exists {
+			currentStake := validatorStorage.Stakers[staker]
 
-				validatorStorage.Stakers[staker] = structures.Staker{
-
-					Stake: 0,
-				}
-
-			}
-
-			stakerData := validatorStorage.Stakers[staker]
-
-			stakerData.Stake += amount
+			currentStake += amount
 
 			validatorStorage.TotalStaked += amount
 
-			validatorStorage.Stakers[staker] = stakerData
+			validatorStorage.Stakers[staker] = currentStake
 
 			requiredStake := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
@@ -237,22 +224,13 @@ func Stake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			if _, exists := validatorStorage.Stakers[staker]; !exists {
+			currentStake := validatorStorage.Stakers[staker]
 
-				validatorStorage.Stakers[staker] = structures.Staker{
+			currentStake += amount
 
-					Stake: 0,
-				}
-
-			}
-
-			stakerData := validatorStorage.Stakers[staker]
-
-			stakerData.Stake += amount
+			validatorStorage.Stakers[staker] = currentStake
 
 			validatorStorage.TotalStaked += amount
-
-			validatorStorage.Stakers[staker] = stakerData
 
 			requiredStake := handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters.ValidatorRequiredStake
 
@@ -296,7 +274,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			stakerData, exists := validatorStorage.Stakers[unstaker]
+			stakerStake, exists := validatorStorage.Stakers[unstaker]
 
 			if !exists {
 
@@ -304,23 +282,23 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			if stakerData.Stake < amount {
+			if stakerStake < amount {
 
 				return false
 
 			}
 
-			stakerData.Stake -= amount
+			stakerStake -= amount
 
 			validatorStorage.TotalStaked -= amount
 
-			if stakerData.Stake == 0 {
+			if stakerStake == 0 {
 
 				delete(validatorStorage.Stakers, unstaker) // no sense to store staker with 0 balance in stakers list
 
 			} else {
 
-				validatorStorage.Stakers[unstaker] = stakerData
+				validatorStorage.Stakers[unstaker] = stakerStake
 
 			}
 
@@ -346,7 +324,7 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 		if validatorStorage != nil {
 
-			stakerData, exists := validatorStorage.Stakers[unstaker]
+			stakerStake, exists := validatorStorage.Stakers[unstaker]
 
 			if !exists {
 
@@ -354,23 +332,23 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 			}
 
-			if stakerData.Stake < amount {
+			if stakerStake < amount {
 
 				return false
 
 			}
 
-			stakerData.Stake -= amount
+			stakerStake -= amount
 
 			validatorStorage.TotalStaked -= amount
 
-			if stakerData.Stake == 0 {
+			if stakerStake == 0 {
 
 				delete(validatorStorage.Stakers, unstaker) // no sense to store staker with 0 balance in stakers list
 
 			} else {
 
-				validatorStorage.Stakers[unstaker] = stakerData
+				validatorStorage.Stakers[unstaker] = stakerStake
 
 			}
 

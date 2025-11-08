@@ -26,9 +26,7 @@
             "percentage": 50,
             "totalStaked": 50000000000,
             "stakers": {
-                "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK": {
-                    "stake": 50000000000
-                }
+                "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK": 50000000000
             },
             "validatorURL": "http://localhost:7332",
             "wssValidatorURL": "ws://localhost:9999"
@@ -38,9 +36,7 @@
             "percentage": 50,
             "totalStaked": 50000000000,
             "stakers": {
-                "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": {
-                    "stake": 50000000000
-                }
+                "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": 50000000000
             },
             "validatorURL": "http://localhost:7333",
             "wssValidatorURL": "ws://localhost:9998"

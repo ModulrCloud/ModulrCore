@@ -24,15 +24,11 @@ func (src *NetworkParameters) CopyNetworkParameters() NetworkParameters {
 	}
 }
 
-type Staker struct {
-	Stake uint64 `json:"stake"`
-}
-
 type ValidatorStorage struct {
 	Pubkey          string            `json:"pubkey"`
 	Percentage      uint8             `json:"percentage"`
 	TotalStaked     uint64            `json:"totalStaked"`
-	Stakers         map[string]Staker `json:"stakers"`
+	Stakers         map[string]uint64 `json:"stakers"`
 	ValidatorUrl    string            `json:"validatorURL"`
 	WssValidatorUrl string            `json:"wssValidatorURL"`
 }
