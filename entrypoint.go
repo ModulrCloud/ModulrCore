@@ -21,7 +21,15 @@ import (
 
 func RunBlockchain() {
 
-	prepareBlockchain()
+	if err := prepareBlockchain(); err != nil {
+
+		utils.LogWithTime(fmt.Sprintf("Failed to prepare blockchain: %v", err), utils.RED_COLOR)
+
+		utils.GracefulShutdown()
+
+		return
+
+	}
 
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
@@ -82,16 +90,27 @@ func RunBlockchain() {
 
 }
 
-func prepareBlockchain() {
+func prepareBlockchain() error {
 
-	// Create dir for chaindata
-	if _, err := os.Stat(globals.CHAINDATA_PATH); os.IsNotExist(err) {
+	if info, err := os.Stat(globals.CHAINDATA_PATH); err != nil {
 
-		if err := os.MkdirAll(globals.CHAINDATA_PATH, 0755); err != nil {
+		if os.IsNotExist(err) {
 
-			return
+			if err := os.MkdirAll(globals.CHAINDATA_PATH, 0755); err != nil {
+
+				return fmt.Errorf("create chaindata directory: %w", err)
+
+			}
+
+		} else {
+
+			return fmt.Errorf("check chaindata directory: %w", err)
 
 		}
+
+	} else if !info.IsDir() {
+
+		return fmt.Errorf("chaindata path %s exists and is not a directory", globals.CHAINDATA_PATH)
 
 	}
 
@@ -112,23 +131,15 @@ func prepareBlockchain() {
 
 		var gtHandler structures.GenerationThreadMetadataHandler
 
-		if err := json.Unmarshal(data, &gtHandler); err == nil {
-
-			handlers.GENERATION_THREAD_METADATA = gtHandler
-
-		} else {
-
-			fmt.Printf("failed to unmarshal GENERATION_THREAD: %v\n", err)
-
-			return
-
+		if err := json.Unmarshal(data, &gtHandler); err != nil {
+			return fmt.Errorf("unmarshal GENERATION_THREAD metadata: %w", err)
 		}
+
+		handlers.GENERATION_THREAD_METADATA = gtHandler
+
 	} else {
 
-		// Create initial generation thread handler
-
 		handlers.GENERATION_THREAD_METADATA = structures.GenerationThreadMetadataHandler{
-
 			EpochFullId: utils.Blake3("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"+globals.GENESIS.NetworkId) + "#-1",
 			PrevHash:    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			NextIndex:   0,
@@ -136,111 +147,80 @@ func prepareBlockchain() {
 
 	}
 
-	// Load AT - Approvement Thread handler
-
 	if data, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("AT"), nil); err == nil {
 
 		var atHandler structures.ApprovementThreadMetadataHandler
 
-		if err := json.Unmarshal(data, &atHandler); err == nil {
-
-			if atHandler.ValidatorsStoragesCache == nil {
-
-				atHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
-
-			}
-
-			handlers.APPROVEMENT_THREAD_METADATA.Handler = atHandler
-
-		} else {
-
-			fmt.Printf("failed to unmarshal APPROVEMENT_THREAD: %v\n", err)
-
-			return
-
+		if err := json.Unmarshal(data, &atHandler); err != nil {
+			return fmt.Errorf("unmarshal APPROVEMENT_THREAD metadata: %w", err)
 		}
 
-	}
+		if atHandler.ValidatorsStoragesCache == nil {
+			atHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
+		}
 
-	// Load ET - Execution Thread handler
+		handlers.APPROVEMENT_THREAD_METADATA.Handler = atHandler
+
+	}
 
 	if data, err := databases.STATE.Get([]byte("ET"), nil); err == nil {
 
 		var etHandler structures.ExecutionThreadMetadataHandler
 
-		if err := json.Unmarshal(data, &etHandler); err == nil {
-
-			if etHandler.AccountsCache == nil {
-
-				etHandler.AccountsCache = make(map[string]*structures.Account)
-
-			}
-
-			if etHandler.ValidatorsStoragesCache == nil {
-
-				etHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
-
-			}
-
-			handlers.EXECUTION_THREAD_METADATA.Handler = etHandler
-
-		} else {
-
-			fmt.Printf("failed to unmarshal EXECUTION_THREAD: %v\n", err)
-
-			return
-
+		if err := json.Unmarshal(data, &etHandler); err != nil {
+			return fmt.Errorf("unmarshal EXECUTION_THREAD metadata: %w", err)
 		}
+
+		if etHandler.AccountsCache == nil {
+			etHandler.AccountsCache = make(map[string]*structures.Account)
+		}
+
+		if etHandler.ValidatorsStoragesCache == nil {
+			etHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
+		}
+
+		handlers.EXECUTION_THREAD_METADATA.Handler = etHandler
 
 	}
 
-	// Init genesis if version is -1
 	if handlers.EXECUTION_THREAD_METADATA.Handler.CoreMajorVersion == -1 {
 
-		if genesisWriteErr := setGenesisToState(); genesisWriteErr != nil {
-
-			panic("Error with writing genesis to state. Try to delete chaindata and repeat node launch")
-
+		if err := setGenesisToState(); err != nil {
+			return fmt.Errorf("write genesis to state: %w", err)
 		}
 
 		serializedApprovementThread, err := json.Marshal(handlers.APPROVEMENT_THREAD_METADATA.Handler)
 
-		serializedExecutionThread, err2 := json.Marshal(handlers.EXECUTION_THREAD_METADATA.Handler)
+		if err != nil {
+			return fmt.Errorf("marshal APPROVEMENT_THREAD metadata: %w", err)
+		}
 
-		if err != nil || err2 != nil {
+		serializedExecutionThread, err := json.Marshal(handlers.EXECUTION_THREAD_METADATA.Handler)
 
-			fmt.Printf("failed to marshal handlers: %v\n", err)
-
-			return
-
+		if err != nil {
+			return fmt.Errorf("marshal EXECUTION_THREAD metadata: %w", err)
 		}
 
 		if err := databases.APPROVEMENT_THREAD_METADATA.Put([]byte("AT"), serializedApprovementThread, nil); err != nil {
-
-			fmt.Printf("failed to save APPROVEMENT_THREAD: %v\n", err)
-
-			return
-
+			return fmt.Errorf("save APPROVEMENT_THREAD metadata: %w", err)
 		}
 
 		if err := databases.STATE.Put([]byte("ET"), serializedExecutionThread, nil); err != nil {
-
-			fmt.Printf("failed to save EXECUTION_THREAD: %v\n", err)
-
-			return
-
+			return fmt.Errorf("save EXECUTION_THREAD metadata: %w", err)
 		}
 	}
 
-	// Version check
 	if utils.IsMyCoreVersionOld(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
 
 		utils.LogWithTime("New version detected on APPROVEMENT_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
 
 		utils.GracefulShutdown()
 
+		return fmt.Errorf("core version is outdated")
+
 	}
 
+	return nil
 }
 
 func setGenesisToState() error {
