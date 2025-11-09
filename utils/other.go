@@ -51,6 +51,10 @@ func GracefulShutdown() {
 
 		LogWithTime("Closing server connections...", CYAN_COLOR)
 
+		if err := databases.CloseAll(); err != nil {
+			LogWithTime(fmt.Sprintf("failed to close databases: %v", err), RED_COLOR)
+		}
+
 		LogWithTime("Node was gracefully stopped", GREEN_COLOR)
 
 		os.Exit(0)
