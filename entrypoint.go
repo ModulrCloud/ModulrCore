@@ -21,9 +21,13 @@ import (
 func RunBlockchain() {
 
 	if err := prepareBlockchain(); err != nil {
+
 		utils.LogWithTime(fmt.Sprintf("Failed to prepare blockchain: %v", err), utils.RED_COLOR)
+
 		utils.GracefulShutdown()
+
 		return
+
 	}
 
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
@@ -75,16 +79,27 @@ func RunBlockchain() {
 }
 
 func prepareBlockchain() error {
+
 	if info, err := os.Stat(globals.CHAINDATA_PATH); err != nil {
+
 		if os.IsNotExist(err) {
+
 			if err := os.MkdirAll(globals.CHAINDATA_PATH, 0755); err != nil {
+
 				return fmt.Errorf("create chaindata directory: %w", err)
+
 			}
+
 		} else {
+
 			return fmt.Errorf("check chaindata directory: %w", err)
+
 		}
+
 	} else if !info.IsDir() {
+
 		return fmt.Errorf("chaindata path %s exists and is not a directory", globals.CHAINDATA_PATH)
+
 	}
 
 	databases.BLOCKS = utils.OpenDb("BLOCKS")
@@ -94,55 +109,75 @@ func prepareBlockchain() error {
 	databases.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")
 
 	if data, err := databases.BLOCKS.Get([]byte("GT"), nil); err == nil {
+
 		var gtHandler structures.GenerationThreadMetadataHandler
+
 		if err := json.Unmarshal(data, &gtHandler); err != nil {
 			return fmt.Errorf("unmarshal GENERATION_THREAD metadata: %w", err)
 		}
+
 		handlers.GENERATION_THREAD_METADATA = gtHandler
+
 	} else {
+
 		handlers.GENERATION_THREAD_METADATA = structures.GenerationThreadMetadataHandler{
 			EpochFullId: utils.Blake3("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"+globals.GENESIS.NetworkId) + "#-1",
 			PrevHash:    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			NextIndex:   0,
 		}
+
 	}
 
 	if data, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("AT"), nil); err == nil {
+
 		var atHandler structures.ApprovementThreadMetadataHandler
+
 		if err := json.Unmarshal(data, &atHandler); err != nil {
 			return fmt.Errorf("unmarshal APPROVEMENT_THREAD metadata: %w", err)
 		}
+
 		if atHandler.ValidatorsStoragesCache == nil {
 			atHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
 		}
+
 		handlers.APPROVEMENT_THREAD_METADATA.Handler = atHandler
+
 	}
 
 	if data, err := databases.STATE.Get([]byte("ET"), nil); err == nil {
+
 		var etHandler structures.ExecutionThreadMetadataHandler
+
 		if err := json.Unmarshal(data, &etHandler); err != nil {
 			return fmt.Errorf("unmarshal EXECUTION_THREAD metadata: %w", err)
 		}
+
 		if etHandler.AccountsCache == nil {
 			etHandler.AccountsCache = make(map[string]*structures.Account)
 		}
+
 		if etHandler.ValidatorsStoragesCache == nil {
 			etHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
 		}
+
 		handlers.EXECUTION_THREAD_METADATA.Handler = etHandler
+
 	}
 
 	if handlers.EXECUTION_THREAD_METADATA.Handler.CoreMajorVersion == -1 {
+
 		if err := setGenesisToState(); err != nil {
 			return fmt.Errorf("write genesis to state: %w", err)
 		}
 
 		serializedApprovementThread, err := json.Marshal(handlers.APPROVEMENT_THREAD_METADATA.Handler)
+
 		if err != nil {
 			return fmt.Errorf("marshal APPROVEMENT_THREAD metadata: %w", err)
 		}
 
 		serializedExecutionThread, err := json.Marshal(handlers.EXECUTION_THREAD_METADATA.Handler)
+
 		if err != nil {
 			return fmt.Errorf("marshal EXECUTION_THREAD metadata: %w", err)
 		}
@@ -157,9 +192,13 @@ func prepareBlockchain() error {
 	}
 
 	if utils.IsMyCoreVersionOld(&handlers.APPROVEMENT_THREAD_METADATA.Handler) {
+
 		utils.LogWithTime("New version detected on APPROVEMENT_THREAD. Please, upgrade your node software", utils.YELLOW_COLOR)
+
 		utils.GracefulShutdown()
+
 		return fmt.Errorf("core version is outdated")
+
 	}
 
 	return nil
