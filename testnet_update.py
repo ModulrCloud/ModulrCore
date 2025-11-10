@@ -3,10 +3,8 @@ import time
 import json
 import re
 import shutil
+import argparse
 from pathlib import Path
-
-# Absolute path to the root directory that contains V1, V2, ... Vn subfolders
-ROOT_DIR = Path("/Users/vladchernenko/MyProjects/Modulr/ModulrCore/XTESTNET_5")
 
 V_DIR_PATTERN = re.compile(r"^V\d+$")
 GENESIS_FILENAME = "genesis.json"
@@ -57,8 +55,13 @@ def delete_databases_dir(vdir: Path) -> bool:
     return False
 
 def main():
-    if not ROOT_DIR.exists():
-        raise SystemExit(f"Root dir not found: {ROOT_DIR}")
+    parser = argparse.ArgumentParser(description="Update genesis.json and remove DATABASES dirs in version folders.")
+    parser.add_argument("root_dir", type=Path, help="Path to root directory containing V1, V2, ... subfolders")
+    args = parser.parse_args()
+
+    root_dir = args.root_dir
+    if not root_dir.exists():
+        raise SystemExit(f"Root dir not found: {root_dir}")
 
     millis = int(time.time() * 1000)
     print(millis)
@@ -67,7 +70,7 @@ def main():
     updated = 0
     deleted_db = 0
 
-    for vdir in sorted(find_version_dirs(ROOT_DIR), key=lambda p: int(p.name[1:])):
+    for vdir in sorted(find_version_dirs(root_dir), key=lambda p: int(p.name[1:])):
         total += 1
         genesis = vdir / GENESIS_FILENAME
 
