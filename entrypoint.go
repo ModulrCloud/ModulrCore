@@ -9,13 +9,13 @@ import (
 	"github.com/ModulrCloud/ModulrCore/databases"
 	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/handlers"
+	"github.com/ModulrCloud/ModulrCore/http_pack"
 	"github.com/ModulrCloud/ModulrCore/structures"
 	"github.com/ModulrCloud/ModulrCore/threads"
 	"github.com/ModulrCloud/ModulrCore/utils"
 	"github.com/ModulrCloud/ModulrCore/websocket_pack"
 
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/valyala/fasthttp"
 )
 
 func RunBlockchain() {
@@ -64,17 +64,7 @@ func RunBlockchain() {
 
 	go websocket_pack.CreateWebsocketServer()
 
-	serverAddr := globals.CONFIGURATION.Interface + ":" + strconv.Itoa(globals.CONFIGURATION.Port)
-
-	utils.LogWithTime(fmt.Sprintf("Server is starting at http://%s ...✅", serverAddr), utils.CYAN_COLOR)
-
-	err := fasthttp.ListenAndServe(serverAddr, NewRouter())
-
-	if err != nil {
-
-		utils.LogWithTime(fmt.Sprintf("Error in server: %s", err), utils.RED_COLOR)
-
-	}
+	http_pack.CreateHTTPServer()
 
 }
 
