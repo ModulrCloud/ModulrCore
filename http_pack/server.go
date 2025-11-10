@@ -1,13 +1,18 @@
-package main
+package http_pack
 
 import (
+	"fmt"
+	"strconv"
+
+	"github.com/ModulrCloud/ModulrCore/globals"
 	"github.com/ModulrCloud/ModulrCore/routes"
+	"github.com/ModulrCloud/ModulrCore/utils"
 
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 )
 
-func NewRouter() fasthttp.RequestHandler {
+func createRouter() fasthttp.RequestHandler {
 
 	r := router.New()
 
@@ -30,4 +35,15 @@ func NewRouter() fasthttp.RequestHandler {
 	r.POST("/transaction", routes.AcceptTransaction)
 
 	return r.Handler
+}
+
+func CreateHTTPServer() {
+
+	serverAddr := globals.CONFIGURATION.Interface + ":" + strconv.Itoa(globals.CONFIGURATION.Port)
+
+	utils.LogWithTime(fmt.Sprintf("Server is starting at http://%s ...✅", serverAddr), utils.CYAN_COLOR)
+
+	if err := fasthttp.ListenAndServe(serverAddr, createRouter()); err != nil {
+		utils.LogWithTime(fmt.Sprintf("Error in server: %s", err), utils.RED_COLOR)
+	}
 }
