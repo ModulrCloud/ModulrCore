@@ -229,7 +229,7 @@ Fetches account state from the LevelDB-backed state store.
 
 **Example request**
 ```bash
-curl https://localhost:7332/account/ed25519_receiver...
+curl https://localhost:7332/account/6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE
 ```
 
 **Example response**
