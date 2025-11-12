@@ -8,7 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 var CORE_MAJOR_VERSION = func() int {

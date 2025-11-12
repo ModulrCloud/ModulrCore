@@ -3,7 +3,7 @@ package block_pack
 import (
 	"encoding/json"
 
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 type ExtraDataToBlock struct {

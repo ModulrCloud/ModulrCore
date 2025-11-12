@@ -1,8 +1,8 @@
 package websocket_pack
 
 import (
-	"github.com/ModulrCloud/ModulrCore/block_pack"
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/block_pack"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 type WsLeaderRotationProofRequest struct {

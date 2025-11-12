@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/block_pack"
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/structures"
-	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/modulrcloud/modulr-core/block_pack"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/valyala/fasthttp"

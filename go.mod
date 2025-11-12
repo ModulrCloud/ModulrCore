@@ -1,4 +1,4 @@
-module github.com/ModulrCloud/ModulrCore
+module github.com/modulrcloud/modulr-core
 
 go 1.23.1
 

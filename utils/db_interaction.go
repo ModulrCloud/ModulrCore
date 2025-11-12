@@ -3,10 +3,10 @@ package utils
 import (
 	"encoding/json"
 
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/handlers"
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/handlers"
+	"github.com/modulrcloud/modulr-core/structures"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )

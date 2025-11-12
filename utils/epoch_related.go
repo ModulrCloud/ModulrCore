@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/handlers"
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/handlers"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 type CurrentLeaderData struct {

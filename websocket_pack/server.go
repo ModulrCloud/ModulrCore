@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/utils"
 
 	"github.com/lxzan/gws"
 )

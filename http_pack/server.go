@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/routes"
-	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/routes"
+	"github.com/modulrcloud/modulr-core/utils"
 
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"

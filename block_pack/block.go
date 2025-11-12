@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ModulrCloud/ModulrCore/cryptography"
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/globals"
-	"github.com/ModulrCloud/ModulrCore/handlers"
-	"github.com/ModulrCloud/ModulrCore/structures"
-	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/modulrcloud/modulr-core/cryptography"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/handlers"
+	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/utils"
 )
 
 type Block struct {
