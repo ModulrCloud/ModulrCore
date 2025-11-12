@@ -96,7 +96,7 @@ This version may contains the bugs, so to restart the network you should:
 
 # Netspawner usage
 
-See https://github.com/ModulrCloud/NetSpawner
+See https://github.com/modulrcloud/net-spawner
 
 # Testing
 

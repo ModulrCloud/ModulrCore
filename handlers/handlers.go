@@ -3,7 +3,7 @@ package handlers
 import (
 	"sync"
 
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 var GENERATION_THREAD_METADATA structures.GenerationThreadMetadataHandler

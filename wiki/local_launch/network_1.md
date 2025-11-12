@@ -1,7 +1,7 @@
 ### 1. Clone repo
 
 ```
-git clone https://github.com/ModulrCloud/ModulrCore.git
+git clone https://github.com/modulrcloud/modulr-core.git
 
 cd ModulrCore
 ```

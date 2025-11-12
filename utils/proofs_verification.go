@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ModulrCloud/ModulrCore/cryptography"
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/cryptography"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/structures"
 )
 
 func VerifyAggregatedEpochFinalizationProof(proof *structures.AggregatedEpochFinalizationProof, quorum []string, majority int, epochFullID string) bool {

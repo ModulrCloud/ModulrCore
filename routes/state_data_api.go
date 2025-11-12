@@ -3,8 +3,8 @@ package routes
 import (
 	"encoding/json"
 
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/structures"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/structures"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/valyala/fasthttp"

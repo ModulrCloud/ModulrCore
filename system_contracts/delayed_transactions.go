@@ -4,10 +4,10 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/ModulrCloud/ModulrCore/databases"
-	"github.com/ModulrCloud/ModulrCore/handlers"
-	"github.com/ModulrCloud/ModulrCore/structures"
-	"github.com/ModulrCloud/ModulrCore/utils"
+	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/handlers"
+	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/utils"
 )
 
 type DelayedTxExecutorFunction = func(map[string]string, string) bool
