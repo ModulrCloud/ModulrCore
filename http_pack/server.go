@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/modulrcloud/modulr-core/globals"
-	"github.com/modulrcloud/modulr-core/routes"
+	"github.com/modulrcloud/modulr-core/http_pack/routes"
 	"github.com/modulrcloud/modulr-core/utils"
 
 	"github.com/fasthttp/router"
