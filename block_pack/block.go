@@ -50,10 +50,17 @@ func (block *Block) GetHash() string {
 		panic("GetHash: failed to marshal transactions: " + err.Error())
 	}
 
+	jsonedExtraData, err := json.Marshal(block.ExtraData)
+
+	if err != nil {
+		panic("GetHash: failed to marshal extraData: " + err.Error())
+	}
+
 	dataToHash := strings.Join([]string{
 		block.Creator,
 		strconv.FormatInt(block.Time, 10),
 		string(jsonedTransactions),
+		string(jsonedExtraData),
 		globals.GENESIS.NetworkId,
 		block.Epoch,
 		strconv.Itoa(block.Index),
