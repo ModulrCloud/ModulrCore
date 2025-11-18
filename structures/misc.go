@@ -16,7 +16,6 @@ type FirstBlockResult struct {
 
 type FirstBlockDataForNextEpoch struct {
 	FirstBlockResult
-	Aefp *AggregatedEpochFinalizationProof
 }
 
 type FirstBlockAssumption struct {
