@@ -88,67 +88,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 				}
 
-				if parsedRequest.Block.Index == 0 {
-
-					aefpIsOk := false
-
-					if epochIndex == 0 {
-
-						aefpIsOk = true
-
-					} else {
-
-						var legacyEpochHandler structures.EpochDataHandler
-
-						prevEpochIndex := epochHandler.Id - 1
-
-						legacyEpochHandlerRaw, err := databases.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(prevEpochIndex)), nil)
-
-						if err == nil {
-
-							errParse := json.Unmarshal(legacyEpochHandlerRaw, &legacyEpochHandler)
-
-							aefpFromBlock := parsedRequest.Block.ExtraData.AefpForPreviousEpoch
-
-							if errParse == nil {
-
-								legacyEpochFullID := legacyEpochHandler.Hash + "#" + strconv.Itoa(legacyEpochHandler.Id)
-
-								legacyMajority := utils.GetQuorumMajority(&legacyEpochHandler)
-
-								aefpIsOk = epochHandler.Id == 0 || utils.VerifyAggregatedEpochFinalizationProof(
-
-									aefpFromBlock,
-
-									legacyEpochHandler.Quorum,
-
-									legacyMajority,
-
-									legacyEpochFullID,
-								)
-
-							}
-
-						}
-
-					}
-
-					//_________________________________________2_________________________________________
-
-					// Verify the ALRP chain validity here
-
-					alrpChainIsOk := parsedRequest.Block.VerifyAlrpChain(
-
-						epochHandler, positionOfBlockCreatorInLeadersSequence,
-					)
-
-					if !aefpIsOk || !alrpChainIsOk {
-
-						return // prevent proof generation
-
-					}
-
-				} else {
+				if parsedRequest.Block.Index > 0 {
 
 					// This branch related to case when block index is > 0 (so it's not the first block by leader)
 
@@ -226,13 +166,10 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 									// Only after we stored the these 3 components = generate signature (finalization proof)
 
-									dataToSign, prevBlockHash := "", ""
+									dataToSign := ""
+									prevBlockHash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-									if parsedRequest.Block.Index == 0 {
-
-										prevBlockHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-
-									} else {
+									if parsedRequest.Block.Index > 0 {
 
 										prevBlockHash = parsedRequest.PreviousBlockAfp.BlockHash
 

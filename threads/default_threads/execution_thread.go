@@ -649,27 +649,45 @@ func tryToFinishCurrentEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		//____________After we get the first blocks for epoch X+1 - get the AEFP from it and build the data for VT to finish epoch X____________
+		//____________After we get the first blocks for epoch X+1 - build the data for VT to finish epoch X____________
 
 		firstBlockInThisEpoch := block_pack.GetBlock(nextEpochIndex, firstBlockDataOnNextEpoch.FirstBlockCreator, 0, epochHandler)
 
 		if firstBlockInThisEpoch != nil && firstBlockInThisEpoch.GetHash() == firstBlockDataOnNextEpoch.FirstBlockHash {
 
-			firstBlockDataOnNextEpoch.Aefp = firstBlockInThisEpoch.ExtraData.AefpForPreviousEpoch
+			if aefp := loadAggregatedEpochFinalizationProof(epochIndex); aefp != nil {
 
-		}
+				// Activate to start get data from it
 
-		if firstBlockDataOnNextEpoch.Aefp != nil {
+				handlers.EXECUTION_THREAD_METADATA.Handler.LegacyEpochAlignmentData.Activated = true
 
-			// Activate to start get data from it
+				findInfoAboutLastBlocks(epochHandler, aefp)
 
-			handlers.EXECUTION_THREAD_METADATA.Handler.LegacyEpochAlignmentData.Activated = true
-
-			findInfoAboutLastBlocks(epochHandler, firstBlockDataOnNextEpoch.Aefp)
+			}
 
 		}
 
 	}
+
+}
+
+func loadAggregatedEpochFinalizationProof(epochIndex int) *structures.AggregatedEpochFinalizationProof {
+
+	key := []byte("AEFP:" + strconv.Itoa(epochIndex))
+
+	if raw, err := databases.EPOCH_DATA.Get(key, nil); err == nil {
+
+		var proof structures.AggregatedEpochFinalizationProof
+
+		if json.Unmarshal(raw, &proof) == nil {
+
+			return &proof
+
+		}
+
+	}
+
+	return nil
 
 }
 

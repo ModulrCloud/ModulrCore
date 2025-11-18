@@ -54,10 +54,9 @@ func (handler *ExecutionThreadMetadataHandler) GetEpochHandler() EpochDataHandle
 }
 
 type GenerationThreadMetadataHandler struct {
-	EpochFullId          string                            `json:"epochFullId"`
-	PrevHash             string                            `json:"prevHash"`
-	NextIndex            int                               `json:"nextIndex"`
-	AefpForPreviousEpoch *AggregatedEpochFinalizationProof `json:"aefpForPreviousEpoch"`
+	EpochFullId string `json:"epochFullId"`
+	PrevHash    string `json:"prevHash"`
+	NextIndex   int    `json:"nextIndex"`
 }
 
 type AlignmentDataHandler struct {
