@@ -1,0 +1,57 @@
+{
+  "nodeUrl": "http://localhost:7332",
+  "tickMs": 1000,
+  "transactionsPerSender": 2,
+  "requestTimeoutMs": 10000,
+  "defaultPayload": {
+    "memo": "loadgen"
+  },
+  "faucet": {
+    "enabled": true,
+    "listen": ":8080",
+    "senderName": "validator-1",
+    "payload": {
+      "memo": "faucet"
+    }
+  },
+  "senders": [
+    {
+      "name": "validator-1",
+      "publicKey": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEILdhTMVYFz2GP8+uKUA+1FnZTEdN8eHFzbb8400cpEU9",
+      "recipients": [
+        "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+        "GUbYLN5NqmRocMBHqS183r2FQRoUjhx1p5nKyyUBpntQ"
+      ],
+      "amount": 10,
+      "fee": 1,
+      "version": 1
+    },
+    {
+      "name": "validator-2",
+      "publicKey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIJT7NA/u+Df874H2DFRbyg43LpJwlhcRsS3Bv8/FUIZN",
+      "recipients": [
+        "3JAeBnsMedzxjCMNWQYcAXtwGVE9A5DBQyXgWBujtL9R"
+      ],
+      "amount": 15,
+      "fee": 1,
+      "version": 1
+    },
+    {
+      "name": "validator-3",
+      "publicKey": "GUbYLN5NqmRocMBHqS183r2FQRoUjhx1p5nKyyUBpntQ",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEILjvmDeOmyg1/VG2VKQTzsv6lkIizQpjmRsdfEEIHHU8",
+      "recipients": [
+        "EGU4u3Anwahbtbx8F1ZZgFQSg2u49EkrkqMERT9r3q1o",
+        "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK"
+      ],
+      "amount": 20,
+      "fee": 1,
+      "version": 1,
+      "payload": {
+        "memo": "high-volume-sender"
+      }
+    }
+  ]
+}
