@@ -75,8 +75,8 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 			}
 
 			for _, proof := range blk.AnchorsStopProofs {
-				if proof.Index != blk.Index {
-					t.Fatalf("anchor %s block %d has mismatched anchor proof index %d", anchor, i, proof.Index)
+				if proof.Index == 0 {
+					t.Fatalf("anchor %s block %d has zero anchor proof index", anchor, i)
 				}
 				if proof.Hash == "" {
 					t.Fatalf("anchor %s block %d has empty anchor proof hash", anchor, i)
@@ -84,8 +84,8 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 			}
 
 			for _, proof := range blk.LeaderStopProofs {
-				if proof.Index != blk.Index {
-					t.Fatalf("anchor %s block %d has mismatched leader proof index %d", anchor, i, proof.Index)
+				if proof.Index == 0 {
+					t.Fatalf("anchor %s block %d has zero leader proof index", anchor, i)
 				}
 				if proof.Hash == "" {
 					t.Fatalf("anchor %s block %d has empty leader proof hash", anchor, i)
@@ -112,8 +112,8 @@ func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []strin
 			Index:             idx,
 			Hash:              randomHash(rng, "block", i),
 			PrevHash:          prevHash,
-			AnchorsStopProofs: randomAnchorProofSubset(rng, idx, anchors),
-			LeaderStopProofs:  randomLeaderProofSubset(rng, idx, leaders),
+			AnchorsStopProofs: randomAnchorProofSubset(rng, anchors),
+			LeaderStopProofs:  randomLeaderProofSubset(rng, leaders),
 		}
 
 		prevHash = blocks[i].Hash
@@ -132,12 +132,12 @@ func generateTargetAnchorBlocks(rng *rand.Rand, count, targetIndex int, anchors,
 	for i := 0; i < count; i++ {
 		idx := uint(i + 1)
 
-		anchorProofs := randomAnchorProofSubset(rng, idx, anchors)
-		leaderProofs := randomLeaderProofSubset(rng, idx, leaders)
+		anchorProofs := randomAnchorProofSubset(rng, anchors)
+		leaderProofs := randomLeaderProofSubset(rng, leaders)
 
 		for _, anchor := range anchorAssignments[i] {
 			anchorProofs[anchor] = AnchorStopProof{
-				Index:  idx,
+				Index:  randomProofIndex(rng),
 				Hash:   randomHash(rng, fmt.Sprintf("anchor-%s", anchor), i),
 				Proofs: randomProofs(rng, "anchor-proof", 2),
 			}
@@ -145,7 +145,7 @@ func generateTargetAnchorBlocks(rng *rand.Rand, count, targetIndex int, anchors,
 
 		for _, leader := range leaderAssignments[i] {
 			leaderProofs[leader] = LeaderStopProof{
-				Index:  idx,
+				Index:  randomProofIndex(rng),
 				Hash:   randomHash(rng, fmt.Sprintf("leader-%s", leader), i),
 				Proofs: randomProofs(rng, "leader-proof", 3),
 			}
@@ -209,13 +209,13 @@ func validateTargetAnchorCoverage(t *testing.T, anchor string, blocks []Block, p
 	}
 }
 
-func randomAnchorProofSubset(rng *rand.Rand, idx uint, anchors []string) map[string]AnchorStopProof {
+func randomAnchorProofSubset(rng *rand.Rand, anchors []string) map[string]AnchorStopProof {
 	proofs := make(map[string]AnchorStopProof)
 	for _, anchor := range anchors {
 		if rng.Intn(2) == 0 { // roughly half will include the proof
 			proofs[anchor] = AnchorStopProof{
-				Index:  idx,
-				Hash:   randomHash(rng, fmt.Sprintf("anchor-%s", anchor), int(idx)),
+				Index:  randomProofIndex(rng),
+				Hash:   randomHash(rng, fmt.Sprintf("anchor-%s", anchor), rng.Int()),
 				Proofs: randomProofs(rng, "anchor-proof", 1),
 			}
 		}
@@ -223,13 +223,13 @@ func randomAnchorProofSubset(rng *rand.Rand, idx uint, anchors []string) map[str
 	return proofs
 }
 
-func randomLeaderProofSubset(rng *rand.Rand, idx uint, leaders []string) map[string]LeaderStopProof {
+func randomLeaderProofSubset(rng *rand.Rand, leaders []string) map[string]LeaderStopProof {
 	proofs := make(map[string]LeaderStopProof)
 	for _, leader := range leaders {
 		if rng.Intn(2) == 0 {
 			proofs[leader] = LeaderStopProof{
-				Index:  idx,
-				Hash:   randomHash(rng, fmt.Sprintf("leader-%s", leader), int(idx)),
+				Index:  randomProofIndex(rng),
+				Hash:   randomHash(rng, fmt.Sprintf("leader-%s", leader), rng.Int()),
 				Proofs: randomProofs(rng, "leader-proof", 1),
 			}
 		}
@@ -265,10 +265,14 @@ func keysFromAnchorProofs(m map[string]AnchorStopProof) []string {
 
 func keysFromLeaderProofs(m map[string]LeaderStopProof) []string {
 	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+	for name, proof := range m {
+		keys = append(keys, fmt.Sprintf("%s(%d)", name, proof.Index))
 	}
 	return keys
+}
+
+func randomProofIndex(rng *rand.Rand) uint {
+	return uint(rng.Intn(20) + 1)
 }
 
 func contains(items []string, target string) bool {
