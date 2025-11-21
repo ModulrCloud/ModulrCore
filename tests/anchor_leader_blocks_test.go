@@ -257,8 +257,8 @@ func visualizeAnchors(t *testing.T, anchors, leaders []string, blocksByAnchor ma
 
 func keysFromAnchorProofs(m map[string]AnchorStopProof) []string {
 	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+	for name, proof := range m {
+		keys = append(keys, fmt.Sprintf("%s(%d)", name, proof.Index))
 	}
 	return keys
 }
