@@ -33,21 +33,32 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	t.Logf("generated anchors: %v", anchors)
-	t.Logf("generated leaders: %v", leaders)
+	selectedAnchorIndex := rng.Intn(len(anchors))
+	selectedAnchor := anchors[selectedAnchorIndex]
+	t.Logf("selected anchor: %s (index %d)", selectedAnchor, selectedAnchorIndex)
 
 	blocksByAnchor := make(map[string][]Block, len(anchors))
-	for _, anchor := range anchors {
-		count := rng.Intn(11) // 0..10 inclusive
-		t.Logf("anchor %s will generate %d blocks", anchor, count)
-		blocksByAnchor[anchor] = generateBlocksForAnchor(rng, count, anchors, leaders)
+	for idx, anchor := range anchors {
+		var count int
+		if idx == selectedAnchorIndex {
+			count = rng.Intn(10) + 1 // ensure at least one block to host required proofs
+		} else {
+			count = rng.Intn(11)
+		}
+
+		if idx == selectedAnchorIndex {
+			blocksByAnchor[anchor] = generateTargetAnchorBlocks(rng, count, idx, anchors, leaders)
+		} else {
+			blocksByAnchor[anchor] = generateBlocksForAnchor(rng, count, anchors, leaders)
+		}
 	}
 
 	if len(blocksByAnchor) != len(anchors) {
 		t.Fatalf("expected %d anchor entries, got %d", len(anchors), len(blocksByAnchor))
 	}
 
-	for anchor, blocks := range blocksByAnchor {
+	for idx, anchor := range anchors {
+		blocks := blocksByAnchor[anchor]
 		if len(blocks) > 10 {
 			t.Fatalf("anchor %s generated too many blocks: %d", anchor, len(blocks))
 		}
@@ -55,7 +66,6 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 		var prevHash string
 		for i, blk := range blocks {
 			expectedIndex := uint(i + 1)
-			t.Logf("anchor %s inspecting block %d: hash=%s prev_hash=%s", anchor, expectedIndex, blk.Hash, blk.PrevHash)
 			if blk.Index != expectedIndex {
 				t.Fatalf("anchor %s block %d has unexpected index %d", anchor, i, blk.Index)
 			}
@@ -64,25 +74,12 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 				t.Fatalf("anchor %s block %d has prev hash %q, expected %q", anchor, i, blk.PrevHash, prevHash)
 			}
 
-			if len(blk.AnchorsStopProofs) != len(anchors) {
-				t.Fatalf("anchor %s block %d missing anchor proofs: expected %d, got %d", anchor, i, len(anchors), len(blk.AnchorsStopProofs))
-			}
-			t.Logf("anchor %s block %d anchor proofs: %d entries", anchor, expectedIndex, len(blk.AnchorsStopProofs))
-
-			if len(blk.LeaderStopProofs) != len(leaders) {
-				t.Fatalf("anchor %s block %d missing leader proofs: expected %d, got %d", anchor, i, len(leaders), len(blk.LeaderStopProofs))
-			}
-			t.Logf("anchor %s block %d leader proofs: %d entries", anchor, expectedIndex, len(blk.LeaderStopProofs))
-
 			for _, proof := range blk.AnchorsStopProofs {
 				if proof.Index != blk.Index {
 					t.Fatalf("anchor %s block %d has mismatched anchor proof index %d", anchor, i, proof.Index)
 				}
 				if proof.Hash == "" {
 					t.Fatalf("anchor %s block %d has empty anchor proof hash", anchor, i)
-				}
-				if len(proof.Proofs) == 0 {
-					t.Fatalf("anchor %s block %d expected anchor proof map to be populated", anchor, i)
 				}
 			}
 
@@ -93,14 +90,17 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 				if proof.Hash == "" {
 					t.Fatalf("anchor %s block %d has empty leader proof hash", anchor, i)
 				}
-				if len(proof.Proofs) == 0 {
-					t.Fatalf("anchor %s block %d expected leader proof map to be populated", anchor, i)
-				}
 			}
 
 			prevHash = blk.Hash
 		}
+
+		if idx == selectedAnchorIndex {
+			validateTargetAnchorCoverage(t, anchor, blocks, anchors[:idx], leaders)
+		}
 	}
+
+	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
 }
 
 func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []string) []Block {
@@ -108,10 +108,34 @@ func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []strin
 	var prevHash string
 	for i := 0; i < count; i++ {
 		idx := uint(i + 1)
-		anchorProofs := make(map[string]AnchorStopProof, len(anchors))
-		leaderProofs := make(map[string]LeaderStopProof, len(leaders))
+		blocks[i] = Block{
+			Index:             idx,
+			Hash:              randomHash(rng, "block", i),
+			PrevHash:          prevHash,
+			AnchorsStopProofs: randomAnchorProofSubset(rng, idx, anchors),
+			LeaderStopProofs:  randomLeaderProofSubset(rng, idx, leaders),
+		}
 
-		for _, anchor := range anchors {
+		prevHash = blocks[i].Hash
+	}
+
+	return blocks
+}
+
+func generateTargetAnchorBlocks(rng *rand.Rand, count, targetIndex int, anchors, leaders []string) []Block {
+	blocks := make([]Block, count)
+	var prevHash string
+
+	anchorAssignments := distributeProofs(rng, count, anchors[:targetIndex])
+	leaderAssignments := distributeProofs(rng, count, leaders)
+
+	for i := 0; i < count; i++ {
+		idx := uint(i + 1)
+
+		anchorProofs := randomAnchorProofSubset(rng, idx, anchors)
+		leaderProofs := randomLeaderProofSubset(rng, idx, leaders)
+
+		for _, anchor := range anchorAssignments[i] {
 			anchorProofs[anchor] = AnchorStopProof{
 				Index:  idx,
 				Hash:   randomHash(rng, fmt.Sprintf("anchor-%s", anchor), i),
@@ -119,7 +143,7 @@ func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []strin
 			}
 		}
 
-		for _, leader := range leaders {
+		for _, leader := range leaderAssignments[i] {
 			leaderProofs[leader] = LeaderStopProof{
 				Index:  idx,
 				Hash:   randomHash(rng, fmt.Sprintf("leader-%s", leader), i),
@@ -139,6 +163,121 @@ func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []strin
 	}
 
 	return blocks
+}
+
+func distributeProofs(rng *rand.Rand, blockCount int, names []string) map[int][]string {
+	assignments := make(map[int][]string, blockCount)
+	if blockCount == 0 {
+		return assignments
+	}
+
+	for _, name := range names {
+		blockIndex := rng.Intn(blockCount)
+		assignments[blockIndex] = append(assignments[blockIndex], name)
+	}
+
+	return assignments
+}
+
+func validateTargetAnchorCoverage(t *testing.T, anchor string, blocks []Block, previousAnchors, leaders []string) {
+	seenAnchors := make(map[string]struct{}, len(previousAnchors))
+	seenLeaders := make(map[string]struct{}, len(leaders))
+
+	for _, blk := range blocks {
+		for name, proof := range blk.AnchorsStopProofs {
+			if contains(previousAnchors, name) && len(proof.Proofs) > 0 {
+				seenAnchors[name] = struct{}{}
+			}
+		}
+		for name, proof := range blk.LeaderStopProofs {
+			if len(proof.Proofs) > 0 {
+				seenLeaders[name] = struct{}{}
+			}
+		}
+	}
+
+	for _, prev := range previousAnchors {
+		if _, ok := seenAnchors[prev]; !ok {
+			t.Fatalf("anchor %s is missing coverage for previous anchor %s", anchor, prev)
+		}
+	}
+
+	for _, leader := range leaders {
+		if _, ok := seenLeaders[leader]; !ok {
+			t.Fatalf("anchor %s is missing coverage for leader %s", anchor, leader)
+		}
+	}
+}
+
+func randomAnchorProofSubset(rng *rand.Rand, idx uint, anchors []string) map[string]AnchorStopProof {
+	proofs := make(map[string]AnchorStopProof)
+	for _, anchor := range anchors {
+		if rng.Intn(2) == 0 { // roughly half will include the proof
+			proofs[anchor] = AnchorStopProof{
+				Index:  idx,
+				Hash:   randomHash(rng, fmt.Sprintf("anchor-%s", anchor), int(idx)),
+				Proofs: randomProofs(rng, "anchor-proof", 1),
+			}
+		}
+	}
+	return proofs
+}
+
+func randomLeaderProofSubset(rng *rand.Rand, idx uint, leaders []string) map[string]LeaderStopProof {
+	proofs := make(map[string]LeaderStopProof)
+	for _, leader := range leaders {
+		if rng.Intn(2) == 0 {
+			proofs[leader] = LeaderStopProof{
+				Index:  idx,
+				Hash:   randomHash(rng, fmt.Sprintf("leader-%s", leader), int(idx)),
+				Proofs: randomProofs(rng, "leader-proof", 1),
+			}
+		}
+	}
+	return proofs
+}
+
+func visualizeAnchors(t *testing.T, anchors, leaders []string, blocksByAnchor map[string][]Block) {
+	for _, anchor := range anchors {
+		blocks := blocksByAnchor[anchor]
+		t.Logf("anchor %s: %d blocks", anchor, len(blocks))
+		for _, blk := range blocks {
+			anchorProofKeys := keysFromAnchorProofs(blk.AnchorsStopProofs)
+			leaderProofKeys := keysFromLeaderProofs(blk.LeaderStopProofs)
+			t.Logf("  block #%d hash=%s prev=%s", blk.Index, blk.Hash, blk.PrevHash)
+			t.Logf("    anchor proofs -> %v", anchorProofKeys)
+			t.Logf("    leader proofs -> %v", leaderProofKeys)
+		}
+		if len(blocks) == 0 {
+			t.Log("  (no blocks)")
+		}
+		t.Log("------------------------------")
+	}
+}
+
+func keysFromAnchorProofs(m map[string]AnchorStopProof) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func keysFromLeaderProofs(m map[string]LeaderStopProof) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func contains(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }
 
 func generateSequential(prefix string, count int) []string {
