@@ -30,6 +30,10 @@ type Block struct {
 func TestGenerateAnchorBlocks(t *testing.T) {
 	anchors := generateSequential("anchor", 5)
 	leaders := generateSequential("leader", 6)
+	anchorPositions := make(map[string]int, len(anchors))
+	for idx, name := range anchors {
+		anchorPositions[name] = idx
+	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -53,7 +57,7 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 		if idx == selectedAnchorIndex {
 			blocksByAnchor[anchor] = generateTargetAnchorBlocks(rng, count, idx, anchors, leaders, blockCounts)
 		} else {
-			blocksByAnchor[anchor] = generateBlocksForAnchor(rng, count, anchors, leaders, blockCounts)
+			blocksByAnchor[anchor] = generateBlocksForAnchor(rng, count, idx, anchors, leaders, blockCounts)
 		}
 	}
 
@@ -79,6 +83,9 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 			}
 
 			for name, proof := range blk.AnchorsStopProofs {
+				if anchorPositions[name] >= idx {
+					t.Fatalf("anchor %s block %d references future anchor proof %s", anchor, i, name)
+				}
 				anchorBlockCount := blockCounts[name]
 				if anchorBlockCount == 0 {
 					if proof.Index != 0 {
@@ -112,7 +119,7 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
 }
 
-func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []string, blockCounts map[string]int) []Block {
+func generateBlocksForAnchor(rng *rand.Rand, count, anchorIndex int, anchors, leaders []string, blockCounts map[string]int) []Block {
 	blocks := make([]Block, count)
 	var prevHash string
 	for i := 0; i < count; i++ {
@@ -121,7 +128,7 @@ func generateBlocksForAnchor(rng *rand.Rand, count int, anchors, leaders []strin
 			Index:             idx,
 			Hash:              randomHash(rng, "block", i),
 			PrevHash:          prevHash,
-			AnchorsStopProofs: randomAnchorProofSubset(rng, anchors, blockCounts),
+			AnchorsStopProofs: randomAnchorProofSubset(rng, anchors[:anchorIndex], blockCounts),
 			LeaderStopProofs:  randomLeaderProofSubset(rng, leaders),
 		}
 
@@ -141,7 +148,7 @@ func generateTargetAnchorBlocks(rng *rand.Rand, count, targetIndex int, anchors,
 	for i := 0; i < count; i++ {
 		idx := uint(i + 1)
 
-		anchorProofs := randomAnchorProofSubset(rng, anchors, blockCounts)
+		anchorProofs := randomAnchorProofSubset(rng, anchors[:targetIndex], blockCounts)
 		leaderProofs := randomLeaderProofSubset(rng, leaders)
 
 		for _, anchor := range anchorAssignments[i] {
