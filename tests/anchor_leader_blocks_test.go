@@ -65,6 +65,8 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 		t.Fatalf("expected %d anchor entries, got %d", len(anchors), len(blocksByAnchor))
 	}
 
+	leaderFinal, anchorFinal := aggregateStopProofs(selectedAnchorIndex, anchors, anchorPositions, blocksByAnchor)
+
 	for idx, anchor := range anchors {
 		blocks := blocksByAnchor[anchor]
 		if len(blocks) > 10 {
@@ -116,7 +118,11 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 		}
 	}
 
+	validateLeaderAggregation(t, leaders, leaderFinal)
+	validateAnchorAggregation(t, anchors[:selectedAnchorIndex], anchorFinal)
+
 	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
+	visualizeAggregatedProofs(t, leaderFinal, anchorFinal)
 }
 
 func generateBlocksForAnchor(rng *rand.Rand, count, anchorIndex int, anchors, leaders []string, blockCounts map[string]int) []Block {
@@ -225,6 +231,58 @@ func validateTargetAnchorCoverage(t *testing.T, anchor string, blocks []Block, p
 	}
 }
 
+func aggregateStopProofs(selectedAnchorIndex int, anchors []string, anchorPositions map[string]int, blocksByAnchor map[string][]Block) (map[string]LeaderStopProof, map[string]AnchorStopProof) {
+	leaderFinal := make(map[string]LeaderStopProof)
+	anchorFinal := make(map[string]AnchorStopProof)
+
+	for ai := selectedAnchorIndex; ai >= 0; ai-- {
+		anchor := anchors[ai]
+		blocks := blocksByAnchor[anchor]
+		for bi := len(blocks) - 1; bi >= 0; bi-- {
+			blk := blocks[bi]
+			for name, proof := range blk.LeaderStopProofs {
+				leaderFinal[name] = proof
+			}
+
+			for name, proof := range blk.AnchorsStopProofs {
+				if anchorPositions[name] >= ai {
+					continue
+				}
+				anchorFinal[name] = proof
+			}
+		}
+	}
+
+	return leaderFinal, anchorFinal
+}
+
+func validateLeaderAggregation(t *testing.T, leaders []string, leaderFinal map[string]LeaderStopProof) {
+	for _, leader := range leaders {
+		proof, ok := leaderFinal[leader]
+		if !ok {
+			t.Fatalf("leader %s missing from aggregated mapping", leader)
+		}
+		if proof.Index == 0 {
+			t.Fatalf("leader %s has zero index in aggregated mapping", leader)
+		}
+		if proof.Hash == "" {
+			t.Fatalf("leader %s has empty hash in aggregated mapping", leader)
+		}
+	}
+}
+
+func validateAnchorAggregation(t *testing.T, priorAnchors []string, anchorFinal map[string]AnchorStopProof) {
+	for _, anchor := range priorAnchors {
+		proof, ok := anchorFinal[anchor]
+		if !ok {
+			t.Fatalf("anchor %s missing from aggregated mapping", anchor)
+		}
+		if proof.Hash == "" {
+			t.Fatalf("anchor %s has empty hash in aggregated mapping", anchor)
+		}
+	}
+}
+
 func randomAnchorProofSubset(rng *rand.Rand, anchors []string, blockCounts map[string]int) map[string]AnchorStopProof {
 	proofs := make(map[string]AnchorStopProof)
 	for _, anchor := range anchors {
@@ -285,6 +343,26 @@ func keysFromLeaderProofs(m map[string]LeaderStopProof) []string {
 		keys = append(keys, fmt.Sprintf("%s(%d)", name, proof.Index))
 	}
 	return keys
+}
+
+func visualizeAggregatedProofs(t *testing.T, leaders map[string]LeaderStopProof, anchors map[string]AnchorStopProof) {
+	t.Log("aggregated leader proofs (earliest wins):")
+	for name, proof := range leaders {
+		keys := make([]string, 0, len(proof.Proofs))
+		for k := range proof.Proofs {
+			keys = append(keys, k)
+		}
+		t.Logf("  %s -> index=%d hash=%s proofs=%v", name, proof.Index, proof.Hash, keys)
+	}
+
+	t.Log("aggregated anchor proofs (earliest wins):")
+	for name, proof := range anchors {
+		keys := make([]string, 0, len(proof.Proofs))
+		for k := range proof.Proofs {
+			keys = append(keys, k)
+		}
+		t.Logf("  %s -> index=%d hash=%s proofs=%v", name, proof.Index, proof.Hash, keys)
+	}
 }
 
 func randomProofIndex(rng *rand.Rand) uint {
