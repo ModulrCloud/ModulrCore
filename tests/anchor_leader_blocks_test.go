@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -123,6 +124,116 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 
 	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
 	visualizeAggregatedProofs(t, leaderFinal, anchorFinal)
+}
+
+func TestAggregateFromDifferentAnchorViews(t *testing.T) {
+	anchors := generateSequential("anchor", 5)
+	leaders := generateSequential("leader", 6)
+	anchorPositions := make(map[string]int, len(anchors))
+	for idx, name := range anchors {
+		anchorPositions[name] = idx
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	firstTarget := rng.Intn(len(anchors))
+	secondTarget := rng.Intn(len(anchors) - 1)
+	if secondTarget >= firstTarget {
+		secondTarget++
+	}
+
+	if secondTarget < firstTarget {
+		firstTarget, secondTarget = secondTarget, firstTarget
+	}
+
+	t.Logf("selected anchors: %s (index %d), %s (index %d)", anchors[firstTarget], firstTarget, anchors[secondTarget], secondTarget)
+
+	blockCounts := make(map[string]int, len(anchors))
+	for idx, anchor := range anchors {
+		if idx == firstTarget || idx == secondTarget {
+			blockCounts[anchor] = rng.Intn(10) + 1
+		} else {
+			blockCounts[anchor] = rng.Intn(11)
+		}
+	}
+
+	blocksByAnchor := make(map[string][]Block, len(anchors))
+	for idx, anchor := range anchors {
+		count := blockCounts[anchor]
+		switch idx {
+		case firstTarget, secondTarget:
+			blocksByAnchor[anchor] = generateTargetAnchorBlocks(rng, count, idx, anchors, leaders, blockCounts)
+		default:
+			blocksByAnchor[anchor] = generateBlocksForAnchor(rng, count, idx, anchors, leaders, blockCounts)
+		}
+	}
+
+	if len(blocksByAnchor) != len(anchors) {
+		t.Fatalf("expected %d anchor entries, got %d", len(anchors), len(blocksByAnchor))
+	}
+
+	firstLeaderFinal, firstAnchorFinal := aggregateStopProofs(firstTarget, anchors, anchorPositions, blocksByAnchor)
+	secondLeaderFinal, secondAnchorFinal := aggregateStopProofs(secondTarget, anchors, anchorPositions, blocksByAnchor)
+
+	for idx, anchor := range anchors {
+		blocks := blocksByAnchor[anchor]
+		var prevHash string
+		for i, blk := range blocks {
+			expectedIndex := uint(i + 1)
+			if blk.Index != expectedIndex {
+				t.Fatalf("anchor %s block %d has unexpected index %d", anchor, i, blk.Index)
+			}
+
+			if blk.PrevHash != prevHash {
+				t.Fatalf("anchor %s block %d has prev hash %q, expected %q", anchor, i, blk.PrevHash, prevHash)
+			}
+
+			for name, proof := range blk.AnchorsStopProofs {
+				if anchorPositions[name] >= idx {
+					t.Fatalf("anchor %s block %d references future anchor proof %s", anchor, i, name)
+				}
+				anchorBlockCount := blockCounts[name]
+				if anchorBlockCount == 0 {
+					if proof.Index != 0 {
+						t.Fatalf("anchor %s block %d has anchor proof index %d exceeding available blocks for %s", anchor, i, proof.Index, name)
+					}
+				} else if proof.Index == 0 || int(proof.Index) > anchorBlockCount {
+					t.Fatalf("anchor %s block %d has anchor proof index %d outside range 1-%d for %s", anchor, i, proof.Index, anchorBlockCount, name)
+				}
+				if proof.Hash == "" {
+					t.Fatalf("anchor %s block %d has empty anchor proof hash", anchor, i)
+				}
+			}
+
+			for _, proof := range blk.LeaderStopProofs {
+				if proof.Index == 0 {
+					t.Fatalf("anchor %s block %d has zero leader proof index", anchor, i)
+				}
+				if proof.Hash == "" {
+					t.Fatalf("anchor %s block %d has empty leader proof hash", anchor, i)
+				}
+			}
+
+			prevHash = blk.Hash
+		}
+
+		if idx == firstTarget || idx == secondTarget {
+			validateTargetAnchorCoverage(t, anchor, blocks, anchors[:idx], leaders)
+		}
+	}
+
+	validateLeaderAggregation(t, leaders, firstLeaderFinal)
+	validateLeaderAggregation(t, leaders, secondLeaderFinal)
+	validateAnchorAggregation(t, anchors[:firstTarget], firstAnchorFinal)
+	validateAnchorAggregation(t, anchors[:secondTarget], secondAnchorFinal)
+
+	if !leaderProofMapsEqual(firstLeaderFinal, secondLeaderFinal) {
+		t.Fatalf("aggregated leader mappings differ between anchors %s and %s", anchors[firstTarget], anchors[secondTarget])
+	}
+
+	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
+	visualizeAggregatedProofs(t, firstLeaderFinal, firstAnchorFinal)
+	visualizeAggregatedProofs(t, secondLeaderFinal, secondAnchorFinal)
 }
 
 func generateBlocksForAnchor(rng *rand.Rand, count, anchorIndex int, anchors, leaders []string, blockCounts map[string]int) []Block {
@@ -374,6 +485,24 @@ func randomAnchorProofIndex(rng *rand.Rand, maxCount int) uint {
 		return 0
 	}
 	return uint(rng.Intn(maxCount) + 1)
+}
+
+func leaderProofMapsEqual(a, b map[string]LeaderStopProof) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, v := range a {
+		other, ok := b[k]
+		if !ok {
+			return false
+		}
+		if !reflect.DeepEqual(v, other) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func contains(items []string, target string) bool {
