@@ -377,25 +377,39 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 		return batch
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	type signatureResult struct {
+		pubKey    string
+		signature string
+	}
+
 	httpClient := &http.Client{Timeout: 2 * time.Second}
+	signaturesChan := make(chan signatureResult, len(quorumMembers))
+	var wg sync.WaitGroup
+
 	for _, member := range quorumMembers {
 		if member.PubKey == globals.CONFIGURATION.PublicKey {
 			continue
 		}
 
-		req, err := http.NewRequest(http.MethodPost, member.Url+"/delayed_transactions_signature", bytes.NewBuffer(reqBody))
-		if err != nil {
-			continue
-		}
+		wg.Add(1)
+		go func(member structures.QuorumUrlAndPubkey) {
+			defer wg.Done()
 
-		req.Header.Set("Content-Type", "application/json")
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, member.Url+"/delayed_transactions_signature", bytes.NewBuffer(reqBody))
+			if err != nil {
+				return
+			}
 
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			continue
-		}
+			req.Header.Set("Content-Type", "application/json")
 
-		func() {
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				return
+			}
+
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
 				return
@@ -413,11 +427,26 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 				return
 			}
 
-			proofs[member.PubKey] = signResponse.Signature
-		}()
+			select {
+			case signaturesChan <- signatureResult{pubKey: member.PubKey, signature: signResponse.Signature}:
+			case <-ctx.Done():
+			}
+		}(member)
+	}
 
+	go func() {
+		wg.Wait()
+		close(signaturesChan)
+	}()
+
+	for signResult := range signaturesChan {
+		if _, alreadyAdded := proofs[signResult.pubKey]; alreadyAdded {
+			continue
+		}
+
+		proofs[signResult.pubKey] = signResult.signature
 		if len(proofs) >= majority {
-			break
+			cancel()
 		}
 	}
 
