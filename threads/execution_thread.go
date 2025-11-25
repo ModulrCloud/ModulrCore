@@ -10,6 +10,7 @@ import (
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/system_contracts"
 	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/modulrcloud/modulr-core/websocket_pack"
 
@@ -435,6 +436,28 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64) {
 
 		accountFrom := utils.GetAccountFromExecThreadState(tx.From)
 
+		if delayedTxPayload, delayedTxType, isDelayed := getDelayedTransactionPayload(tx); isDelayed {
+
+			if !validateDelayedTransaction(delayedTxType, tx, delayedTxPayload, accountFrom) {
+
+				return false, 0
+
+			}
+
+			if err := saveDelayedTransactionPayload(delayedTxPayload); err != nil {
+
+				return false, 0
+
+			}
+
+			accountFrom.Balance -= tx.Fee
+
+			accountFrom.Nonce++
+
+			return true, tx.Fee
+
+		}
+
 		accountTo := utils.GetAccountFromExecThreadState(tx.To)
 
 		totalSpend := tx.Fee + tx.Amount
@@ -456,6 +479,132 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64) {
 	}
 
 	return false, 0
+
+}
+
+func getDelayedTransactionPayload(tx *structures.Transaction) (map[string]string, string, bool) {
+
+	if tx.Payload == nil {
+
+		return nil, "", false
+
+	}
+
+	payloadType, ok := tx.Payload["type"]
+
+	if !ok {
+
+		return nil, "", false
+
+	}
+
+	payloadTypeStr, ok := payloadType.(string)
+
+	if !ok {
+
+		return nil, "", false
+
+	}
+
+	if _, exists := system_contracts.DELAYED_TRANSACTIONS_MAP[payloadTypeStr]; !exists {
+
+		return nil, "", false
+
+	}
+
+	payload := make(map[string]string)
+
+	for key, value := range tx.Payload {
+
+		payload[key] = fmt.Sprint(value)
+
+	}
+
+	return payload, payloadTypeStr, true
+
+}
+
+func validateDelayedTransaction(delayedTxType string, tx *structures.Transaction, payload map[string]string, accountFrom *structures.Account) bool {
+
+	if accountFrom == nil {
+
+		return false
+
+	}
+
+	if tx.Nonce != accountFrom.Nonce+1 {
+
+		return false
+
+	}
+
+	if accountFrom.Balance < tx.Fee {
+
+		return false
+
+	}
+
+	switch delayedTxType {
+
+	case "createValidator", "updateValidator":
+
+		return tx.From == payload["creator"]
+
+	case "stake":
+
+		amount, err := strconv.ParseUint(payload["amount"], 10, 64)
+
+		if err != nil {
+
+			return false
+
+		}
+
+		return accountFrom.Balance >= amount+tx.Fee
+
+	default:
+
+		return true
+
+	}
+
+}
+
+func saveDelayedTransactionPayload(payload map[string]string) error {
+
+	epochIndex := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id
+
+	delayedTxKey := fmt.Sprintf("DELAYED_TRANSACTIONS:%d", epochIndex+2)
+
+	cachedPayloads := make([]map[string]string, 0)
+
+	rawCachedPayloads, err := databases.STATE.Get([]byte(delayedTxKey), nil)
+
+	if err == nil {
+
+		if jsonErr := json.Unmarshal(rawCachedPayloads, &cachedPayloads); jsonErr != nil {
+
+			cachedPayloads = make([]map[string]string, 0)
+
+		}
+
+	} else if err != leveldb.ErrNotFound {
+
+		return err
+
+	}
+
+	cachedPayloads = append(cachedPayloads, payload)
+
+	serializedPayloads, err := json.Marshal(cachedPayloads)
+
+	if err != nil {
+
+		return err
+
+	}
+
+	return databases.STATE.Put([]byte(delayedTxKey), serializedPayloads, nil)
 
 }
 
