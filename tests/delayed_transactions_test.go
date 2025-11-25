@@ -1,6 +1,8 @@
 package tests
 
 import (
+	_ "github.com/modulrcloud/modulr-core/tests/testenv"
+
 	"path/filepath"
 	"testing"
 
