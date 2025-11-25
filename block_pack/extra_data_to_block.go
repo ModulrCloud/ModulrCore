@@ -7,10 +7,8 @@ import (
 )
 
 type ExtraDataToBlock struct {
-	Rest                            map[string]string                                    `json:"rest"`
-	AefpForPreviousEpoch            *structures.AggregatedEpochFinalizationProof         `json:"aefpForPreviousEpoch"`
-	DelayedTransactionsBatch        structures.DelayedTransactionsBatch                  `json:"delayedTxsBatch"`
-	AggregatedLeadersRotationProofs map[string]*structures.AggregatedLeaderRotationProof `json:"aggregatedLeadersRotationProofs"`
+	Rest                     map[string]string                   `json:"rest"`
+	DelayedTransactionsBatch structures.DelayedTransactionsBatch `json:"delayedTxsBatch"`
 }
 
 func (ed *ExtraDataToBlock) UnmarshalJSON(data []byte) error {
@@ -25,10 +23,6 @@ func (ed *ExtraDataToBlock) UnmarshalJSON(data []byte) error {
 
 	if aux.Rest == nil {
 		aux.Rest = make(map[string]string)
-	}
-
-	if aux.AggregatedLeadersRotationProofs == nil {
-		aux.AggregatedLeadersRotationProofs = make(map[string]*structures.AggregatedLeaderRotationProof)
 	}
 
 	*ed = ExtraDataToBlock(aux)
