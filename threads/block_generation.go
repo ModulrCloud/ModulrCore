@@ -395,7 +395,7 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 		}
 
 		wg.Add(1)
-		go func(member structures.QuorumUrlAndPubkey) {
+		go func(member structures.QuorumMemberData) {
 			defer wg.Done()
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, member.Url+"/delayed_transactions_signature", bytes.NewBuffer(reqBody))
