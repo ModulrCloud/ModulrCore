@@ -10,6 +10,7 @@ import (
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/system_contracts"
 	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/modulrcloud/modulr-core/websocket_pack"
 
@@ -253,103 +254,75 @@ func executeBlock(block *block_pack.Block) {
 	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
 
 		currentEpochIndex := epochHandlerRef.EpochDataHandler.Id
-
 		currentBlockId := strconv.Itoa(currentEpochIndex) + ":" + block.Creator + ":" + strconv.Itoa(block.Index)
 
 		// To change the state atomically - prepare the atomic batch
-
 		stateBatch := new(leveldb.Batch)
 
 		blockFees := uint64(0)
+		delayedTxPayloadsForBatch := make([]map[string]string, 0)
 
 		for index, transaction := range block.Transactions {
 
-			_, fee := executeTransaction(&transaction)
-
+			_, fee, delayedPayload, isDelayed := executeTransaction(&transaction)
+			if isDelayed {
+				delayedTxPayloadsForBatch = append(delayedTxPayloadsForBatch, delayedPayload)
+			}
 			blockFees += fee
 
 			if locationBytes, err := json.Marshal(structures.TransactionLocation{Block: currentBlockId, Position: index}); err == nil {
-
 				stateBatch.Put([]byte("TX:"+transaction.Hash()), locationBytes)
-
 			} else {
-
 				panic("Impossible to add transaction location data to atomic batch")
-
 			}
+		}
 
+		if len(delayedTxPayloadsForBatch) > 0 {
+			if err := addDelayedTransactionsToBatch(delayedTxPayloadsForBatch, currentEpochIndex, stateBatch); err != nil {
+				panic("Impossible to add delayed transactions to atomic batch")
+			}
 		}
 
 		// distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
-
 		sendFeesToValidatorAccount(block.Creator, blockFees)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
-
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
-
 				stateBatch.Put([]byte(accountID), accountDataBytes)
-
 			} else {
-
 				panic("Impossible to add new account data to atomic batch")
-
 			}
-
 		}
 
 		for validatorPubkey, validatorStorage := range epochHandlerRef.ValidatorsStoragesCache {
-
 			if dataBytes, err := json.Marshal(validatorStorage); err == nil {
-
 				stateBatch.Put([]byte(validatorPubkey), dataBytes)
-
 			} else {
-
 				panic("Impossible to add validator storage to atomic batch")
-
 			}
-
 		}
 
 		// Update the execution data for progress
-
 		blockHash := block.GetHash()
-
 		blockCreatorData := epochHandlerRef.ExecutionData[block.Creator]
-
 		blockCreatorData.Index = block.Index
-
 		blockCreatorData.Hash = blockHash
-
 		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
 
 		// Finally set the updated execution thread handler to atomic batch
-
 		epochHandlerRef.LastHeight++
-
 		epochHandlerRef.LastBlockHash = blockHash
-
 		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.LastHeight)), []byte(currentBlockId))
-
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
-
 			stateBatch.Put([]byte("ET"), execThreadRawBytes)
-
 		} else {
-
 			panic("Impossible to store updated execution thread version to atomic batch")
-
 		}
 
 		if err := databases.STATE.Write(stateBatch, nil); err == nil {
-
 			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, epochHandlerRef.LastHeight), utils.CYAN_COLOR)
-
 		} else {
-
 			panic("Impossible to commit changes in atomic batch to permanent state")
-
 		}
 
 	}
@@ -429,11 +402,27 @@ func sendFeesToValidatorAccount(blockCreatorPubkey string, feeFromBlock uint64) 
 
 }
 
-func executeTransaction(tx *structures.Transaction) (bool, uint64) {
+func executeTransaction(tx *structures.Transaction) (bool, uint64, map[string]string, bool) {
 
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
 		accountFrom := utils.GetAccountFromExecThreadState(tx.From)
+
+		if delayedTxPayload, delayedTxType, isDelayed := getDelayedTransactionPayload(tx); isDelayed {
+
+			if !validateDelayedTransaction(delayedTxType, tx, delayedTxPayload, accountFrom) {
+
+				return false, 0, nil, false
+
+			}
+
+			accountFrom.Balance -= tx.Fee
+
+			accountFrom.Nonce++
+
+			return true, tx.Fee, delayedTxPayload, true
+
+		}
 
 		accountTo := utils.GetAccountFromExecThreadState(tx.To)
 
@@ -447,16 +436,124 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64) {
 
 			accountFrom.Nonce++
 
-			return true, tx.Fee
+			return true, tx.Fee, nil, false
 
 		}
 
-		return false, 0
+		return false, 0, nil, false
 
 	}
 
-	return false, 0
+	return false, 0, nil, false
 
+}
+
+func getDelayedTransactionPayload(tx *structures.Transaction) (map[string]string, string, bool) {
+
+	if tx.Payload == nil {
+
+		return nil, "", false
+
+	}
+
+	payloadType, ok := tx.Payload["type"]
+
+	if !ok {
+
+		return nil, "", false
+
+	}
+
+	payloadTypeStr, ok := payloadType.(string)
+
+	if !ok {
+
+		return nil, "", false
+
+	}
+
+	if _, exists := system_contracts.DELAYED_TRANSACTIONS_MAP[payloadTypeStr]; !exists {
+
+		return nil, "", false
+
+	}
+
+	payload := make(map[string]string)
+
+	for key, value := range tx.Payload {
+
+		payload[key] = fmt.Sprint(value)
+
+	}
+
+	return payload, payloadTypeStr, true
+
+}
+
+func validateDelayedTransaction(delayedTxType string, tx *structures.Transaction, payload map[string]string, accountFrom *structures.Account) bool {
+
+	if accountFrom == nil {
+
+		return false
+
+	}
+
+	if tx.Nonce != accountFrom.Nonce+1 {
+
+		return false
+
+	}
+
+	if accountFrom.Balance < tx.Fee {
+
+		return false
+
+	}
+
+	switch delayedTxType {
+
+	case "createValidator", "updateValidator":
+
+		return tx.From == payload["creator"]
+
+	case "stake":
+
+		amount, err := strconv.ParseUint(payload["amount"], 10, 64)
+
+		if err != nil {
+
+			return false
+
+		}
+
+		return accountFrom.Balance >= amount+tx.Fee
+
+	default:
+
+		return true
+
+	}
+
+}
+
+func addDelayedTransactionsToBatch(delayedTxPayloads []map[string]string, epochIndex int, batch *leveldb.Batch) error {
+	delayedTxKey := fmt.Sprintf("DELAYED_TRANSACTIONS:%d", epochIndex+2)
+	cachedPayloads := make([]map[string]string, 0)
+	rawCachedPayloads, err := databases.STATE.Get([]byte(delayedTxKey), nil)
+	if err == nil {
+		if jsonErr := json.Unmarshal(rawCachedPayloads, &cachedPayloads); jsonErr != nil {
+			cachedPayloads = make([]map[string]string, 0)
+		}
+	} else if err != leveldb.ErrNotFound {
+		return err
+	}
+	cachedPayloads = append(cachedPayloads, delayedTxPayloads...)
+	serializedPayloads, err := json.Marshal(cachedPayloads)
+	if err != nil {
+		return err
+	}
+	batch.Put([]byte(delayedTxKey), serializedPayloads)
+	return nil
 }
 
 /*
