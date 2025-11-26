@@ -1,10 +1,14 @@
 package default_threads
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/modulrcloud/modulr-core/block_pack"
@@ -78,20 +82,126 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 	epochHandlerRef := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	prevEpochIndex := epochHandlerRef.Id - 2
+	majority := utils.GetQuorumMajority(epochHandlerRef)
 
-	if indexOfLeader != 0 {
-
-		return structures.DelayedTransactionsBatch{
-			EpochIndex:          prevEpochIndex,
-			DelayedTransactions: []map[string]string{},
-			Proofs:              map[string]string{},
-		}
-
+	batch := structures.DelayedTransactionsBatch{
+		EpochIndex:          prevEpochIndex,
+		DelayedTransactions: []map[string]string{},
+		Proofs:              map[string]string{},
 	}
 
-	// var delayedTransactions []map[string]string
+	if indexOfLeader != 0 {
+		return batch
+	}
 
-	return structures.DelayedTransactionsBatch{}
+	delayedTxKey := fmt.Sprintf("DELAYED_TRANSACTIONS:%d", prevEpochIndex)
+	rawDelayedTxs, err := databases.STATE.Get([]byte(delayedTxKey), nil)
+	if err != nil {
+		return batch
+	}
+
+	var delayedTransactions []map[string]string
+	if err := json.Unmarshal(rawDelayedTxs, &delayedTransactions); err != nil {
+		return batch
+	}
+
+	if len(delayedTransactions) == 0 {
+		return batch
+	}
+
+	delayedTxHash := utils.Blake3(string(rawDelayedTxs))
+
+	proofs := map[string]string{
+		globals.CONFIGURATION.PublicKey: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, delayedTxHash),
+	}
+
+	quorumMembers := utils.GetQuorumUrlsAndPubkeys(epochHandlerRef)
+	reqBody, err := json.Marshal(map[string]int{"epochIndex": prevEpochIndex})
+	if err != nil {
+		return batch
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	type signatureResult struct {
+		pubKey    string
+		signature string
+	}
+
+	httpClient := &http.Client{Timeout: 2 * time.Second}
+	signaturesChan := make(chan signatureResult, len(quorumMembers))
+	var wg sync.WaitGroup
+
+	for _, member := range quorumMembers {
+		if member.PubKey == globals.CONFIGURATION.PublicKey {
+			continue
+		}
+
+		wg.Add(1)
+		go func(member structures.QuorumMemberData) {
+			defer wg.Done()
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, member.Url+"/delayed_transactions_signature", bytes.NewBuffer(reqBody))
+			if err != nil {
+				return
+			}
+
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				return
+			}
+
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return
+			}
+
+			var signResponse struct {
+				Signature string `json:"signature"`
+			}
+
+			if err := json.NewDecoder(resp.Body).Decode(&signResponse); err != nil {
+				return
+			}
+
+			if signResponse.Signature == "" {
+				return
+			}
+
+			select {
+			case signaturesChan <- signatureResult{pubKey: member.PubKey, signature: signResponse.Signature}:
+			case <-ctx.Done():
+			}
+		}(member)
+	}
+
+	go func() {
+		wg.Wait()
+		close(signaturesChan)
+	}()
+
+	for signResult := range signaturesChan {
+		if _, alreadyAdded := proofs[signResult.pubKey]; alreadyAdded {
+			continue
+		}
+
+		proofs[signResult.pubKey] = signResult.signature
+		if len(proofs) >= majority {
+			cancel()
+		}
+	}
+
+	if len(proofs) < majority {
+		return batch
+	}
+
+	batch.DelayedTransactions = delayedTransactions
+	batch.Proofs = proofs
+
+	return batch
 
 }
 
