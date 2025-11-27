@@ -7,6 +7,7 @@ import (
 	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -54,6 +55,22 @@ func GetBlockByHeight(ctx *fasthttp.RequestCtx) {
 		ctx.SetContentType("application/json")
 		ctx.Write([]byte(`{"err": "Invalid height"}`))
 		return
+	}
+
+	if absoluteHeight == "x" {
+
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+		lastHeight := handlers.EXECUTION_THREAD_METADATA.Handler.LastHeight
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+		if lastHeight < 0 {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetContentType("application/json")
+			ctx.Write([]byte(`{"err": "Not found"}`))
+			return
+		}
+
+		absoluteHeight = strconv.FormatInt(lastHeight, 10)
 	}
 
 	if _, err := strconv.ParseInt(absoluteHeight, 10, 64); err != nil {
