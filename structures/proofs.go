@@ -22,11 +22,31 @@ func (afp *AggregatedFinalizationProof) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (afp AggregatedFinalizationProof) MarshalJSON() ([]byte, error) {
+	type alias AggregatedFinalizationProof
+
+	if afp.Proofs == nil {
+		afp.Proofs = make(map[string]string)
+	}
+
+	return json.Marshal(alias(afp))
+}
+
 type AggregatedLeaderRotationProof struct {
 	FirstBlockHash string            `json:"firstBlockHash"`
 	SkipIndex      int               `json:"skipIndex"`
 	SkipHash       string            `json:"skipHash"`
 	Proofs         map[string]string `json:"proofs"`
+}
+
+func (alrp AggregatedLeaderRotationProof) MarshalJSON() ([]byte, error) {
+	type alias AggregatedLeaderRotationProof
+
+	if alrp.Proofs == nil {
+		alrp.Proofs = make(map[string]string)
+	}
+
+	return json.Marshal(alias(alrp))
 }
 
 func (alrp *AggregatedLeaderRotationProof) UnmarshalJSON(data []byte) error {
