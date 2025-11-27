@@ -18,6 +18,7 @@ func createRouter() fasthttp.RequestHandler {
 
 	r.GET("/block/{id}", routes.GetBlockById)
 	r.GET("/height/{absoluteHeightIndex}", routes.GetBlockByHeight)
+	r.GET("/last_height", routes.GetLastHeight)
 
 	r.GET("/account/{accountId}", routes.GetAccountById)
 
