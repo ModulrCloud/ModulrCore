@@ -42,7 +42,6 @@ func CloseAll() error {
 			errs = append(errs, fmt.Errorf("close %s: %w", database.name, err))
 		}
 
-		*database.db = nil
 	}
 
 	if len(errs) > 0 {
