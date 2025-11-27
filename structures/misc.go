@@ -30,6 +30,20 @@ type DelayedTransactionsBatch struct {
 	Proofs              map[string]string   `json:"proofs"`
 }
 
+func (dtb DelayedTransactionsBatch) MarshalJSON() ([]byte, error) {
+	type alias DelayedTransactionsBatch
+
+	if dtb.DelayedTransactions == nil {
+		dtb.DelayedTransactions = make([]map[string]string, 0)
+	}
+
+	if dtb.Proofs == nil {
+		dtb.Proofs = make(map[string]string)
+	}
+
+	return json.Marshal(alias(dtb))
+}
+
 func (dtb *DelayedTransactionsBatch) UnmarshalJSON(data []byte) error {
 	type alias DelayedTransactionsBatch
 	var aux alias
