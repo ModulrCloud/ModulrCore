@@ -89,22 +89,6 @@ func GetBlockByHeight(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if absoluteHeight == "x" {
-
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		lastHeight := handlers.EXECUTION_THREAD_METADATA.Handler.LastHeight
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
-
-		if lastHeight < 0 {
-			ctx.SetStatusCode(fasthttp.StatusNotFound)
-			ctx.SetContentType("application/json")
-			ctx.Write([]byte(`{"err": "Not found"}`))
-			return
-		}
-
-		absoluteHeight = strconv.FormatInt(lastHeight, 10)
-	}
-
 	if _, err := strconv.ParseInt(absoluteHeight, 10, 64); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetContentType("application/json")
