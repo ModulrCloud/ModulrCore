@@ -15,6 +15,38 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+type lastHeightResponse struct {
+	LastHeight int64 `json:"lastHeight"`
+}
+
+func GetLastHeight(ctx *fasthttp.RequestCtx) {
+
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	lastHeight := handlers.EXECUTION_THREAD_METADATA.Handler.LastHeight
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if lastHeight < 0 {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Not found"}`))
+		return
+	}
+
+	response, err := json.Marshal(lastHeightResponse{LastHeight: lastHeight})
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to marshal response"}`))
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/json")
+	ctx.Write(response)
+}
+
 func GetBlockById(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
