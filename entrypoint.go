@@ -44,13 +44,10 @@ func RunBlockchain() {
 	//✅ 4.Start a separate thread to work with voting for blocks in a sync way (for security)
 	go threads.LeaderRotationThread()
 
-	//✅ 5.This thread will be responsible to find the first block in each epoch
-	go threads.FirstBlockInEpochMonitor()
-
-	//✅ 6.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
+	//✅ 5.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
 	go threads.SequenceAlignmentThread()
 
-	//✅ 7.Start execution process - take blocks and execute transactions
+	//✅ 6.Start execution process - take blocks and execute transactions
 	go threads.ExecutionThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
