@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,122 +78,6 @@ func (block *Block) SignBlock() {
 func (block *Block) VerifySignature() bool {
 
 	return cryptography.VerifySignature(block.GetHash(), block.Creator, block.Sig)
-
-}
-
-func (block *Block) VerifyAlrpChain(epochHandler *structures.EpochDataHandler, position int) bool {
-
-	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
-
-	arrayIndexer := 0
-
-	arrayForIteration := slices.Clone(epochHandler.LeadersSequence[:position])
-
-	slices.Reverse(arrayForIteration) // we need reversed version
-
-	reachedLeaderWhoCreatedAtLeastOneBlock := false
-
-	for _, leaderPubkey := range arrayForIteration {
-
-		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
-
-			signaIsOk := utils.VerifyAggregatedLeaderRotationProof(alrpForThisLeader, leaderPubkey, epochHandler)
-
-			if signaIsOk {
-
-				arrayIndexer++
-
-				if alrpForThisLeader.SkipIndex >= 0 {
-
-					reachedLeaderWhoCreatedAtLeastOneBlock = true
-
-					break
-
-				}
-
-			} else {
-
-				return false
-
-			}
-
-		} else {
-
-			return false
-
-		}
-
-	}
-
-	if arrayIndexer == position || reachedLeaderWhoCreatedAtLeastOneBlock {
-
-		return true
-
-	}
-
-	return false
-
-}
-
-func (block *Block) VerifyAlrpChainExtended(epochHandler *structures.EpochDataHandler, position int, dontCheckSigna bool) (bool, map[string]structures.ExecutionStatsPerLeaderSequence) {
-
-	aggregatedLeadersRotationProofsRef := block.ExtraData.AggregatedLeadersRotationProofs
-
-	infoAboutFinalBlocksInThisEpoch := make(map[string]structures.ExecutionStatsPerLeaderSequence)
-
-	arrayIndexer := 0
-
-	arrayForIteration := slices.Clone(epochHandler.LeadersSequence[:position])
-
-	slices.Reverse(arrayForIteration) // we need reversed version
-
-	reachedLeaderWhoCreatedAtLeastOneBlock := false
-
-	for _, leaderPubkey := range arrayForIteration {
-
-		if alrpForThisLeader, ok := aggregatedLeadersRotationProofsRef[leaderPubkey]; ok {
-
-			signaIsOk := dontCheckSigna || utils.VerifyAggregatedLeaderRotationProof(alrpForThisLeader, leaderPubkey, epochHandler)
-
-			if signaIsOk {
-
-				infoAboutFinalBlocksInThisEpoch[leaderPubkey] = structures.ExecutionStatsPerLeaderSequence{
-					Index:          alrpForThisLeader.SkipIndex,
-					Hash:           alrpForThisLeader.SkipHash,
-					FirstBlockHash: alrpForThisLeader.FirstBlockHash,
-				}
-
-				arrayIndexer++
-
-				if alrpForThisLeader.SkipIndex >= 0 {
-
-					reachedLeaderWhoCreatedAtLeastOneBlock = true
-
-					break
-
-				}
-
-			} else {
-
-				return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
-
-			}
-
-		} else {
-
-			return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
-
-		}
-
-	}
-
-	if arrayIndexer == position || reachedLeaderWhoCreatedAtLeastOneBlock {
-
-		return true, infoAboutFinalBlocksInThisEpoch
-
-	}
-
-	return false, make(map[string]structures.ExecutionStatsPerLeaderSequence)
 
 }
 

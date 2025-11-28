@@ -21,10 +21,6 @@ func (ed ExtraDataToBlock) MarshalJSON() ([]byte, error) {
 		aux.Rest = nil
 	}
 
-	if aux.AggregatedLeadersRotationProofs != nil && len(aux.AggregatedLeadersRotationProofs) == 0 {
-		aux.AggregatedLeadersRotationProofs = nil
-	}
-
 	return json.Marshal(aux)
 }
 
