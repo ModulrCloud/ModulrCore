@@ -1,4 +1,4 @@
-package default_threads
+package threads
 
 import (
 	"bytes"
@@ -20,22 +20,8 @@ import (
 	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/modulrcloud/modulr-core/websocket_pack"
 
-	"github.com/gorilla/websocket"
 	"github.com/syndtr/goleveldb/leveldb"
 )
-
-type DoubleMap = map[string]map[string][]byte
-
-type RotationProofCollector struct {
-	wsConnMap map[string]*websocket.Conn
-	quorum    []string
-	majority  int
-	timeout   time.Duration
-}
-
-var ALRP_METADATA = make(map[string]*structures.AlrpSkeleton) // previousLeaderPubkey => AlrpData
-
-var WEBSOCKET_CONNECTIONS_FOR_ALRP = make(map[string]*websocket.Conn) // quorumMember => websocket connection handler
 
 func BlocksGenerationThread() {
 

@@ -11,8 +11,7 @@ import (
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/http_pack"
 	"github.com/modulrcloud/modulr-core/structures"
-	"github.com/modulrcloud/modulr-core/threads/anchor_threads"
-	"github.com/modulrcloud/modulr-core/threads/default_threads"
+	"github.com/modulrcloud/modulr-core/threads"
 	"github.com/modulrcloud/modulr-core/utils"
 	"github.com/modulrcloud/modulr-core/websocket_pack"
 
@@ -33,40 +32,26 @@ func RunBlockchain() {
 
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
-	//✅ 1.Thread to find AEFPs and change the epoch for AT
-	go default_threads.EpochRotationThread()
+	//✅ 1.Thread to change the epoch for APPROVEMENT THREAD
+	go threads.EpochRotationThread()
 
 	//✅ 2.Share our blocks within quorum members and get the finalization proofs
-	go default_threads.BlocksSharingAndProofsGrabingThread()
+	go threads.BlocksSharingAndProofsGrabingThread()
 
-	//✅ 3.Thread to propose AEFPs to move to next epoch
-	go default_threads.NewEpochProposerThread()
+	//✅ 3.Start to generate blocks
+	go threads.BlocksGenerationThread()
 
-	//✅ 4.Start to generate blocks
-	go default_threads.BlocksGenerationThread()
+	//✅ 4.Start a separate thread to work with voting for blocks in a sync way (for security)
+	go threads.LeaderRotationThread()
 
-	//✅ 5.Start a separate thread to work with voting for blocks in a sync way (for security)
-	go default_threads.LeaderRotationThread()
+	//✅ 5.This thread will be responsible to find the first block in each epoch
+	go threads.FirstBlockInEpochMonitor()
 
-	//✅ 6.This thread will be responsible to find the first block in each epoch
-	go default_threads.FirstBlockInEpochMonitor()
+	//✅ 6.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
+	go threads.SequenceAlignmentThread()
 
-	//✅ 7.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
-	go default_threads.SequenceAlignmentThread()
-
-	//✅ 8.Start execution process - take blocks and execute transactions
-	go default_threads.ExecutionThread()
-
-	// ------------------ Anchors subnetwork related stuff ------------------
-
-	//✅ 9.Start to generate anchor blocks
-	go anchor_threads.AnchorBlocksGenerationThread()
-
-	//✅ 10.Start to share anchor blocks and grab approvements
-	go anchor_threads.AnchorBlocksSharingAndProofsGrabingThread()
-
-	//✅ 10.Start monitor anchors health
-	go anchor_threads.AnchorsHealthChecker()
+	//✅ 7.Start execution process - take blocks and execute transactions
+	go threads.ExecutionThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
@@ -109,12 +94,6 @@ func prepareBlockchain() error {
 	databases.EPOCH_DATA = utils.OpenDb("EPOCH_DATA")
 	databases.APPROVEMENT_THREAD_METADATA = utils.OpenDb("APPROVEMENT_THREAD_METADATA")
 	databases.FINALIZATION_VOTING_STATS = utils.OpenDb("FINALIZATION_VOTING_STATS")
-
-	// Anchors databases
-
-	databases.ANCHOR_BLOCKS = utils.OpenDb("ANCHOR_BLOCKS")
-	databases.ANCHOR_EPOCH_DATA = utils.OpenDb("ANCHOR_EPOCH_DATA")
-	databases.ANCHOR_FINALIZATION_VOTING_STATS = utils.OpenDb("ANCHOR_FINALIZATION_VOTING_STATS")
 
 	// Load GT - Generation Thread handler
 	if data, err := databases.BLOCKS.Get([]byte("GT"), nil); err == nil {

@@ -1,4 +1,4 @@
-package default_threads
+package threads
 
 import (
 	"encoding/json"
