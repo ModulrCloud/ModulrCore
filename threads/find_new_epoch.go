@@ -1,11 +1,8 @@
 package threads
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/json"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -22,46 +19,11 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-type FirstBlockDataWithAefp struct {
+type FirstBlockData struct {
 	FirstBlockCreator, FirstBlockHash string
-
-	Aefp *structures.AggregatedEpochFinalizationProof
 }
 
-var AEFP_HTTP_CLIENT = &http.Client{Timeout: 2 * time.Second}
-
-var AEFP_AND_FIRST_BLOCK_DATA FirstBlockDataWithAefp
-
-func fetchAefp(ctx context.Context, url string, quorum []string, majority int, epochFullID string, resultCh chan<- *structures.AggregatedEpochFinalizationProof) {
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-
-	if err != nil {
-		return
-	}
-
-	resp, err := AEFP_HTTP_CLIENT.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
-		return
-	}
-
-	var aefp structures.AggregatedEpochFinalizationProof
-	if err := json.NewDecoder(resp.Body).Decode(&aefp); err != nil {
-		return
-	}
-	if utils.VerifyAggregatedEpochFinalizationProof(&aefp, quorum, majority, epochFullID) {
-		select {
-		case resultCh <- &aefp:
-		case <-ctx.Done():
-		}
-	}
-}
+var FIRST_BLOCK_DATA FirstBlockData
 
 // Reads latest batch index from LevelDB.
 // Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
@@ -141,62 +103,20 @@ func EpochRotationThread() {
 
 				majority := utils.GetQuorumMajority(epochHandlerRef)
 
-				quorumMembers := utils.GetQuorumUrlsAndPubkeys(epochHandlerRef)
+				haveFirstBlockData := FIRST_BLOCK_DATA.FirstBlockHash != ""
 
-				haveEverything := AEFP_AND_FIRST_BLOCK_DATA.Aefp != nil && AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash != ""
+				if !haveFirstBlockData {
 
-				if !haveEverything {
-
-					// 1. Find AEFPs
-
-					if AEFP_AND_FIRST_BLOCK_DATA.Aefp == nil {
-
-						// Try to find locally first
-
-						keyValue := []byte("AEFP:" + strconv.Itoa(epochHandlerRef.Id))
-
-						aefpRaw, err := databases.EPOCH_DATA.Get(keyValue, nil)
-
-						var aefp structures.AggregatedEpochFinalizationProof
-
-						errParse := json.Unmarshal(aefpRaw, &aefp)
-
-						if err == nil && errParse == nil {
-
-							AEFP_AND_FIRST_BLOCK_DATA.Aefp = &aefp
-
-						} else {
-
-							// Ask quorum for AEFP
-
-							resultCh := make(chan *structures.AggregatedEpochFinalizationProof, 1)
-							ctx, cancel := context.WithCancel(context.Background())
-
-							for _, quorumMember := range quorumMembers {
-								go fetchAefp(ctx, quorumMember.Url, epochHandlerRef.Quorum, majority, epochFullID, resultCh)
-							}
-
-							select {
-
-							case value := <-resultCh:
-								AEFP_AND_FIRST_BLOCK_DATA.Aefp = value
-								cancel()
-							case <-time.After(2 * time.Second):
-								cancel()
-							}
-						}
-					}
-
-					// 2. Find first block in this epoch
-					if AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash == "" {
+					// Find first block in this epoch
+					if FIRST_BLOCK_DATA.FirstBlockHash == "" {
 
 						firstBlockData := GetFirstBlockDataFromDB(epochHandlerRef.Id)
 
 						if firstBlockData != nil {
 
-							AEFP_AND_FIRST_BLOCK_DATA.FirstBlockCreator = firstBlockData.FirstBlockCreator
+							FIRST_BLOCK_DATA.FirstBlockCreator = firstBlockData.FirstBlockCreator
 
-							AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash = firstBlockData.FirstBlockHash
+							FIRST_BLOCK_DATA.FirstBlockHash = firstBlockData.FirstBlockHash
 
 						}
 
@@ -204,15 +124,15 @@ func EpochRotationThread() {
 
 				}
 
-				if AEFP_AND_FIRST_BLOCK_DATA.Aefp != nil && AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash != "" {
+				if FIRST_BLOCK_DATA.FirstBlockHash != "" {
 
 					// 1. Fetch first block
 
-					firstBlock := block_pack.GetBlock(epochHandlerRef.Id, AEFP_AND_FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
+					firstBlock := block_pack.GetBlock(epochHandlerRef.Id, FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
 
 					// 2. Compare hashes
 
-					if firstBlock != nil && firstBlock.GetHash() == AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash {
+					if firstBlock != nil && firstBlock.GetHash() == FIRST_BLOCK_DATA.FirstBlockHash {
 
 						// 3. Verify that quorum agreed batch of delayed transactions
 
@@ -328,7 +248,7 @@ func EpochRotationThread() {
 
 						nextEpochId := epochHandlerRef.Id + 1
 
-						nextEpochHash := utils.Blake3(AEFP_AND_FIRST_BLOCK_DATA.FirstBlockHash)
+						nextEpochHash := utils.Blake3(FIRST_BLOCK_DATA.FirstBlockHash)
 
 						nextEpochQuorumSize := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize
 
@@ -374,7 +294,7 @@ func EpochRotationThread() {
 
 						// Clean in-memory helpful object
 
-						AEFP_AND_FIRST_BLOCK_DATA = FirstBlockDataWithAefp{}
+						FIRST_BLOCK_DATA = FirstBlockData{}
 
 						if batchCommitErr := databases.APPROVEMENT_THREAD_METADATA.Write(atomicBatch, nil); batchCommitErr != nil {
 
