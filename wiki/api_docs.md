@@ -2,6 +2,59 @@
 
 This document describes every HTTP endpoint registered in [`server.go`](../http_pack/server.go), the expected request inputs, and the response formats returned by the node.
 
+## Live statistics
+
+### `GET /live_stats`
+Returns a snapshot of the node's current view of the chain along with runtime parameters.
+
+- **Success (200)**: JSON object with the following shape:
+  - `statistics`: Aggregated chain metrics.
+    - `lastHeight`: Absolute height of the latest executed block (starts at `-1` before any block is executed).
+    - `lastBlockHash`: Hash of the latest executed block.
+    - `totalTransactions`: Total number of transactions observed in executed blocks.
+    - `successfulTransactions`: Transactions that passed validation and were applied.
+    - `failedTransactions`: Transactions that failed validation.
+    - `totalFees`: Total amount of fees collected across executed blocks.
+  - `networkParameters`: Current [`structures.NetworkParameters`](../structures/network_parameters.go).
+  - `epoch`: Current [`structures.EpochDataHandler`](../structures/epoch.go).
+- **Errors**
+  - `500` — failed to marshal response.
+
+**Example request**
+```bash
+curl https://localhost:7332/live_stats
+```
+
+**Example response**
+```json
+{
+  "statistics": {
+    "lastHeight": 1024,
+    "lastBlockHash": "00f9...",
+    "totalTransactions": 18230,
+    "successfulTransactions": 17980,
+    "failedTransactions": 250,
+    "totalFees": 941000
+  },
+  "networkParameters": {
+    "epochDuration": 60000,
+    "quorumSize": 5,
+    "minimalStakePerStaker": 1000000,
+    "validatorRequiredStake": 5000000,
+    "leadersCount": 12
+  },
+  "epoch": {
+    "id": 42,
+    "hash": "2ad1...",
+    "validatorsRegistry": ["validator_1", "validator_2"],
+    "startTimestamp": 1714042385123,
+    "quorum": ["validator_1", "validator_3", "validator_7", "validator_8", "validator_12"],
+    "leadersSequence": ["validator_1", "validator_3", "validator_7"],
+    "currentLeaderIndex": 1
+  }
+}
+```
+
 ## Blocks
 
 ### `GET /block/{id}`
