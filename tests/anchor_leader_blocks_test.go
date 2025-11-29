@@ -122,7 +122,7 @@ func TestGenerateAnchorBlocks(t *testing.T) {
 	validateLeaderAggregation(t, leaders, leaderFinal)
 	validateAnchorAggregation(t, anchors[:selectedAnchorIndex], anchorFinal)
 
-	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
+	visualizeAnchors(t, anchors, blocksByAnchor)
 	visualizeAggregatedProofs(t, leaderFinal, anchorFinal)
 }
 
@@ -231,7 +231,7 @@ func TestAggregateFromDifferentAnchorViews(t *testing.T) {
 		t.Fatalf("aggregated leader mappings differ between anchors %s and %s", anchors[firstTarget], anchors[secondTarget])
 	}
 
-	visualizeAnchors(t, anchors, leaders, blocksByAnchor)
+	visualizeAnchors(t, anchors, blocksByAnchor)
 	visualizeAggregatedProofs(t, firstLeaderFinal, firstAnchorFinal)
 	visualizeAggregatedProofs(t, secondLeaderFinal, secondAnchorFinal)
 }
@@ -422,7 +422,7 @@ func randomLeaderProofSubset(rng *rand.Rand, leaders []string) map[string]Leader
 	return proofs
 }
 
-func visualizeAnchors(t *testing.T, anchors, leaders []string, blocksByAnchor map[string][]Block) {
+func visualizeAnchors(t *testing.T, anchors []string, blocksByAnchor map[string][]Block) {
 	for _, anchor := range anchors {
 		blocks := blocksByAnchor[anchor]
 		t.Logf("anchor %s: %d blocks", anchor, len(blocks))
