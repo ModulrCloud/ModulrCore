@@ -26,7 +26,15 @@ type Transaction struct {
 }
 
 func (t *Transaction) Hash() string {
-	payloadJSON, err := json.Marshal(t.Payload)
+
+	payload := t.Payload
+
+	if payload == nil {
+		payload = make(map[string]any)
+	}
+
+	payloadJSON, err := json.Marshal(payload)
+
 	if err != nil {
 		return ""
 	}
@@ -43,6 +51,14 @@ func (t *Transaction) Hash() string {
 
 	sum := blake3.Sum256([]byte(preimage))
 	return hex.EncodeToString(sum[:])
+}
+
+func (t Transaction) MarshalJSON() ([]byte, error) {
+	type alias Transaction
+	if t.Payload == nil {
+		t.Payload = make(map[string]any)
+	}
+	return json.Marshal((alias)(t))
 }
 
 func (t *Transaction) UnmarshalJSON(data []byte) error {
