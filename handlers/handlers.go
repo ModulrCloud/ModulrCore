@@ -28,11 +28,7 @@ var EXECUTION_THREAD_METADATA = struct {
 		ValidatorsStoragesCache: make(map[string]*structures.ValidatorStorage),
 		LastHeight:              -1,
 		ExecutionData:           make(map[string]structures.ExecutionStatsPerLeaderSequence),
-		CurrentEpochAlignmentData: structures.AlignmentDataHandler{
-			Activated:                  true,
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
-		},
-		LegacyEpochAlignmentData: structures.AlignmentDataHandler{
+		SequenceAlignmentData: structures.AlignmentDataHandler{
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		},
 	},

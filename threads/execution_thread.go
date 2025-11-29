@@ -121,11 +121,11 @@ func ExecutionThread() {
 				shouldMoveToNextEpoch = true
 			}
 
-		} else if currentEpochIsFresh && epochHandlerRef.CurrentEpochAlignmentData.Activated {
+		} else if currentEpochIsFresh && epochHandlerRef.SequenceAlignmentData.Activated {
 
 			// Take the leader by it's position
 
-			currentEpochAlignmentData := &epochHandlerRef.CurrentEpochAlignmentData
+			currentEpochAlignmentData := &epochHandlerRef.SequenceAlignmentData
 
 			leaderPubkeyToExecBlocks := epochHandlerRef.EpochDataHandler.LeadersSequence[currentEpochAlignmentData.CurrentLeaderToExecBlocksFrom]
 
@@ -137,7 +137,7 @@ func ExecutionThread() {
 
 				// Move to the next leader
 
-				epochHandlerRef.CurrentEpochAlignmentData.CurrentLeaderToExecBlocksFrom++
+				epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom++
 
 				if !currentEpochIsFresh {
 
@@ -825,7 +825,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		// Finally, clean useless data
 
-		handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData = structures.AlignmentDataHandler{
+		handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
 			Activated:                  true,
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}

@@ -30,7 +30,7 @@ func SequenceAlignmentThread() {
 
 		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
 
-		localVersionOfCurrentLeader := handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption
+		localVersionOfCurrentLeader := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentLeaderAssumption
 
 		quorumMembers := utils.GetQuorumUrlsAndPubkeys(&handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler)
 
@@ -213,11 +213,11 @@ func SequenceAlignmentThread() {
 
 										for leaderPubKey, leaderExecData := range leaderExecStats {
 
-											_, dataAlreadyExists := handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey]
+											_, dataAlreadyExists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey]
 
 											if !dataAlreadyExists {
 
-												handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
+												handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubKey] = leaderExecData
 
 												utils.LogWithTime2("Resolved last block index for "+utils.CYAN_COLOR+leaderPubKey+" => "+strconv.Itoa(leaderExecData.Index), utils.DEEP_GRAY)
 
@@ -229,7 +229,7 @@ func SequenceAlignmentThread() {
 
 									// Finally, set the <currentLeader> to the new pointer
 
-									handlers.EXECUTION_THREAD_METADATA.Handler.CurrentEpochAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
+									handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
 
 									leaderPubkey := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence[targetResponse.ProposedIndexOfLeader]
 
