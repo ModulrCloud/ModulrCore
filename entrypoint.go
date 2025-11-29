@@ -150,6 +150,10 @@ func prepareBlockchain() error {
 			etHandler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
 		}
 
+		if etHandler.Statistics == nil {
+			etHandler.Statistics = &structures.Statistics{LastHeight: -1}
+		}
+
 		handlers.EXECUTION_THREAD_METADATA.Handler = etHandler
 
 	}

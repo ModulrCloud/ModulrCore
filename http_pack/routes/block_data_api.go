@@ -19,22 +19,59 @@ type lastHeightResponse struct {
 	LastHeight int64 `json:"lastHeight"`
 }
 
+type liveStatsResponse struct {
+	Statistics        *structures.Statistics       `json:"statistics"`
+	NetworkParameters structures.NetworkParameters `json:"networkParameters"`
+	Epoch             structures.EpochDataHandler  `json:"epoch"`
+}
+
 func GetLastHeight(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-	lastHeight := handlers.EXECUTION_THREAD_METADATA.Handler.LastHeight
+	statistics := handlers.EXECUTION_THREAD_METADATA.Handler.Statistics
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-	if lastHeight < 0 {
+	if statistics == nil || statistics.LastHeight < 0 {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetContentType("application/json")
 		ctx.Write([]byte(`{"err": "Not found"}`))
 		return
 	}
 
-	response, err := json.Marshal(lastHeightResponse{LastHeight: lastHeight})
+	response, err := json.Marshal(lastHeightResponse{LastHeight: statistics.LastHeight})
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetContentType("application/json")
+		ctx.Write([]byte(`{"err": "Failed to marshal response"}`))
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/json")
+	ctx.Write(response)
+}
+
+func GetLiveStats(ctx *fasthttp.RequestCtx) {
+
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	statistics := handlers.EXECUTION_THREAD_METADATA.Handler.Statistics
+	networkParameters := handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters
+	epoch := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if statistics == nil {
+		statistics = &structures.Statistics{LastHeight: -1}
+	}
+
+	response, err := json.Marshal(liveStatsResponse{
+		Statistics:        statistics,
+		NetworkParameters: networkParameters,
+		Epoch:             epoch,
+	})
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetContentType("application/json")
