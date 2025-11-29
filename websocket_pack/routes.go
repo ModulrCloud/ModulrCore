@@ -88,169 +88,101 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 				}
 
-				if parsedRequest.Block.Index == 0 {
+				// This branch related to case when block index is > 0 (so it's not the first block by leader)
 
-					aefpIsOk := false
+				previousBlockId := strconv.Itoa(epochIndex) + ":" + parsedRequest.Block.Creator + ":" + strconv.Itoa(previousBlockIndex)
 
-					if epochIndex == 0 {
+				// Check if AFP inside related to previous block AFP
 
-						aefpIsOk = true
+				if parsedRequest.Block.Index == 0 || previousBlockId == parsedRequest.PreviousBlockAfp.BlockId && utils.VerifyAggregatedFinalizationProof(&parsedRequest.PreviousBlockAfp, epochHandler) {
 
-					} else {
+					// In case it's request for the third block, we'll receive AFP for the second block which includes .prevBlockHash field
+					// This will be the assumption of hash of the first block in epoch
 
-						var legacyEpochHandler structures.EpochDataHandler
+					if parsedRequest.Block.Index == 2 {
 
-						prevEpochIndex := epochHandler.Id - 1
+						keyBytes := []byte("FIRST_BLOCK_ASSUMPTION:" + strconv.Itoa(epochIndex))
 
-						legacyEpochHandlerRaw, err := databases.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+strconv.Itoa(prevEpochIndex)), nil)
+						_, err := databases.EPOCH_DATA.Get(keyBytes, nil)
 
-						if err == nil {
+						// We need to store first block assumption only in case we don't have it yet
 
-							errParse := json.Unmarshal(legacyEpochHandlerRaw, &legacyEpochHandler)
+						if err != nil {
 
-							aefpFromBlock := parsedRequest.Block.ExtraData.AefpForPreviousEpoch
+							assumption := structures.FirstBlockAssumption{
 
-							if errParse == nil {
+								IndexOfFirstBlockCreator: positionOfBlockCreatorInLeadersSequence,
 
-								legacyEpochFullID := legacyEpochHandler.Hash + "#" + strconv.Itoa(legacyEpochHandler.Id)
-
-								legacyMajority := utils.GetQuorumMajority(&legacyEpochHandler)
-
-								aefpIsOk = epochHandler.Id == 0 || utils.VerifyAggregatedEpochFinalizationProof(
-
-									aefpFromBlock,
-
-									legacyEpochHandler.Quorum,
-
-									legacyMajority,
-
-									legacyEpochFullID,
-								)
-
+								AfpForSecondBlock: parsedRequest.PreviousBlockAfp,
 							}
+
+							valBytes, _ := json.Marshal(assumption)
+
+							databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
 
 						}
 
 					}
 
-					//_________________________________________2_________________________________________
+					// Store the block and return finalization proof
 
-					// Verify the ALRP chain validity here
-
-					alrpChainIsOk := parsedRequest.Block.VerifyAlrpChain(
-
-						epochHandler, positionOfBlockCreatorInLeadersSequence,
-					)
-
-					if !aefpIsOk || !alrpChainIsOk {
-
-						return // prevent proof generation
-
-					}
-
-				} else {
-
-					// This branch related to case when block index is > 0 (so it's not the first block by leader)
-
-					previousBlockId := strconv.Itoa(epochIndex) + ":" + parsedRequest.Block.Creator + ":" + strconv.Itoa(previousBlockIndex)
-
-					// Check if AFP inside related to previous block AFP
-
-					if previousBlockId == parsedRequest.PreviousBlockAfp.BlockId && utils.VerifyAggregatedFinalizationProof(&parsedRequest.PreviousBlockAfp, epochHandler) {
-
-						// In case it's request for the third block, we'll receive AFP for the second block which includes .prevBlockHash field
-						// This will be the assumption of hash of the first block in epoch
-
-						if parsedRequest.Block.Index == 2 {
-
-							keyBytes := []byte("FIRST_BLOCK_ASSUMPTION:" + strconv.Itoa(epochIndex))
-
-							_, err := databases.EPOCH_DATA.Get(keyBytes, nil)
-
-							// We need to store first block assumption only in case we don't have it yet
-
-							if err != nil {
-
-								assumption := structures.FirstBlockAssumption{
-
-									IndexOfFirstBlockCreator: positionOfBlockCreatorInLeadersSequence,
-
-									AfpForSecondBlock: parsedRequest.PreviousBlockAfp,
-								}
-
-								valBytes, _ := json.Marshal(assumption)
-
-								databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
-
-							}
-
-						}
-
-					} else {
-
-						return
-
-					}
-
-				}
-
-				// Store the block and return finalization proof
-
-				blockBytes, err := json.Marshal(parsedRequest.Block)
-
-				if err == nil {
-
-					// 1. Store the block
-
-					err = databases.BLOCKS.Put([]byte(proposedBlockId), blockBytes, nil)
+					blockBytes, err := json.Marshal(parsedRequest.Block)
 
 					if err == nil {
 
-						afpBytes, err := json.Marshal(parsedRequest.PreviousBlockAfp)
+						// 1. Store the block
+
+						err = databases.BLOCKS.Put([]byte(proposedBlockId), blockBytes, nil)
 
 						if err == nil {
 
-							// 2. Store the AFP for previous block
+							afpBytes, err := json.Marshal(parsedRequest.PreviousBlockAfp)
 
-							errStore := databases.EPOCH_DATA.Put([]byte("AFP:"+parsedRequest.PreviousBlockAfp.BlockId), afpBytes, nil)
+							if err == nil {
 
-							votingStatBytes, errParse := json.Marshal(futureVotingDataToStore)
+								// 2. Store the AFP for previous block
 
-							if errStore == nil && errParse == nil {
+								errStore := databases.EPOCH_DATA.Put([]byte("AFP:"+parsedRequest.PreviousBlockAfp.BlockId), afpBytes, nil)
 
-								// 3. Store the voting stats
+								votingStatBytes, errParse := json.Marshal(futureVotingDataToStore)
 
-								err := databases.FINALIZATION_VOTING_STATS.Put([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), votingStatBytes, nil)
+								if errStore == nil && errParse == nil {
 
-								if err == nil {
+									// 3. Store the voting stats
 
-									// Only after we stored the these 3 components = generate signature (finalization proof)
-
-									dataToSign, prevBlockHash := "", ""
-
-									if parsedRequest.Block.Index == 0 {
-
-										prevBlockHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-
-									} else {
-
-										prevBlockHash = parsedRequest.PreviousBlockAfp.BlockHash
-
-									}
-
-									dataToSign += strings.Join([]string{prevBlockHash, proposedBlockId, proposedBlockHash, epochFullID}, ":")
-
-									response := WsFinalizationProofResponse{
-										Voter:             globals.CONFIGURATION.PublicKey,
-										FinalizationProof: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
-										VotedForHash:      proposedBlockHash,
-									}
-
-									jsonResponse, err := json.Marshal(response)
+									err := databases.FINALIZATION_VOTING_STATS.Put([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), votingStatBytes, nil)
 
 									if err == nil {
 
-										connection.WriteMessage(gws.OpcodeText, jsonResponse)
+										// Only after we stored the these 3 components = generate signature (finalization proof)
+
+										dataToSign, prevBlockHash := "", ""
+
+										if parsedRequest.Block.Index == 0 {
+
+											prevBlockHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+										} else {
+
+											prevBlockHash = parsedRequest.PreviousBlockAfp.BlockHash
+
+										}
+
+										dataToSign += strings.Join([]string{prevBlockHash, proposedBlockId, proposedBlockHash, epochFullID}, ":")
+
+										response := WsFinalizationProofResponse{
+											Voter:             globals.CONFIGURATION.PublicKey,
+											FinalizationProof: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+											VotedForHash:      proposedBlockHash,
+										}
+
+										jsonResponse, err := json.Marshal(response)
+
+										if err == nil {
+
+											connection.WriteMessage(gws.OpcodeText, jsonResponse)
+
+										}
 
 									}
 
