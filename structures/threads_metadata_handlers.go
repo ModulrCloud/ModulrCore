@@ -18,8 +18,7 @@ type ExecutionThreadMetadataHandler struct {
 	NetworkParameters NetworkParameters `json:"networkParameters"`
 	EpochDataHandler  EpochDataHandler  `json:"epoch"`
 
-	LastHeight    int64  `json:"lastHeight"`
-	LastBlockHash string `json:"lastBlockHash"`
+	Statistics *Statistics `json:"statistics,omitempty"`
 
 	ExecutionData         map[string]ExecutionStatsPerLeaderSequence `json:"executionData"` // PUBKEY => {index:int, hash:""}
 	SequenceAlignmentData AlignmentDataHandler                       `json:"currentEpochAlignmentData"`

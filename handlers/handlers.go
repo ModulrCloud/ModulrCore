@@ -26,10 +26,10 @@ var EXECUTION_THREAD_METADATA = struct {
 		CoreMajorVersion:        -1,
 		AccountsCache:           make(map[string]*structures.Account),
 		ValidatorsStoragesCache: make(map[string]*structures.ValidatorStorage),
-		LastHeight:              -1,
 		ExecutionData:           make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		SequenceAlignmentData: structures.AlignmentDataHandler{
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		},
+		Statistics: &structures.Statistics{LastHeight: -1},
 	},
 }

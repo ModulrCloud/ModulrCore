@@ -251,6 +251,10 @@ func executeBlock(block *block_pack.Block) {
 
 	epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler
 
+	if epochHandlerRef.Statistics == nil {
+		epochHandlerRef.Statistics = &structures.Statistics{LastHeight: -1}
+	}
+
 	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
 
 		currentEpochIndex := epochHandlerRef.EpochDataHandler.Id
@@ -264,9 +268,15 @@ func executeBlock(block *block_pack.Block) {
 
 		for index, transaction := range block.Transactions {
 
-			_, fee, delayedPayload, isDelayed := executeTransaction(&transaction)
+			success, fee, delayedPayload, isDelayed := executeTransaction(&transaction)
 			if isDelayed {
 				delayedTxPayloadsForBatch = append(delayedTxPayloadsForBatch, delayedPayload)
+			}
+			epochHandlerRef.Statistics.TotalTransactions++
+			if success {
+				epochHandlerRef.Statistics.SuccessfulTransactions++
+			} else {
+				epochHandlerRef.Statistics.FailedTransactions++
 			}
 			blockFees += fee
 
@@ -310,9 +320,11 @@ func executeBlock(block *block_pack.Block) {
 		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
 
 		// Finally set the updated execution thread handler to atomic batch
-		epochHandlerRef.LastHeight++
-		epochHandlerRef.LastBlockHash = blockHash
-		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.LastHeight)), []byte(currentBlockId))
+		epochHandlerRef.Statistics.LastHeight++
+		epochHandlerRef.Statistics.LastBlockHash = blockHash
+		epochHandlerRef.Statistics.TotalFees += blockFees
+
+		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.Statistics.LastHeight)), []byte(currentBlockId))
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
 			stateBatch.Put([]byte("ET"), execThreadRawBytes)
 		} else {
@@ -320,7 +332,7 @@ func executeBlock(block *block_pack.Block) {
 		}
 
 		if err := databases.STATE.Write(stateBatch, nil); err == nil {
-			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, epochHandlerRef.LastHeight), utils.CYAN_COLOR)
+			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, epochHandlerRef.Statistics.LastHeight), utils.CYAN_COLOR)
 		} else {
 			panic("Impossible to commit changes in atomic batch to permanent state")
 		}
