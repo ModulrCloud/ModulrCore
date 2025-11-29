@@ -62,6 +62,12 @@ func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
 
 }
 
+func getFirstBlockDataFromDB(epochIndex int) *FirstBlockData {
+	// TBD
+	// FIRST_BLOCK_DATA: key
+	return nil
+}
+
 func ExecuteDelayedTransaction(delayedTransaction map[string]string, contextTag string) {
 
 	if delayedTxType, ok := delayedTransaction["type"]; ok {
@@ -110,7 +116,7 @@ func EpochRotationThread() {
 					// Find first block in this epoch
 					if FIRST_BLOCK_DATA.FirstBlockHash == "" {
 
-						firstBlockData := GetFirstBlockDataFromDB(epochHandlerRef.Id)
+						firstBlockData := getFirstBlockDataFromDB(epochHandlerRef.Id)
 
 						if firstBlockData != nil {
 
