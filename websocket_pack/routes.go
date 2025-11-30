@@ -211,47 +211,46 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 	}
 
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	currentApprovementHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
-	defer handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+	epochIndex := detectEpochIndexForRotation(parsedRequest, currentApprovementHandler.EpochDataHandler.Id)
+	epochHandler := getEpochHandlerForRotation(epochIndex)
+	if epochHandler == nil || parsedRequest.IndexOfLeaderToRotate >= len(epochHandler.LeadersSequence) {
+		return
+	}
 
-	epochHandler := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+	epochMatchesApprovement := currentApprovementHandler.EpochDataHandler.Id == epochHandler.Id
+	epochAlreadyPassed := currentApprovementHandler.EpochDataHandler.Id > epochHandler.Id
+	rotationAllowed := epochAlreadyPassed || (epochMatchesApprovement && parsedRequest.IndexOfLeaderToRotate < currentApprovementHandler.EpochDataHandler.CurrentLeaderIndex)
 
-	epochIndex := epochHandler.Id
+	if !rotationAllowed {
+		return
+	}
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochIndex)
-
 	leaderToRotate := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToRotate]
+	maxRotatedLeaderIndex := epochHandler.CurrentLeaderIndex
+	if epochAlreadyPassed {
+		maxRotatedLeaderIndex = len(epochHandler.LeadersSequence)
+	} else if epochMatchesApprovement {
+		maxRotatedLeaderIndex = currentApprovementHandler.EpochDataHandler.CurrentLeaderIndex
+	}
 
-	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToRotate {
-
+	if maxRotatedLeaderIndex > parsedRequest.IndexOfLeaderToRotate {
 		localVotingData := structures.NewLeaderVotingStatTemplate()
-
 		localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToRotate), nil)
-
 		if err == nil {
-
 			json.Unmarshal(localVotingDataRaw, &localVotingData)
-
 		}
-
 		propSkipData := parsedRequest.SkipData
-
 		if localVotingData.Index > propSkipData.Index {
-
-			// Try to return with AFP for the first block
-
 			firstBlockID := strconv.Itoa(epochHandler.Id) + ":" + leaderToRotate + ":0"
-
 			afpForFirstBlockBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
-
 			if err == nil {
-
 				var afpForFirstBlock structures.AggregatedFinalizationProof
-
 				err := json.Unmarshal(afpForFirstBlockBytes, &afpForFirstBlock)
-
 				if err == nil {
-
 					responseData := WsLeaderRotationProofResponseUpgrade{
 						Voter:            globals.CONFIGURATION.PublicKey,
 						ForLeaderPubkey:  leaderToRotate,
@@ -259,113 +258,126 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 						AfpForFirstBlock: afpForFirstBlock,
 						SkipData:         localVotingData,
 					}
-
 					jsonResponse, err := json.Marshal(responseData)
-
 					if err == nil {
-
 						connection.WriteMessage(gws.OpcodeText, jsonResponse)
-
 					}
-
 				}
-
 			}
-
 		} else {
-
-			//________________________________________________ Verify the proposed AFP ________________________________________________
-
 			afpIsOk := false
-
 			parts := strings.Split(propSkipData.Afp.BlockId, ":")
-
 			if len(parts) != 3 {
 				return
 			}
-
 			indexOfBlockInAfp, err := strconv.Atoi(parts[2])
-
 			if err != nil {
 				return
 			}
-
 			if propSkipData.Index > -1 {
-
 				if propSkipData.Hash == propSkipData.Afp.BlockHash && propSkipData.Index == indexOfBlockInAfp {
-
 					afpIsOk = utils.VerifyAggregatedFinalizationProof(&propSkipData.Afp, epochHandler)
-
 				}
-
 			} else {
-
 				afpIsOk = true
 			}
-
 			if afpIsOk {
-
 				dataToSignForLeaderRotation, firstBlockAfpIsOk := "", false
-
 				if parsedRequest.SkipData.Index == -1 {
-
 					dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:-1"
 					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:" + epochFullID
-
 					firstBlockAfpIsOk = true
-
 				} else if parsedRequest.SkipData.Index >= 0 {
-
 					blockIdOfFirstBlock := strconv.Itoa(epochIndex) + ":" + leaderToRotate + ":0"
-
 					if parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
-
 						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
-
 						dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate +
 							":" + firstBlockHash +
 							":" + strconv.Itoa(propSkipData.Index) +
 							":" + propSkipData.Hash +
 							":" + epochFullID
-
 						firstBlockAfpIsOk = true
-
 					}
-
 				}
-
-				// If proof is ok - generate LRP(leader rotation proof)
-
 				if firstBlockAfpIsOk {
-
 					leaderRotationProofMessage := WsLeaderRotationProofResponseOk{
-
-						Voter: globals.CONFIGURATION.PublicKey,
-
+						Voter:           globals.CONFIGURATION.PublicKey,
 						ForLeaderPubkey: leaderToRotate,
-
-						Status: "OK",
-
-						Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
+						Status:          "OK",
+						Sig:             cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
 					}
-
 					jsonResponse, err := json.Marshal(leaderRotationProofMessage)
-
 					if err == nil {
-
 						connection.WriteMessage(gws.OpcodeText, jsonResponse)
-
 					}
-
 				}
-
 			}
-
 		}
+	}
+}
 
+func detectEpochIndexForRotation(parsedRequest WsLeaderRotationProofRequest, fallback int) int {
+
+	if parsedRequest.SkipData.Afp.BlockId != "" {
+		if idx := epochIndexFromBlockId(parsedRequest.SkipData.Afp.BlockId); idx >= 0 {
+			return idx
+		}
 	}
 
+	if parsedRequest.AfpForFirstBlock.BlockId != "" {
+		if idx := epochIndexFromBlockId(parsedRequest.AfpForFirstBlock.BlockId); idx >= 0 {
+			return idx
+		}
+	}
+
+	return fallback
+}
+
+func epochIndexFromBlockId(blockId string) int {
+
+	parts := strings.Split(blockId, ":")
+	if len(parts) == 0 {
+		return -1
+	}
+
+	if idx, err := strconv.Atoi(parts[0]); err == nil {
+		return idx
+	}
+
+	return -1
+}
+
+func getEpochHandlerForRotation(epochIndex int) *structures.EpochDataHandler {
+
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	currentHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	if currentHandler.Id == epochIndex {
+		return &currentHandler
+	}
+
+	handlers.FINALIZATION_THREAD_CACHE.RWMutex.RLock()
+	cached, ok := handlers.FINALIZATION_THREAD_CACHE.EpochHandlers[epochIndex]
+	handlers.FINALIZATION_THREAD_CACHE.RWMutex.RUnlock()
+
+	if ok {
+		return &cached
+	}
+
+	key := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochIndex))
+	if raw, err := databases.EPOCH_DATA.Get(key, nil); err == nil {
+		var stored structures.EpochDataHandler
+		if json.Unmarshal(raw, &stored) == nil {
+			handlers.FINALIZATION_THREAD_CACHE.RWMutex.Lock()
+			handlers.FINALIZATION_THREAD_CACHE.EpochHandlers[epochIndex] = stored
+			handlers.FINALIZATION_THREAD_CACHE.RWMutex.Unlock()
+			return &stored
+		}
+	}
+
+	return nil
 }
 
 func GetBlockWithProof(parsedRequest WsBlockWithAfpRequest, connection *gws.Conn) {
