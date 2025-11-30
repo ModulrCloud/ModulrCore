@@ -18,6 +18,13 @@ var APPROVEMENT_THREAD_METADATA = struct {
 	},
 }
 
+var FINALIZATION_THREAD_CACHE = struct {
+	RWMutex       sync.RWMutex
+	EpochHandlers map[int]structures.EpochDataHandler
+}{
+	EpochHandlers: make(map[int]structures.EpochDataHandler),
+}
+
 var EXECUTION_THREAD_METADATA = struct {
 	RWMutex sync.RWMutex
 	Handler structures.ExecutionThreadMetadataHandler
