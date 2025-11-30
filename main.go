@@ -10,12 +10,11 @@ import (
 	"syscall"
 
 	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
 )
 
 func main() {
-
-	//_____________________________________________________CONFIG_PROCESS____________________________________________________
 
 	configsRawJson, readError := os.ReadFile(globals.CHAINDATA_PATH + "/configs.json")
 
@@ -31,7 +30,29 @@ func main() {
 
 	}
 
-	//_____________________________________________________READ GENESIS______________________________________________________
+	anchorsRawJson, readError := os.ReadFile(globals.CHAINDATA_PATH + "/anchors.json")
+
+	if readError != nil {
+
+		panic("Error while reading anchors: " + readError.Error())
+
+	}
+
+	var anchorsList []structures.Anchor
+
+	if err := json.Unmarshal(anchorsRawJson, &anchorsList); err != nil {
+
+		panic("Error with anchors parsing: " + err.Error())
+
+	}
+
+	globals.ANCHORS = make(map[string]structures.Anchor, len(anchorsList))
+
+	for _, anchor := range anchorsList {
+
+		globals.ANCHORS[anchor.Pubkey] = anchor
+
+	}
 
 	genesisRawJson, readError := os.ReadFile(globals.CHAINDATA_PATH + "/genesis.json")
 

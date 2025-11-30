@@ -81,6 +81,8 @@ var CONFIGURATION structures.NodeLevelConfig
 
 var GENESIS structures.Genesis
 
+var ANCHORS map[string]structures.Anchor
+
 var MEMPOOL struct {
 	Slice []structures.Transaction
 	Mutex sync.Mutex
