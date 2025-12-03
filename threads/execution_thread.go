@@ -278,7 +278,7 @@ func executeBlock(block *block_pack.Block) {
 			}
 			blockFees += fee
 
-			if locationBytes, err := json.Marshal(structures.TransactionLocation{Block: currentBlockId, Position: index}); err == nil {
+			if locationBytes, err := json.Marshal(structures.TransactionReceipt{Block: currentBlockId, Position: index, Success: success}); err == nil {
 				stateBatch.Put([]byte("TX:"+transaction.Hash()), locationBytes)
 			} else {
 				panic("Impossible to add transaction location data to atomic batch")
