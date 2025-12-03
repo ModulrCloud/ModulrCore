@@ -52,34 +52,6 @@ func GetEpochData(ctx *fasthttp.RequestCtx) {
 	ctx.Write([]byte(`{"err": "No epoch data found"}`))
 }
 
-func GetFirstBlockAssumption(ctx *fasthttp.RequestCtx) {
-
-	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-
-	epochIndexVal := ctx.UserValue("epochIndex")
-	epochIndex, ok := epochIndexVal.(string)
-
-	if !ok {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		ctx.SetContentType("application/json")
-		ctx.Write([]byte(`{"err": "Invalid epoch index"}`))
-		return
-	}
-
-	value, err := databases.EPOCH_DATA.Get([]byte("FIRST_BLOCK_ASSUMPTION:"+epochIndex), nil)
-
-	if err == nil && value != nil {
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetContentType("application/json")
-		ctx.Write(value)
-		return
-	}
-
-	ctx.SetStatusCode(fasthttp.StatusNotFound)
-	ctx.SetContentType("application/json")
-	ctx.Write([]byte(`{"err": "No assumptions found"}`))
-}
-
 func GetAggregatedEpochFinalizationProof(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")

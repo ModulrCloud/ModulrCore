@@ -2,7 +2,6 @@ package websocket_pack
 
 import (
 	"encoding/json"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,8 +62,6 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 			var futureVotingDataToStore structures.LeaderVotingStat
 
-			positionOfBlockCreatorInLeadersSequence := slices.Index(epochHandler.LeadersSequence, parsedRequest.Block.Creator)
-
 			if parsedRequest.Block.VerifySignature() && !utils.SignalAboutEpochRotationExists(epochIndex) {
 
 				BLOCK_CREATOR_REQUEST_MUTEX.Lock()
@@ -95,34 +92,6 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 				// Check if AFP inside related to previous block AFP
 
 				if parsedRequest.Block.Index == 0 || previousBlockId == parsedRequest.PreviousBlockAfp.BlockId && utils.VerifyAggregatedFinalizationProof(&parsedRequest.PreviousBlockAfp, epochHandler) {
-
-					// In case it's request for the third block, we'll receive AFP for the second block which includes .prevBlockHash field
-					// This will be the assumption of hash of the first block in epoch
-
-					if parsedRequest.Block.Index == 2 {
-
-						keyBytes := []byte("FIRST_BLOCK_ASSUMPTION:" + strconv.Itoa(epochIndex))
-
-						_, err := databases.EPOCH_DATA.Get(keyBytes, nil)
-
-						// We need to store first block assumption only in case we don't have it yet
-
-						if err != nil {
-
-							assumption := structures.FirstBlockAssumption{
-
-								IndexOfFirstBlockCreator: positionOfBlockCreatorInLeadersSequence,
-
-								AfpForSecondBlock: parsedRequest.PreviousBlockAfp,
-							}
-
-							valBytes, _ := json.Marshal(assumption)
-
-							databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
-
-						}
-
-					}
 
 					// Store the block and return finalization proof
 

@@ -2,25 +2,8 @@ package structures
 
 import "encoding/json"
 
-type ResponseStatus struct {
-	Status string
-}
-
 type QuorumMemberData struct {
 	PubKey, Url string
-}
-
-type FirstBlockResult struct {
-	FirstBlockCreator, FirstBlockHash string
-}
-
-type FirstBlockDataForNextEpoch struct {
-	FirstBlockResult
-}
-
-type FirstBlockAssumption struct {
-	IndexOfFirstBlockCreator int                         `json:"indexOfFirstBlockCreator"`
-	AfpForSecondBlock        AggregatedFinalizationProof `json:"afpForSecondBlock"`
 }
 
 type DelayedTransactionsBatch struct {

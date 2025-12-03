@@ -7,6 +7,5 @@ type Statistics struct {
 	LastBlockHash          string `json:"lastBlockHash"`
 	TotalTransactions      uint64 `json:"totalTransactions"`
 	SuccessfulTransactions uint64 `json:"successfulTransactions"`
-	FailedTransactions     uint64 `json:"failedTransactions"`
 	TotalFees              uint64 `json:"totalFees"`
 }

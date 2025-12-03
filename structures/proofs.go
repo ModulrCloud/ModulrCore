@@ -61,20 +61,3 @@ func (alrp *AggregatedLeaderRotationProof) UnmarshalJSON(data []byte) error {
 	*alrp = AggregatedLeaderRotationProof(aux)
 	return nil
 }
-
-type AlrpSkeleton struct {
-	AfpForFirstBlock AggregatedFinalizationProof
-	SkipData         LeaderVotingStat
-	Proofs           map[string]string // quorumMemberPubkey => signature
-}
-
-func NewAlrpSkeletonTemplate() *AlrpSkeleton {
-
-	return &AlrpSkeleton{
-
-		AfpForFirstBlock: AggregatedFinalizationProof{},
-		SkipData:         NewLeaderVotingStatTemplate(),
-		Proofs:           make(map[string]string),
-	}
-
-}

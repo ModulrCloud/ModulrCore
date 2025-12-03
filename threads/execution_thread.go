@@ -275,8 +275,6 @@ func executeBlock(block *block_pack.Block) {
 			epochHandlerRef.Statistics.TotalTransactions++
 			if success {
 				epochHandlerRef.Statistics.SuccessfulTransactions++
-			} else {
-				epochHandlerRef.Statistics.FailedTransactions++
 			}
 			blockFees += fee
 
@@ -314,9 +312,11 @@ func executeBlock(block *block_pack.Block) {
 
 		// Update the execution data for progress
 		blockHash := block.GetHash()
+
 		blockCreatorData := epochHandlerRef.ExecutionData[block.Creator]
 		blockCreatorData.Index = block.Index
 		blockCreatorData.Hash = blockHash
+
 		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
 
 		// Finally set the updated execution thread handler to atomic batch
@@ -325,6 +325,7 @@ func executeBlock(block *block_pack.Block) {
 		epochHandlerRef.Statistics.TotalFees += blockFees
 
 		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.Statistics.LastHeight)), []byte(currentBlockId))
+
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
 			stateBatch.Put([]byte("ET"), execThreadRawBytes)
 		} else {
