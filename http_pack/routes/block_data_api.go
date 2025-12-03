@@ -243,23 +243,23 @@ func GetTransactionByHash(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	var location structures.TransactionLocation
+	var txReceipt structures.TransactionReceipt
 
-	if err := json.Unmarshal(locationBytes, &location); err != nil {
+	if err := json.Unmarshal(locationBytes, &txReceipt); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetContentType("application/json")
 		ctx.Write([]byte(`{"err": "Failed to parse transaction location"}`))
 		return
 	}
 
-	if location.Block == "" {
+	if txReceipt.Block == "" {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetContentType("application/json")
 		ctx.Write([]byte(`{"err": "Not found"}`))
 		return
 	}
 
-	blockBytes, err := databases.BLOCKS.Get([]byte(location.Block), nil)
+	blockBytes, err := databases.BLOCKS.Get([]byte(txReceipt.Block), nil)
 
 	if err != nil {
 		if err == leveldb.ErrNotFound {
@@ -284,14 +284,14 @@ func GetTransactionByHash(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if location.Position < 0 || location.Position >= len(block.Transactions) {
+	if txReceipt.Position < 0 || txReceipt.Position >= len(block.Transactions) {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetContentType("application/json")
 		ctx.Write([]byte(`{"err": "Not found"}`))
 		return
 	}
 
-	transactionBytes, err := json.Marshal(block.Transactions[location.Position])
+	transactionBytes, err := json.Marshal(block.Transactions[txReceipt.Position])
 
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)

@@ -9,9 +9,10 @@ import (
 	"lukechampine.com/blake3"
 )
 
-type TransactionLocation struct {
-	Block    string `json:"block"`
-	Position int    `json:"position"`
+type TransactionReceipt struct {
+	Block    string `json:"block"`    // reference to block where tx located
+	Position int    `json:"position"` // position in this block
+	Success  bool   `json:success`    // status of execution
 }
 
 type Transaction struct {
