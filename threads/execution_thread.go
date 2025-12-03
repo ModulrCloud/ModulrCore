@@ -341,69 +341,6 @@ func executeBlock(block *block_pack.Block) {
 
 }
 
-func distributeFeesAmongValidatorAndStakers(blockCreatorPubkey string, feeFromBlock uint64) {
-
-	/*
-
-	   _____________________Here we perform the following logic_____________________
-
-	   [*] feeFromBlock - amount of total fees received in this block
-
-	   1) Get the validator storage to extract list of stakers
-
-	   2) In this list (validatorStorage.stakers) we have structure like:
-
-	       {
-	           validatorPubkey:{stake},
-	           ...
-	           stakerPubkey:{stake}
-	           ...
-	       }
-
-	   3) Send <validatorStorage.percentage * feeFromBlock> to block creator:
-
-	       validatorCreatorAccount.balance += validatorStorage.percentage * feeFromBlock
-
-	   2) Distribute the rest among other stakers
-
-	       For this, we should:
-
-	           2.1) Go through validatorStorage.stakers
-
-	           2.2) Increase balance - stakerAccount.balance += totalStakerPowerPercentage * restOfFees
-
-	*/
-
-	blockCreatorStorage := utils.GetValidatorFromExecThreadState(blockCreatorPubkey)
-
-	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
-
-	// 1. Transfer part of fees to account with pubkey associated with block creator
-
-	rewardForBlockCreator := (uint64(blockCreatorStorage.Percentage) * feeFromBlock) / 100
-
-	blockCreatorAccount.Balance += rewardForBlockCreator
-
-	// 2. Share the rest of fees among stakers due to their % part in total stake
-
-	feesToShareAmongStakers := feeFromBlock - rewardForBlockCreator
-
-	if feesToShareAmongStakers != 0 {
-
-		for stakerPubkey, stakerStake := range blockCreatorStorage.Stakers {
-
-			stakerReward := (stakerStake * feesToShareAmongStakers) / blockCreatorStorage.TotalStaked
-
-			stakerAccount := utils.GetAccountFromExecThreadState(stakerPubkey)
-
-			stakerAccount.Balance += stakerReward
-
-		}
-
-	}
-
-}
-
 func sendFeesToValidatorAccount(blockCreatorPubkey string, feeFromBlock uint64) {
 
 	blockCreatorAccount := utils.GetAccountFromExecThreadState(blockCreatorPubkey)
