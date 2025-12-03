@@ -251,16 +251,11 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 
 		keyBytes := []byte("AFP:" + blockIdForHunting)
 
-		valueBytes, err := json.Marshal(aggregatedFinalizationProof)
-
-		if err != nil {
-			panic(fmt.Sprintf("failed to marshal AFP for block %s: %v", blockIdForHunting, err))
-		}
+		valueBytes, _ := json.Marshal(aggregatedFinalizationProof)
 
 		// Store AFP locally
-		if err := databases.EPOCH_DATA.Put(keyBytes, valueBytes, nil); err != nil {
-			panic(fmt.Sprintf("failed to store AFP for block %s: %v", blockIdForHunting, err))
-		}
+
+		databases.EPOCH_DATA.Put(keyBytes, valueBytes, nil)
 
 		// Repeat procedure for the next block and store the progress
 
