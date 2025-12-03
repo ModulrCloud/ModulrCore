@@ -12,7 +12,7 @@ import (
 type TransactionReceipt struct {
 	Block    string `json:"block"`    // reference to block where tx located
 	Position int    `json:"position"` // position in this block
-	Success  bool   `json:success`    // status of execution
+	Success  bool   `json:"success"`  // status of execution
 }
 
 type Transaction struct {
