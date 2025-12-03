@@ -3,6 +3,7 @@ package threads
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -202,9 +203,27 @@ func EpochRotationThread() {
 
 						keyBytes := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochHandlerRef.Id))
 
-						valBytes, _ := json.Marshal(epochHandlerRef)
+						valBytes, marshalErr := json.Marshal(epochHandlerRef)
 
-						databases.EPOCH_DATA.Put(keyBytes, valBytes, nil)
+						if marshalErr != nil {
+
+							handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Unlock()
+
+							globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(true)
+
+							panic(fmt.Sprintf("failed to marshal epoch handler: %v", marshalErr))
+
+						}
+
+						if err := databases.EPOCH_DATA.Put(keyBytes, valBytes, nil); err != nil {
+
+							handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Unlock()
+
+							globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(true)
+
+							panic(fmt.Sprintf("failed to store epoch handler: %v", err))
+
+						}
 
 						var daoVotingContractCalls, allTheRestContractCalls []map[string]string
 
