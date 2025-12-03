@@ -4,6 +4,24 @@ This document describes every HTTP endpoint registered in [`server.go`](../http_
 
 ## Live statistics
 
+### `GET /last_height`
+Returns the latest executed block height tracked by the node.
+
+- **Success (200)**: `{ "lastHeight": <int> }`.
+- **Errors**
+  - `404` — the node has not executed any blocks yet.
+  - `500` — failed to marshal the response.
+
+**Example request**
+```bash
+curl https://localhost:7332/last_height
+```
+
+**Example response**
+```json
+{ "lastHeight": 1024 }
+```
+
 ### `GET /live_stats`
 Returns a snapshot of the node's current view of the chain along with runtime parameters.
 
