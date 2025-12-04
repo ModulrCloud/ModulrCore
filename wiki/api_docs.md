@@ -213,7 +213,9 @@ Finds a transaction by its hash.
 
 - **Path parameters**
   - `hash`: Hex-encoded transaction hash.
-- **Success (200)**: [`structures.Transaction`](../structures/transaction.go).
+- **Success (200)**: Object containing both the transaction and its receipt:
+  - `tx`: [`structures.Transaction`](../structures/transaction.go).
+  - `receipt`: [`structures.TransactionReceipt`](../structures/transaction.go).
 - **Errors**
   - `400` — missing or invalid hash.
   - `404` — transaction does not exist.
@@ -227,16 +229,22 @@ curl https://localhost:7332/transaction/ab5f5cb2...
 **Example response**
 ```json
 {
-  "v": 1,
-  "type": "transfer",
-  "from": "ed25519_sender...",
-  "to": "ed25519_receiver...",
-  "amount": 50000000,
-  "fee": 1000,
-  "sig": "aabbcc...",
-  "nonce": 57,
-  "payload": {
-    "memo": "Invoice #582"
+  "tx": {
+    "v": 1,
+    "from": "ed25519_sender...",
+    "to": "ed25519_receiver...",
+    "amount": 50000000,
+    "fee": 1000,
+    "sig": "aabbcc...",
+    "nonce": 57,
+    "payload": {
+      "memo": "Invoice #582"
+    }
+  },
+  "receipt": {
+    "block": "42:ed25519_abcd...:0",
+    "position": 3,
+    "success": true
   }
 }
 ```

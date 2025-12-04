@@ -291,7 +291,12 @@ func GetTransactionByHash(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	transactionBytes, err := json.Marshal(block.Transactions[txReceipt.Position])
+	response := structures.TxWithReceipt{
+		Tx:      block.Transactions[txReceipt.Position],
+		Receipt: txReceipt,
+	}
+
+	transactionBytes, err := json.Marshal(response)
 
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)

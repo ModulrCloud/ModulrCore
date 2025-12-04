@@ -9,6 +9,11 @@ import (
 	"lukechampine.com/blake3"
 )
 
+type TxWithReceipt struct {
+	Tx      Transaction        `json:"tx"`
+	Receipt TransactionReceipt `json:"receipt"`
+}
+
 type TransactionReceipt struct {
 	Block    string `json:"block"`    // reference to block where tx located
 	Position int    `json:"position"` // position in this block
