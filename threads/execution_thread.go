@@ -25,184 +25,81 @@ func ExecutionThread() {
 
 		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler
 
-		currentEpochIsFresh := utils.EpochStillFresh(epochHandlerRef)
+		// Take the leader by it's position
 
-		shouldMoveToNextEpoch := false
+		currentEpochAlignmentData := &epochHandlerRef.SequenceAlignmentData
 
-		if epochHandlerRef.LegacyEpochAlignmentData.Activated {
+		leaderPubkeyToExecBlocks := epochHandlerRef.EpochDataHandler.LeadersSequence[currentEpochAlignmentData.CurrentLeaderToExecBlocksFrom]
 
-			infoFromAefpAboutLastBlocksByLeaders := epochHandlerRef.LegacyEpochAlignmentData.InfoAboutLastBlocksInEpoch
+		execStatsOfLeader := epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks] // {index,hash}
 
-			var localExecMetadataForLeader, metadataFromAefpForLeader structures.ExecutionStatsPerLeaderSequence
+		infoAboutLastBlockByThisLeader, infoAboutLastBlockExists := currentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubkeyToExecBlocks] // {index,hash}
 
-			dataExists := false
+		if infoAboutLastBlockExists && execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index {
 
-			for {
+			// Move to the next leader
 
-				indexOfLeaderToExec := epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom
+			epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom++
 
-				pubKeyOfLeader := epochHandlerRef.EpochDataHandler.LeadersSequence[indexOfLeaderToExec]
+			// Here we need to skip the following logic and start next iteration
 
-				localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
+			// handlers.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
 
-				metadataFromAefpForLeader, dataExists = infoFromAefpAboutLastBlocksByLeaders[pubKeyOfLeader]
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
-				if !dataExists {
+			continue
 
-					metadataFromAefpForLeader = structures.NewExecutionStatsTemplate()
+		}
 
-				}
+		if !infoAboutLastBlockExists {
 
-				finishedToExecBlocksByThisLeader := localExecMetadataForLeader.Index == metadataFromAefpForLeader.Index
+			infoAboutLastBlockByThisLeader = structures.NewExecutionStatsTemplate()
+		}
 
-				if finishedToExecBlocksByThisLeader {
+		// Now, when we have connection with some entity which has an ability to give us blocks via WS(s) tunnel
 
-					itsTheLastLeaderInSequence := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == indexOfLeaderToExec+1
+		// ___________ Now start a cycle to fetch blocks and exec ___________
 
-					if itsTheLastLeaderInSequence {
+		for {
 
-						break
+			// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
 
-					} else {
+			blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + leaderPubkeyToExecBlocks + ":" + strconv.Itoa(execStatsOfLeader.Index+1)
 
-						epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom++
+			response := getBlockAndProofFromPoD(blockId)
 
-						continue
-
-					}
-
-				}
-
-				// ___________ Now start a cycle to fetch blocks and exec ___________
-
-				for {
-
-					// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
-
-					blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + pubKeyOfLeader + ":" + strconv.Itoa(localExecMetadataForLeader.Index+1)
-
-					response := getBlockAndProofFromPoD(blockId)
-
-					// Leave cycle if no response or no block
-					if response == nil || response.Block == nil {
-						break
-					}
-
-					if localExecMetadataForLeader.Index+1 == metadataFromAefpForLeader.Index && response.Block.GetHash() == metadataFromAefpForLeader.Hash {
-
-						// No need to verify AFP
-						executeBlock(response.Block)
-
-						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
-
-					} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
-
-						// Exec only if AFP is valid
-						executeBlock(response.Block)
-
-						localExecMetadataForLeader = epochHandlerRef.ExecutionData[pubKeyOfLeader]
-
-					} else {
-
-						break
-
-					}
-
-				}
-
+			// If no data - break
+			if response == nil || response.Block == nil {
+				break
 			}
 
-			allBlocksWereExecutedInLegacyEpoch := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.LegacyEpochAlignmentData.CurrentLeaderToExecBlocksFrom+1
+			if infoAboutLastBlockExists && execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
 
-			finishedToExecBlocksByLastLeader := localExecMetadataForLeader.Index == metadataFromAefpForLeader.Index
+				// Let is exec without AFP
+				executeBlock(response.Block)
 
-			if allBlocksWereExecutedInLegacyEpoch && finishedToExecBlocksByLastLeader {
+				execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
 
-				shouldMoveToNextEpoch = true
-			}
+			} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
 
-		} else if currentEpochIsFresh && epochHandlerRef.SequenceAlignmentData.Activated {
+				// Exec only if AFP is valid
+				executeBlock(response.Block)
 
-			// Take the leader by it's position
+				execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
 
-			currentEpochAlignmentData := &epochHandlerRef.SequenceAlignmentData
+			} else {
 
-			leaderPubkeyToExecBlocks := epochHandlerRef.EpochDataHandler.LeadersSequence[currentEpochAlignmentData.CurrentLeaderToExecBlocksFrom]
-
-			execStatsOfLeader := epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks] // {index,hash}
-
-			infoAboutLastBlockByThisLeader, exists := currentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubkeyToExecBlocks] // {index,hash}
-
-			if exists && execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index {
-
-				// Move to the next leader
-
-				epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom++
-
-				if !currentEpochIsFresh {
-
-					tryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
-
-				}
-
-				// Here we need to skip the following logic and start next iteration
-
-				// handlers.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
-
-				handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
-
-				continue
-
-			}
-
-			// Now, when we have connection with some entity which has an ability to give us blocks via WS(s) tunnel
-
-			// ___________ Now start a cycle to fetch blocks and exec ___________
-
-			for {
-
-				// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
-
-				blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + leaderPubkeyToExecBlocks + ":" + strconv.Itoa(execStatsOfLeader.Index+1)
-
-				response := getBlockAndProofFromPoD(blockId)
-
-				// If no data - break
-				if response == nil || response.Block == nil {
-					break
-				}
-
-				if execStatsOfLeader.Index+1 == infoAboutLastBlockByThisLeader.Index && response.Block.GetHash() == infoAboutLastBlockByThisLeader.Hash {
-
-					// Let is exec without AFP
-					executeBlock(response.Block)
-
-					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
-
-				} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerRef.EpochDataHandler) {
-
-					// Exec only if AFP is valid
-					executeBlock(response.Block)
-
-					execStatsOfLeader = epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks]
-
-				} else {
-
-					break
-
-				}
+				break
 
 			}
 
 		}
 
-		if !currentEpochIsFresh && !epochHandlerRef.LegacyEpochAlignmentData.Activated {
+		finishedToExecBlocksByLastLeader := execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index
 
-			tryToFinishCurrentEpoch(&epochHandlerRef.EpochDataHandler)
+		allBlocksWereExecuted := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom+1
 
-		}
-
-		if shouldMoveToNextEpoch {
+		if allBlocksWereExecuted && finishedToExecBlocksByLastLeader && utils.EpochStillFresh(epochHandlerRef) {
 
 			setupNextEpoch(&epochHandlerRef.EpochDataHandler)
 
@@ -252,90 +149,137 @@ func executeBlock(block *block_pack.Block) {
 	epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler
 
 	if epochHandlerRef.Statistics == nil {
+
 		epochHandlerRef.Statistics = &structures.Statistics{LastHeight: -1}
+
 	}
 
 	if epochHandlerRef.ExecutionData[block.Creator].Hash == block.PrevHash {
 
 		currentEpochIndex := epochHandlerRef.EpochDataHandler.Id
+
 		currentBlockId := strconv.Itoa(currentEpochIndex) + ":" + block.Creator + ":" + strconv.Itoa(block.Index)
 
 		// To change the state atomically - prepare the atomic batch
 		stateBatch := new(leveldb.Batch)
 
 		blockFees := uint64(0)
+
 		delayedTxPayloadsForBatch := make([]map[string]string, 0)
 
 		for index, transaction := range block.Transactions {
 
 			success, fee, delayedPayload, isDelayed := executeTransaction(&transaction)
+
 			if isDelayed {
+
 				delayedTxPayloadsForBatch = append(delayedTxPayloadsForBatch, delayedPayload)
+
 			}
+
 			epochHandlerRef.Statistics.TotalTransactions++
+
 			if success {
+
 				epochHandlerRef.Statistics.SuccessfulTransactions++
+
 			}
+
 			blockFees += fee
 
 			if locationBytes, err := json.Marshal(structures.TransactionReceipt{Block: currentBlockId, Position: index, Success: success}); err == nil {
+
 				stateBatch.Put([]byte("TX:"+transaction.Hash()), locationBytes)
+
 			} else {
+
 				panic("Impossible to add transaction location data to atomic batch")
+
 			}
+
 		}
 
 		if len(delayedTxPayloadsForBatch) > 0 {
+
 			if err := addDelayedTransactionsToBatch(delayedTxPayloadsForBatch, currentEpochIndex, stateBatch); err != nil {
+
 				panic("Impossible to add delayed transactions to atomic batch")
+
 			}
+
 		}
 
 		// distributeFeesAmongValidatorAndStakers(block.Creator, blockFees)
 		sendFeesToValidatorAccount(block.Creator, blockFees)
 
 		for accountID, accountData := range epochHandlerRef.AccountsCache {
+
 			if accountDataBytes, err := json.Marshal(accountData); err == nil {
+
 				stateBatch.Put([]byte(accountID), accountDataBytes)
+
 			} else {
+
 				panic("Impossible to add new account data to atomic batch")
+
 			}
+
 		}
 
 		for validatorPubkey, validatorStorage := range epochHandlerRef.ValidatorsStoragesCache {
+
 			if dataBytes, err := json.Marshal(validatorStorage); err == nil {
+
 				stateBatch.Put([]byte(validatorPubkey), dataBytes)
+
 			} else {
+
 				panic("Impossible to add validator storage to atomic batch")
+
 			}
+
 		}
 
 		// Update the execution data for progress
+
 		blockHash := block.GetHash()
 
 		blockCreatorData := epochHandlerRef.ExecutionData[block.Creator]
+
 		blockCreatorData.Index = block.Index
+
 		blockCreatorData.Hash = blockHash
 
 		epochHandlerRef.ExecutionData[block.Creator] = blockCreatorData
 
 		// Finally set the updated execution thread handler to atomic batch
+
 		epochHandlerRef.Statistics.LastHeight++
+
 		epochHandlerRef.Statistics.LastBlockHash = blockHash
+
 		epochHandlerRef.Statistics.TotalFees += blockFees
 
 		stateBatch.Put([]byte(fmt.Sprintf("BLOCK_INDEX:%d", epochHandlerRef.Statistics.LastHeight)), []byte(currentBlockId))
 
 		if execThreadRawBytes, err := json.Marshal(epochHandlerRef); err == nil {
+
 			stateBatch.Put([]byte("ET"), execThreadRawBytes)
+
 		} else {
+
 			panic("Impossible to store updated execution thread version to atomic batch")
+
 		}
 
 		if err := databases.STATE.Write(stateBatch, nil); err == nil {
+
 			utils.LogWithTime2(fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, epochHandlerRef.Statistics.LastHeight), utils.CYAN_COLOR)
+
 		} else {
+
 			panic("Impossible to commit changes in atomic batch to permanent state")
+
 		}
 
 	}
@@ -487,23 +431,41 @@ func validateDelayedTransaction(delayedTxType string, tx *structures.Transaction
 }
 
 func addDelayedTransactionsToBatch(delayedTxPayloads []map[string]string, epochIndex int, batch *leveldb.Batch) error {
+
 	delayedTxKey := fmt.Sprintf("DELAYED_TRANSACTIONS:%d", epochIndex+2)
+
 	cachedPayloads := make([]map[string]string, 0)
+
 	rawCachedPayloads, err := databases.STATE.Get([]byte(delayedTxKey), nil)
+
 	if err == nil {
+
 		if jsonErr := json.Unmarshal(rawCachedPayloads, &cachedPayloads); jsonErr != nil {
+
 			cachedPayloads = make([]map[string]string, 0)
+
 		}
+
 	} else if err != leveldb.ErrNotFound {
+
 		return err
+
 	}
+
 	cachedPayloads = append(cachedPayloads, delayedTxPayloads...)
+
 	serializedPayloads, err := json.Marshal(cachedPayloads)
+
 	if err != nil {
+
 		return err
+
 	}
+
 	batch.Put([]byte(delayedTxKey), serializedPayloads)
+
 	return nil
+
 }
 
 func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
@@ -562,6 +524,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		// Finally, clean useless data
 
 		handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
+
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		}
 
