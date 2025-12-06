@@ -50,6 +50,9 @@ func RunBlockchain() {
 	//✅ 6.Start execution process - take blocks and execute transactions
 	go threads.ExecutionThread()
 
+	//✅ 7.Thread to get consensus about the last block by each leader, grab proofs and send to anchors
+	go threads.LeadersFinalizationThread()
+
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
 	// Set the atomic flag to true
