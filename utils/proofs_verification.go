@@ -47,45 +47,6 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 	return okSignatures >= majority
 }
 
-func VerifyAggregatedLeaderRotationProof(proof *structures.AggregatedLeaderRotationProof, prevLeaderPubKey string, epochHandler *structures.EpochDataHandler) bool {
-
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
-
-	dataThatShouldBeSigned := "LEADER_ROTATION_PROOF:" + prevLeaderPubKey + ":" +
-		proof.FirstBlockHash + ":" +
-		strconv.Itoa(proof.SkipIndex) + ":" +
-		proof.SkipHash + ":" +
-		epochFullID
-
-	majority := GetQuorumMajority(epochHandler)
-
-	okSignatures := 0
-	seen := make(map[string]bool)
-	quorumMap := make(map[string]bool)
-
-	for _, pk := range epochHandler.Quorum {
-		quorumMap[strings.ToLower(pk)] = true
-	}
-
-	for pubKey, signature := range proof.Proofs {
-
-		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
-
-			loweredPubKey := strings.ToLower(pubKey)
-
-			if quorumMap[loweredPubKey] && !seen[loweredPubKey] {
-				seen[loweredPubKey] = true
-				okSignatures++
-			}
-
-		}
-
-	}
-
-	return okSignatures >= majority
-
-}
-
 func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandler *structures.EpochDataHandler) *structures.AggregatedFinalizationProof {
 
 	localAfpAsBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+blockID), nil)

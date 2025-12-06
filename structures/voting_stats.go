@@ -1,14 +1,14 @@
 package structures
 
-type LeaderVotingStat struct {
+type VotingStat struct {
 	Index int                         `json:"index"`
 	Hash  string                      `json:"hash"`
 	Afp   AggregatedFinalizationProof `json:"afp"`
 }
 
-func NewLeaderVotingStatTemplate() LeaderVotingStat {
+func NewLeaderVotingStatTemplate() VotingStat {
 
-	return LeaderVotingStat{
+	return VotingStat{
 		Index: -1,
 		Hash:  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		Afp:   AggregatedFinalizationProof{},

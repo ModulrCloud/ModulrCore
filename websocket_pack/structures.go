@@ -9,7 +9,7 @@ type WsLeaderRotationProofRequest struct {
 	Route                 string                                 `json:"route"`
 	IndexOfLeaderToRotate int                                    `json:"indexOfLeaderToRotate"`
 	AfpForFirstBlock      structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData              structures.LeaderVotingStat            `json:"skipData"`
+	SkipData              structures.VotingStat                  `json:"skipData"`
 }
 
 type WsLeaderRotationProofResponseOk struct {
@@ -24,7 +24,7 @@ type WsLeaderRotationProofResponseUpgrade struct {
 	ForLeaderPubkey  string                                 `json:"forLeaderPubkey"`
 	Status           string                                 `json:"status"`
 	AfpForFirstBlock structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData         structures.LeaderVotingStat            `json:"skipData"`
+	SkipData         structures.VotingStat                  `json:"skipData"`
 }
 
 type WsFinalizationProofRequest struct {

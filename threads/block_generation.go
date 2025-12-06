@@ -42,6 +42,7 @@ func BlocksGenerationThread() {
 func getTransactionsFromMempool() []structures.Transaction {
 
 	globals.MEMPOOL.Mutex.Lock()
+
 	defer globals.MEMPOOL.Mutex.Unlock()
 
 	limit := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.TxLimitPerBlock
@@ -49,7 +50,9 @@ func getTransactionsFromMempool() []structures.Transaction {
 	mempoolSize := len(globals.MEMPOOL.Slice)
 
 	if limit > mempoolSize {
+
 		limit = mempoolSize
+
 	}
 
 	transactions := make([]structures.Transaction, limit)
