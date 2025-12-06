@@ -7,8 +7,8 @@ import (
 )
 
 type ExtraDataToBlock struct {
-	Rest                     map[string]string                   `json:"rest"`
 	DelayedTransactionsBatch structures.DelayedTransactionsBatch `json:"delayedTxsBatch"`
+	Rest                     map[string]string                   `json:"rest"`
 }
 
 func (ed ExtraDataToBlock) MarshalJSON() ([]byte, error) {
