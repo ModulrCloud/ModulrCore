@@ -1,6 +1,7 @@
 package websocket_pack
 
 import (
+	"github.com/modulrcloud/modulr-core/anchors_pack"
 	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/structures"
 )
@@ -46,5 +47,15 @@ type WsBlockWithAfpRequest struct {
 
 type WsBlockWithAfpResponse struct {
 	Block *block_pack.Block                       `json:"block"`
+	Afp   *structures.AggregatedFinalizationProof `json:"afp"`
+}
+
+type WsAnchorBlockWithAfpRequest struct {
+	Route   string `json:"route"`
+	BlockId string `json:"blockID"`
+}
+
+type WsAnchorBlockWithAfpResponse struct {
+	Block *anchors_pack.AnchorBlock               `json:"block"`
 	Afp   *structures.AggregatedFinalizationProof `json:"afp"`
 }
