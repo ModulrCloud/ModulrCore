@@ -66,7 +66,7 @@ func ExecutionThread() {
 
 			blockId := strconv.Itoa(epochHandlerRef.EpochDataHandler.Id) + ":" + leaderPubkeyToExecBlocks + ":" + strconv.Itoa(execStatsOfLeader.Index+1)
 
-			response := getBlockAndProofFromPoD(blockId)
+			response := getBlockAndAfpFromPoD(blockId)
 
 			// If no data - break
 			if response == nil || response.Block == nil {
@@ -111,7 +111,7 @@ func ExecutionThread() {
 
 }
 
-func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
+func getBlockAndAfpFromPoD(blockID string) *websocket_pack.WsBlockWithAfpResponse {
 
 	req := websocket_pack.WsBlockWithAfpRequest{
 		Route:   "get_block_with_afp",
@@ -143,10 +143,10 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 
 }
 
-func getAnchorBlockAndProofFromAnchorsPoD(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse {
+func getAnchorBlockAndAfpFromAnchorsPoD(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse {
 
 	req := websocket_pack.WsAnchorBlockWithAfpRequest{
-		Route:   "get_anchor_block_with_afp",
+		Route:   "get_block_with_afp",
 		BlockId: blockID,
 	}
 
