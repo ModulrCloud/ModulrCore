@@ -139,6 +139,36 @@ func getBlockAndProofFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespo
 		}
 
 	}
+	return nil
+
+}
+
+func getAnchorBlockAndProofFromAnchorsPoD(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse {
+
+	req := websocket_pack.WsAnchorBlockWithAfpRequest{
+		Route:   "get_anchor_block_with_afp",
+		BlockId: blockID,
+	}
+
+	if reqBytes, err := json.Marshal(req); err == nil {
+
+		if respBytes, err := utils.SendWebsocketMessageToAnchorsPoD(reqBytes); err == nil {
+
+			var resp websocket_pack.WsAnchorBlockWithAfpResponse
+
+			if err := json.Unmarshal(respBytes, &resp); err == nil {
+
+				if resp.Block == nil {
+
+					return nil
+
+				}
+
+				return &resp
+
+			}
+		}
+	}
 
 	return nil
 
