@@ -58,7 +58,7 @@ type GenerationThreadMetadataHandler struct {
 }
 
 type AlignmentDataHandler struct {
-	CurrentLeaderAssumption       int                                        `json:"currentLeader"`
+	CurrentAnchorAssumption       int                                        `json:"currentLeader"`
 	CurrentLeaderToExecBlocksFrom int                                        `json:"currentToExecute"`
 	InfoAboutLastBlocksInEpoch    map[string]ExecutionStatsPerLeaderSequence `json:"infoAboutLastBlocksInEpoch"` // PUBKEY => {index:int, hash:""}
 }

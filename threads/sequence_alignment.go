@@ -30,7 +30,7 @@ func SequenceAlignmentThread() {
 
 		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
 
-		localVersionOfCurrentLeader := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentLeaderAssumption
+		localVersionOfCurrentLeader := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption
 
 		quorumMembers := utils.GetQuorumUrlsAndPubkeys(&handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler)
 
@@ -229,7 +229,7 @@ func SequenceAlignmentThread() {
 
 									// Finally, set the <currentLeader> to the new pointer
 
-									handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentLeaderAssumption = targetResponse.ProposedIndexOfLeader
+									handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption = targetResponse.ProposedIndexOfLeader
 
 									leaderPubkey := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence[targetResponse.ProposedIndexOfLeader]
 
