@@ -331,6 +331,7 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64, map[string]st
 	if cryptography.VerifySignature(tx.Hash(), tx.From, tx.Sig) {
 
 		accountFrom := utils.GetAccountFromExecThreadState(tx.From)
+		accountFrom.InitiatedTransactions++
 
 		if delayedTxPayload, delayedTxType, isDelayed := getDelayedTransactionPayload(tx); isDelayed {
 
@@ -343,6 +344,8 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64, map[string]st
 			accountFrom.Balance -= tx.Fee
 
 			accountFrom.Nonce++
+
+			accountFrom.SuccessfulInitiatedTransactions++
 
 			return true, tx.Fee, delayedTxPayload, true
 
@@ -359,6 +362,8 @@ func executeTransaction(tx *structures.Transaction) (bool, uint64, map[string]st
 			accountTo.Balance += tx.Amount
 
 			accountFrom.Nonce++
+
+			accountFrom.SuccessfulInitiatedTransactions++
 
 			return true, tx.Fee, nil, false
 
