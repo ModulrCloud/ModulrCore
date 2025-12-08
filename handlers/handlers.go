@@ -29,6 +29,7 @@ var EXECUTION_THREAD_METADATA = struct {
 		ExecutionData:           make(map[string]structures.ExecutionStatsPerLeaderSequence),
 		SequenceAlignmentData: structures.AlignmentDataHandler{
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
+			AnchorCatchUpTargets:       make(map[int]int),
 		},
 		Statistics: &structures.Statistics{LastHeight: -1},
 	},

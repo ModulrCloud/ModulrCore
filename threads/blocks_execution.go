@@ -561,6 +561,8 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 		handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
 
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
+
+			AnchorCatchUpTargets: make(map[int]int),
 		}
 
 		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished

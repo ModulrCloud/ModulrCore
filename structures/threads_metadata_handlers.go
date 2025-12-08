@@ -61,4 +61,5 @@ type AlignmentDataHandler struct {
 	CurrentAnchorAssumption       int                                        `json:"currentLeader"`
 	CurrentLeaderToExecBlocksFrom int                                        `json:"currentToExecute"`
 	InfoAboutLastBlocksInEpoch    map[string]ExecutionStatsPerLeaderSequence `json:"infoAboutLastBlocksInEpoch"` // PUBKEY => {index:int, hash:""}
+	AnchorCatchUpTargets          map[int]int                                `json:"anchorCatchUpTargets,omitempty"`
 }

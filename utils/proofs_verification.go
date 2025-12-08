@@ -47,6 +47,76 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 	return okSignatures >= majority
 }
 
+func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderFinalizationProof, epochHandler *structures.EpochDataHandler, firstBlockHash string) bool {
+
+	if proof == nil || epochHandler == nil || proof.EpochIndex != epochHandler.Id {
+		return false
+	}
+
+	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+
+	majority := GetQuorumMajority(epochHandler)
+
+	quorumMap := make(map[string]bool)
+	for _, pk := range epochHandler.Quorum {
+		quorumMap[strings.ToLower(pk)] = true
+	}
+
+	if firstBlockHash == "" {
+		firstBlockHash = structures.NewLeaderVotingStatTemplate().Hash
+	}
+
+	if proof.VotingStat.Index >= 0 {
+		parts := strings.Split(proof.VotingStat.Afp.BlockId, ":")
+		if len(parts) != 3 || parts[0] != strconv.Itoa(epochHandler.Id) || parts[1] != proof.Leader {
+			return false
+		}
+
+		indexFromId, err := strconv.Atoi(parts[2])
+		if err != nil || indexFromId != proof.VotingStat.Index || proof.VotingStat.Hash != proof.VotingStat.Afp.BlockHash {
+			return false
+		}
+
+		if !VerifyAggregatedFinalizationProof(&proof.VotingStat.Afp, epochHandler) {
+			return false
+		}
+	}
+
+	dataToVerify := strings.Join([]string{"LEADER_ROTATION_PROOF", proof.Leader, firstBlockHash, strconv.Itoa(proof.VotingStat.Index), proof.VotingStat.Hash, epochFullID}, ":")
+
+	okSignatures := 0
+	seen := make(map[string]bool)
+
+	for pubKey, signature := range proof.Signatures {
+		if cryptography.VerifySignature(dataToVerify, pubKey, signature) {
+			lowered := strings.ToLower(pubKey)
+			if quorumMap[lowered] && !seen[lowered] {
+				seen[lowered] = true
+				okSignatures++
+			}
+		}
+	}
+
+	return okSignatures >= majority
+}
+
+func VerifyAggregatedAnchorRotationProof(epochIndex int, anchor string, epochHandler *structures.EpochDataHandler, expectedAnchor string) bool {
+
+	if epochHandler == nil {
+		return false
+	}
+
+	if epochIndex != epochHandler.Id {
+		return false
+	}
+
+	if !strings.EqualFold(anchor, expectedAnchor) {
+		return false
+	}
+
+	return true
+}
+
 func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandler *structures.EpochDataHandler) *structures.AggregatedFinalizationProof {
 
 	localAfpAsBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+blockID), nil)

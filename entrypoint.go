@@ -44,13 +44,16 @@ func RunBlockchain() {
 	//✅ 4.Start a separate thread to work with voting for blocks in a sync way (for security)
 	go threads.LeaderRotationThread()
 
-	//✅ 5.Logical thread to build the temporary sequence of blocks to execute them (prepare for execution thread)
+	//✅ 5.Thread to resolve the block sequence and prepare linear blocks data for ExecutionThread
 	go threads.SequenceAlignmentThread()
 
-	//✅ 6.Start execution process - take blocks and execute transactions
+	//✅ 6.Thread to jump between anchors and support SequenceAlignmentThread
+	go threads.SequenceAlignmentDataWatcher()
+
+	//✅ 7.Start execution process - take blocks and execute transactions
 	go threads.ExecutionThread()
 
-	//✅ 7.Thread to get consensus about the last block by each leader, grab proofs and send to anchors
+	//✅ 8.Thread to get consensus about the last block by each leader, grab proofs and send to anchors
 	go threads.LeadersFinalizationThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
