@@ -300,7 +300,7 @@ Fetches account state from the LevelDB-backed state store.
 
 - **Path parameters**
   - `accountId`: Account identifier (public key string).
-- **Success (200)**: [`structures.Account`](../structures/account.go) with `balance` and `nonce`.
+- **Success (200)**: [`structures.Account`](../structures/account.go) with `balance`, `nonce`, `initiatedTransactions`, and `successfulInitiatedTransactions` counters for the sender's activity.
 - **Errors**
   - `400` — invalid account identifier.
   - `404` — account not found.
@@ -315,7 +315,9 @@ curl https://localhost:7332/account/6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE
 ```json
 {
   "balance": 275000000,
-  "nonce": 12
+  "nonce": 12,
+  "initiatedTransactions": 34,
+  "successfulInitiatedTransactions": 30
 }
 ```
 
