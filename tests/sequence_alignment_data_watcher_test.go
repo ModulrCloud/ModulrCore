@@ -610,7 +610,7 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 		}
 
 		anchor := globals.ANCHORS[anchorIndex]
-		currentExec := metadata.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom
+		currentExec := metadata.SequenceAlignmentData.CurrentAnchorBlockIndexToObserve
 
 		blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, currentExec)
 		response := fetcher(blockID)
@@ -633,7 +633,7 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 				}
 			}
 
-			metadata.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom = currentExec + 1
+			metadata.SequenceAlignmentData.CurrentAnchorBlockIndexToObserve = currentExec + 1
 			continue
 		}
 
@@ -649,7 +649,7 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 			}
 
 			metadata.SequenceAlignmentData.CurrentAnchorAssumption = anchorIndex + 1
-			metadata.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom = 0
+			metadata.SequenceAlignmentData.CurrentAnchorBlockIndexToObserve = 0
 			continue
 		}
 
