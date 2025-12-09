@@ -58,9 +58,9 @@ type GenerationThreadMetadataHandler struct {
 }
 
 type AlignmentDataHandler struct {
-	CurrentAnchorAssumption          int                       `json:"currentAnchorAssumption"`
-	CurrentAnchorBlockIndexToObserve int                       `json:"currentAnchorBlockIndexToObserve"`
-	CurrentLeaderToExecBlocksFrom    int                       `json:"currentToExecute"`
-	LastBlocksByLeaders              map[string]ExecutionStats `json:"lastBlocksByLeaders"` // PUBKEY => {index:int, hash:""}
-	LastBlocksByAnchors              map[int]ExecutionStats    `json:"lastBlocksByAnchors"`
+	CurrentAnchorAssumption         int                       `json:"currentAnchorAssumption"`
+	CurrentAnchorBlockIndexObserved int                       `json:"currentAnchorBlockIndexObserved"`
+	CurrentLeaderToExecBlocksFrom   int                       `json:"currentToExecute"`
+	LastBlocksByLeaders             map[string]ExecutionStats `json:"lastBlocksByLeaders"` // PUBKEY => {index:int, hash:""}
+	LastBlocksByAnchors             map[int]ExecutionStats    `json:"lastBlocksByAnchors"`
 }

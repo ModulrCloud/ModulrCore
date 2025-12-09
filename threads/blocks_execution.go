@@ -43,17 +43,10 @@ func ExecutionThread() {
 
 			// Here we need to skip the following logic and start next iteration
 
-			// handlers.EXECUTION_THREAD_METADATA_HANDLER.RWMutex.RUnlock()
-
 			handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
 			continue
 
-		}
-
-		if !infoAboutLastBlockExists {
-
-			infoAboutLastBlockByThisLeader = structures.NewExecutionStatsTemplate()
 		}
 
 		// Now, when we have connection with some entity which has an ability to give us blocks via WS(s) tunnel
@@ -95,13 +88,17 @@ func ExecutionThread() {
 
 		}
 
-		finishedToExecBlocksByLastLeader := execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index
+		if infoAboutLastBlockExists {
 
-		allBlocksWereExecuted := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom+1
+			finishedToExecBlocksByLastLeader := execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index
 
-		if allBlocksWereExecuted && finishedToExecBlocksByLastLeader && utils.EpochStillFresh(epochHandlerRef) {
+			allBlocksWereExecuted := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom+1
 
-			setupNextEpoch(&epochHandlerRef.EpochDataHandler)
+			if allBlocksWereExecuted && finishedToExecBlocksByLastLeader && utils.EpochStillFresh(epochHandlerRef) {
+
+				setupNextEpoch(&epochHandlerRef.EpochDataHandler)
+
+			}
 
 		}
 
