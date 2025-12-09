@@ -562,7 +562,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
 
-			AnchorCatchUpTargets: make(map[int]int),
+			AnchorCatchUpTargets: make(map[int]structures.ExecutionStatsPerLeaderSequence),
 		}
 
 		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished
