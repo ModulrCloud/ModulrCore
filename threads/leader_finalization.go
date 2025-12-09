@@ -19,20 +19,20 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type leaderFinalizationCache struct {
+type LeaderFinalizationCache struct {
 	SkipData structures.VotingStat
 	Proofs   map[string]string
 }
 
-type epochRotationState struct {
-	caches  map[string]*leaderFinalizationCache
+type EpochRotationState struct {
+	caches  map[string]*LeaderFinalizationCache
 	wsConns map[string]*websocket.Conn
 	waiter  *utils.QuorumWaiter
 }
 
 var (
 	leaderFinalizationMutex  = sync.Mutex{}
-	leaderFinalizationStates = make(map[int]*epochRotationState)
+	leaderFinalizationStates = make(map[int]*EpochRotationState)
 	processingEpochId        = -1
 	defaultHash              = structures.NewLeaderVotingStatTemplate().Hash
 	finalizationProgressKey  = []byte("ALFP_PROGRESS")
@@ -54,14 +54,14 @@ func LeadersFinalizationThread() {
 			continue
 		}
 
-		state := ensureLeaderRotationState(processingHandler)
+		state := ensureLeaderFinalizationState(processingHandler)
 		majority := utils.GetQuorumMajority(processingHandler)
 
 		for _, leaderIndex := range leadersReadyForAlfp(processingHandler, &networkParams) {
 			tryCollectLeaderFinalizationProofs(processingHandler, leaderIndex, majority, state)
 		}
 
-		if allLeaderRotationProofsCollected(processingHandler) {
+		if allLeaderFinalizationProofsCollected(processingHandler) {
 			processingEpochId++
 			persistFinalizationProgress(processingEpochId)
 		}
@@ -70,7 +70,7 @@ func LeadersFinalizationThread() {
 	}
 }
 
-func ensureLeaderRotationState(epochHandler *structures.EpochDataHandler) *epochRotationState {
+func ensureLeaderFinalizationState(epochHandler *structures.EpochDataHandler) *EpochRotationState {
 
 	leaderFinalizationMutex.Lock()
 	defer leaderFinalizationMutex.Unlock()
@@ -79,8 +79,8 @@ func ensureLeaderRotationState(epochHandler *structures.EpochDataHandler) *epoch
 		return state
 	}
 
-	state := &epochRotationState{
-		caches:  make(map[string]*leaderFinalizationCache),
+	state := &EpochRotationState{
+		caches:  make(map[string]*LeaderFinalizationCache),
 		wsConns: make(map[string]*websocket.Conn),
 		waiter:  utils.NewQuorumWaiter(len(epochHandler.Quorum)),
 	}
@@ -173,7 +173,7 @@ func leaderHasAlfp(epochId int, leader string) bool {
 	return err == nil
 }
 
-func allLeaderRotationProofsCollected(epochHandler *structures.EpochDataHandler) bool {
+func allLeaderFinalizationProofsCollected(epochHandler *structures.EpochDataHandler) bool {
 
 	for _, leader := range epochHandler.LeadersSequence {
 		if !leaderHasAlfp(epochHandler.Id, leader) {
@@ -190,7 +190,7 @@ func leaderTimeIsOut(epochHandler *structures.EpochDataHandler, networkParams *s
 	return utils.GetUTCTimestampInMilliSeconds() >= int64(epochHandler.StartTimestamp)+(int64(leaderIndex)+1)*leadershipTimeframe
 }
 
-func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandler, leaderIndex, majority int, state *epochRotationState) {
+func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandler, leaderIndex, majority int, state *EpochRotationState) {
 
 	leaderPubKey := epochHandler.LeadersSequence[leaderIndex]
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
@@ -199,7 +199,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 		return
 	}
 
-	cache := ensureLeaderRotationCache(state, epochHandler.Id, leaderPubKey)
+	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
 
 	request := websocket_pack.WsLeaderFinalizationProofRequest{
 		Route:                   "get_leader_finalization_proof",
@@ -221,7 +221,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 	}
 
 	for _, raw := range responses {
-		handleLeaderRotationResponse(raw, epochHandler, leaderPubKey, epochFullID, state)
+		handleLeaderFinalizationResponse(raw, epochHandler, leaderPubKey, epochFullID, state)
 	}
 
 	leaderFinalizationMutex.Lock()
@@ -229,11 +229,11 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 	leaderFinalizationMutex.Unlock()
 
 	if proofsCount >= majority {
-		persistAggregatedLeaderRotationProof(cache, epochHandler.Id, leaderPubKey)
+		persistAggregatedLeaderFinalizationProof(cache, epochHandler.Id, leaderPubKey)
 	}
 }
 
-func ensureLeaderRotationCache(state *epochRotationState, epochId int, leaderPubKey string) *leaderFinalizationCache {
+func ensureLeaderFinalizationCache(state *EpochRotationState, epochId int, leaderPubKey string) *LeaderFinalizationCache {
 
 	key := fmt.Sprintf("%d:%s", epochId, leaderPubKey)
 
@@ -244,7 +244,7 @@ func ensureLeaderRotationCache(state *epochRotationState, epochId int, leaderPub
 		return cache
 	}
 
-	cache := &leaderFinalizationCache{
+	cache := &LeaderFinalizationCache{
 		SkipData: loadLeaderSkipData(epochId, leaderPubKey),
 		Proofs:   make(map[string]string),
 	}
@@ -266,7 +266,7 @@ func loadLeaderSkipData(epochId int, leaderPubKey string) structures.VotingStat 
 	return skipData
 }
 
-func handleLeaderRotationResponse(raw []byte, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *epochRotationState) {
+func handleLeaderFinalizationResponse(raw []byte, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *EpochRotationState) {
 
 	var statusHolder map[string]any
 
@@ -283,23 +283,23 @@ func handleLeaderRotationResponse(raw []byte, epochHandler *structures.EpochData
 	case "OK":
 		var response websocket_pack.WsLeaderFinalizationProofResponseOk
 		if json.Unmarshal(raw, &response) == nil {
-			handleLeaderRotationOk(response, epochHandler, leaderPubKey, epochFullID, state)
+			handleLeaderFinalizationOk(response, epochHandler, leaderPubKey, epochFullID, state)
 		}
 	case "UPGRADE":
 		var response websocket_pack.WsLeaderFinalizationProofResponseUpgrade
 		if json.Unmarshal(raw, &response) == nil {
-			handleLeaderRotationUpgrade(response, epochHandler, leaderPubKey, state)
+			handleLeaderFinalizationUpgrade(response, epochHandler, leaderPubKey, state)
 		}
 	}
 }
 
-func handleLeaderRotationOk(response websocket_pack.WsLeaderFinalizationProofResponseOk, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *epochRotationState) {
+func handleLeaderFinalizationOk(response websocket_pack.WsLeaderFinalizationProofResponseOk, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *EpochRotationState) {
 
 	if response.ForLeaderPubkey != leaderPubKey {
 		return
 	}
 
-	cache := ensureLeaderRotationCache(state, epochHandler.Id, leaderPubKey)
+	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
 
 	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", leaderPubKey, strconv.Itoa(cache.SkipData.Index), cache.SkipData.Hash, epochFullID}, ":")
 
@@ -318,7 +318,7 @@ func handleLeaderRotationOk(response websocket_pack.WsLeaderFinalizationProofRes
 	}
 }
 
-func handleLeaderRotationUpgrade(response websocket_pack.WsLeaderFinalizationProofResponseUpgrade, epochHandler *structures.EpochDataHandler, leaderPubKey string, state *epochRotationState) {
+func handleLeaderFinalizationUpgrade(response websocket_pack.WsLeaderFinalizationProofResponseUpgrade, epochHandler *structures.EpochDataHandler, leaderPubKey string, state *EpochRotationState) {
 
 	if response.ForLeaderPubkey != leaderPubKey {
 		return
@@ -328,7 +328,7 @@ func handleLeaderRotationUpgrade(response websocket_pack.WsLeaderFinalizationPro
 		return
 	}
 
-	cache := ensureLeaderRotationCache(state, epochHandler.Id, leaderPubKey)
+	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
 
 	leaderFinalizationMutex.Lock()
 	cache.SkipData = response.SkipData
@@ -363,10 +363,9 @@ func validateUpgradePayload(response websocket_pack.WsLeaderFinalizationProofRes
 	return true
 }
 
-func persistAggregatedLeaderRotationProof(cache *leaderFinalizationCache, epochId int, leaderPubKey string) {
+func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, epochId int, leaderPubKey string) {
 
 	leaderFinalizationMutex.Lock()
-	defer leaderFinalizationMutex.Unlock()
 
 	aggregated := structures.AggregatedLeaderFinalizationProof{
 		EpochIndex: epochId,
@@ -383,4 +382,7 @@ func persistAggregatedLeaderRotationProof(cache *leaderFinalizationCache, epochI
 	if value, err := json.Marshal(aggregated); err == nil {
 		_ = databases.FINALIZATION_VOTING_STATS.Put(key, value, nil)
 	}
+
+	leaderFinalizationMutex.Unlock()
+
 }

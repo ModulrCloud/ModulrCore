@@ -113,13 +113,11 @@ curl https://localhost:7332/block/0:9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK
   ],
   "extraData": {
     "rest": {},
-    "aefpForPreviousEpoch": null,
     "delayedTxsBatch": {
       "epochIndex": 42,
       "delayedTransactions": [],
       "proofs": {}
-    },
-    "aggregatedLeadersRotationProofs": {}
+    }
   },
   "index": 0,
   "prevHash": "00f9...",
@@ -166,13 +164,11 @@ curl https://localhost:7332/height/1024
   ],
   "extraData": {
     "rest": {},
-    "aefpForPreviousEpoch": null,
     "delayedTxsBatch": {
       "epochIndex": 42,
       "delayedTransactions": [],
       "proofs": {}
-    },
-    "aggregatedLeadersRotationProofs": {}
+    }
   },
   "index": 0,
   "prevHash": "00f9...",

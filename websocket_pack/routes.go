@@ -255,26 +255,26 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 			if afpIsOk {
 
-				dataToSignForLeaderRotation := ""
+				dataToSignForLeaderFinalization := ""
 
 				if parsedRequest.SkipData.Index == -1 {
 
-					dataToSignForLeaderRotation = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize
-					dataToSignForLeaderRotation += ":-1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:"
-					dataToSignForLeaderRotation += epochFullID
+					dataToSignForLeaderFinalization = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize
+					dataToSignForLeaderFinalization += ":-1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:"
+					dataToSignForLeaderFinalization += epochFullID
 
 				} else if parsedRequest.SkipData.Index >= 0 {
 
-					dataToSignForLeaderRotation = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize +
+					dataToSignForLeaderFinalization = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize +
 						":" + strconv.Itoa(propSkipData.Index) +
 						":" + propSkipData.Hash +
 						":" + epochFullID
 
 				}
 
-				// Finally - generate LRP(leader rotation proof)
+				// Finally - generate LFP(leader finalization proof)
 
-				leaderRotationProofMessage := WsLeaderFinalizationProofResponseOk{
+				leaderFinalizationProofMessage := WsLeaderFinalizationProofResponseOk{
 
 					Voter: globals.CONFIGURATION.PublicKey,
 
@@ -282,10 +282,10 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 					Status: "OK",
 
-					Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
+					Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderFinalization),
 				}
 
-				jsonResponse, err := json.Marshal(leaderRotationProofMessage)
+				jsonResponse, err := json.Marshal(leaderFinalizationProofMessage)
 
 				if err == nil {
 
