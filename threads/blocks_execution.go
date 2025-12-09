@@ -33,7 +33,7 @@ func ExecutionThread() {
 
 		execStatsOfLeader := epochHandlerRef.ExecutionData[leaderPubkeyToExecBlocks] // {index,hash}
 
-		infoAboutLastBlockByThisLeader, infoAboutLastBlockExists := currentEpochAlignmentData.InfoAboutLastBlocksInEpoch[leaderPubkeyToExecBlocks] // {index,hash}
+		infoAboutLastBlockByThisLeader, infoAboutLastBlockExists := currentEpochAlignmentData.LastBlocksByLeaders[leaderPubkeyToExecBlocks] // {index,hash}
 
 		if infoAboutLastBlockExists && execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index {
 
@@ -548,7 +548,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		// Nullify values for the upcoming epoch
 
-		handlers.EXECUTION_THREAD_METADATA.Handler.ExecutionData = make(map[string]structures.ExecutionStatsPerLeaderSequence)
+		handlers.EXECUTION_THREAD_METADATA.Handler.ExecutionData = make(map[string]structures.ExecutionStats)
 
 		for _, validatorPubkey := range handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.LeadersSequence {
 
@@ -560,9 +560,9 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
 
-			InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence),
+			LastBlocksByLeaders: make(map[string]structures.ExecutionStats),
 
-			AnchorCatchUpTargets: make(map[int]structures.ExecutionStatsPerLeaderSequence),
+			LastBlocksByAnchors: make(map[int]structures.ExecutionStats),
 		}
 
 		// Commit the changes of state using atomic batch. Because we modified state via delayed transactions when epoch finished

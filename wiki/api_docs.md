@@ -352,32 +352,3 @@ curl https://localhost:7332/epoch_data/42
   ]
 }
 ```
-
-### `GET /aggregated_epoch_finalization_proof/{epochIndex}`
-Reads the aggregated epoch finalization proof stored under `AEFP:{epochIndex}`.
-
-- **Path parameters**
-  - `epochIndex`: Epoch number as a string.
-- **Success (200)**: [`structures.AggregatedEpochFinalizationProof`](../structures/proofs.go).
-- **Errors**
-  - `400` — invalid epoch index.
-  - `404` — proof not found.
-
-**Example request**
-```bash
-curl https://localhost:7332/aggregated_epoch_finalization_proof/42
-```
-
-**Example response**
-```json
-{
-  "lastLeader": 3,
-  "lastIndex": 11,
-  "lastHash": "aa99...",
-  "hashOfFirstBlockByLastLeader": "bb10...",
-  "proofs": {
-    "ed25519_validator_2": "0f41...",
-    "ed25519_validator_7": "98ac..."
-  }
-}
-```

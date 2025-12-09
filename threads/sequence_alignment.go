@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/modulrcloud/modulr-core/anchors_pack"
-	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -23,37 +22,28 @@ type SequenceAlignmentDataResponse struct {
 	Afp                *structures.AggregatedFinalizationProof `json:"afp,omitempty"`
 }
 
-func SequenceAlignmentThread2() {
+func SequenceAlignmentThread() {
 
 	for {
 
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		anchorIndex := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption
+
 		epochHandler := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
-		currentExecIndex := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom
-		catchUpTargets := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.AnchorCatchUpTargets
+
+		anchorIndex := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption
+
+		catchUpTargets := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByAnchors
+
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
-
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		latestAnchorIndex := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
-
-		if latestAnchorIndex != anchorIndex {
-			time.Sleep(time.Second)
-			continue
-		}
-
-		if anchorIndex < 0 || anchorIndex >= len(globals.ANCHORS) {
-			time.Sleep(time.Second)
-			continue
-		}
 
 		anchor := globals.ANCHORS[anchorIndex]
 
-		target, hasTarget := catchUpTargets[anchorIndex]
-		if !hasTarget {
+		target, hasInfoAboutLastBlockByAnchor := catchUpTargets[anchorIndex]
+
+		if !hasInfoAboutLastBlockByAnchor {
+
 			currentExecIndex = 0
-			blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, currentExecIndex)
+			blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, anchorIndex)
 
 			response := getAnchorBlockAndAfpFromAnchorsPoD(blockID)
 			if response == nil || response.Block == nil || response.Afp == nil {
@@ -73,44 +63,41 @@ func SequenceAlignmentThread2() {
 
 			for _, proof := range response.Block.ExtraData.AggregatedLeaderFinalizationProofs {
 
-				firstBlockHash := structures.NewLeaderVotingStatTemplate().Hash
-				if firstBlock := block_pack.GetBlock(epochHandler.Id, proof.Leader, 0, &epochHandler); firstBlock != nil {
-					firstBlockHash = firstBlock.GetHash()
-				}
-
-				if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, &epochHandler, firstBlockHash) {
+				if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, &epochHandler) {
 					continue
 				}
 
 				handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
 
-				if _, exists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[proof.Leader]; !exists {
-					handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[proof.Leader] = structures.ExecutionStatsPerLeaderSequence{
-						Index:          proof.VotingStat.Index,
-						Hash:           proof.VotingStat.Hash,
-						FirstBlockHash: "",
+				if _, exists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader]; !exists {
+
+					handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader] = structures.ExecutionStats{
+						Index: proof.VotingStat.Index,
+						Hash:  proof.VotingStat.Hash,
 					}
+
 				}
 
 				handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 			}
 
 			time.Sleep(time.Second)
-			continue
-		}
 
-		if currentExecIndex < 0 {
-			currentExecIndex = 0
+			continue
+
 		}
 
 		blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, currentExecIndex)
+
 		response := getAnchorBlockAndAfpFromAnchorsPoD(blockID)
+
 		if response == nil || response.Block == nil {
 			time.Sleep(time.Second)
 			continue
 		}
 
 		block := response.Block
+
 		if block.Creator != anchor.Pubkey || block.Index != currentExecIndex || !block.VerifySignature() {
 			time.Sleep(time.Second)
 			continue
@@ -140,7 +127,7 @@ func SequenceAlignmentThread2() {
 			}
 
 			handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
-			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[anchor.Pubkey] = structures.ExecutionStatsPerLeaderSequence{
+			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[anchor.Pubkey] = structures.ExecutionStats{
 				Index:          target.Index,
 				Hash:           actualHash,
 				FirstBlockHash: "",

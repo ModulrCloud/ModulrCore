@@ -6,26 +6,24 @@ import (
 	"github.com/modulrcloud/modulr-core/structures"
 )
 
-type WsLeaderRotationProofRequest struct {
-	Route                 string                                 `json:"route"`
-	IndexOfLeaderToRotate int                                    `json:"indexOfLeaderToRotate"`
-	AfpForFirstBlock      structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData              structures.VotingStat                  `json:"skipData"`
+type WsLeaderFinalizationProofRequest struct {
+	Route                   string                `json:"route"`
+	IndexOfLeaderToFinalize int                   `json:"indexOfLeaderToFinalize"`
+	SkipData                structures.VotingStat `json:"skipData"`
 }
 
-type WsLeaderRotationProofResponseOk struct {
+type WsLeaderFinalizationProofResponseOk struct {
 	Voter           string `json:"voter"`
 	ForLeaderPubkey string `json:"forLeaderPubkey"`
 	Status          string `json:"status"`
 	Sig             string `json:"sig"`
 }
 
-type WsLeaderRotationProofResponseUpgrade struct {
-	Voter            string                                 `json:"voter"`
-	ForLeaderPubkey  string                                 `json:"forLeaderPubkey"`
-	Status           string                                 `json:"status"`
-	AfpForFirstBlock structures.AggregatedFinalizationProof `json:"afpForFirstBlock"`
-	SkipData         structures.VotingStat                  `json:"skipData"`
+type WsLeaderFinalizationProofResponseUpgrade struct {
+	Voter           string                `json:"voter"`
+	ForLeaderPubkey string                `json:"forLeaderPubkey"`
+	Status          string                `json:"status"`
+	SkipData        structures.VotingStat `json:"skipData"`
 }
 
 type WsFinalizationProofRequest struct {

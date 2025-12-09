@@ -61,8 +61,8 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		return scenario.blockMap[blockID]
 	}
 
-	metaA := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence), AnchorCatchUpTargets: make(map[int]structures.ExecutionStatsPerLeaderSequence)}}
-	metaB := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, InfoAboutLastBlocksInEpoch: make(map[string]structures.ExecutionStatsPerLeaderSequence), AnchorCatchUpTargets: make(map[int]structures.ExecutionStatsPerLeaderSequence)}}
+	metaA := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
+	metaB := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
 
 	// Node A receives a higher anchor response, Node B receives a nearer response; both should still agree on the last block for anchor 0.
 	for idx, resp := range []*threads.SequenceAlignmentDataResponse{&scenario.responseA} {
@@ -100,19 +100,19 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 			scenario.anchor0ProofAtAnchor2, scenario.anchor0ProofAtAnchor1, scenario.anchor0ProofAtAnchor1)
 	}
 
-	if !reflect.DeepEqual(metaA.SequenceAlignmentData.AnchorCatchUpTargets, metaB.SequenceAlignmentData.AnchorCatchUpTargets) {
-		t.Fatalf("anchor catch-up targets diverged: A=%v B=%v", metaA.SequenceAlignmentData.AnchorCatchUpTargets, metaB.SequenceAlignmentData.AnchorCatchUpTargets)
+	if !reflect.DeepEqual(metaA.SequenceAlignmentData.LastBlocksByAnchors, metaB.SequenceAlignmentData.LastBlocksByAnchors) {
+		t.Fatalf("anchor catch-up targets diverged: A=%v B=%v", metaA.SequenceAlignmentData.LastBlocksByAnchors, metaB.SequenceAlignmentData.LastBlocksByAnchors)
 	}
 
 	if metaA.SequenceAlignmentData.CurrentAnchorAssumption != metaB.SequenceAlignmentData.CurrentAnchorAssumption {
 		t.Fatalf("current anchor assumptions differ: %d vs %d", metaA.SequenceAlignmentData.CurrentAnchorAssumption, metaB.SequenceAlignmentData.CurrentAnchorAssumption)
 	}
 
-	expected := map[int]structures.ExecutionStatsPerLeaderSequence{
+	expected := map[int]structures.ExecutionStats{
 		0: {Index: scenario.anchor0ProofAtAnchor1, Hash: scenario.anchor0Hashes[scenario.anchor0ProofAtAnchor1]},
 	}
-	if !reflect.DeepEqual(metaA.SequenceAlignmentData.AnchorCatchUpTargets, expected) {
-		t.Fatalf("unexpected catch-up targets: got %v, expected %v", metaA.SequenceAlignmentData.AnchorCatchUpTargets, expected)
+	if !reflect.DeepEqual(metaA.SequenceAlignmentData.LastBlocksByAnchors, expected) {
+		t.Fatalf("unexpected catch-up targets: got %v, expected %v", metaA.SequenceAlignmentData.LastBlocksByAnchors, expected)
 	}
 
 	simulateSequenceAlignmentThreadForTest(t, &metaA, epochHandler, fetcher, 10)
@@ -130,9 +130,9 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		"\n  Node A -> catch-up targets=%s, current anchor=%d"+
 		"\n  Node B -> catch-up targets=%s, current anchor=%d"+
 		"\n  Per-anchor last blocks: %s",
-		formatCatchUpTargets(metaA.SequenceAlignmentData.AnchorCatchUpTargets), metaA.SequenceAlignmentData.CurrentAnchorAssumption,
-		formatCatchUpTargets(metaB.SequenceAlignmentData.AnchorCatchUpTargets), metaB.SequenceAlignmentData.CurrentAnchorAssumption,
-		formatPerAnchorHeights(metaA.SequenceAlignmentData.AnchorCatchUpTargets))
+		formatCatchUpTargets(metaA.SequenceAlignmentData.LastBlocksByAnchors), metaA.SequenceAlignmentData.CurrentAnchorAssumption,
+		formatCatchUpTargets(metaB.SequenceAlignmentData.LastBlocksByAnchors), metaB.SequenceAlignmentData.CurrentAnchorAssumption,
+		formatPerAnchorHeights(metaA.SequenceAlignmentData.LastBlocksByAnchors))
 }
 
 func buildRotationScenarioForTest(t *testing.T, rng *rand.Rand, anchorKeys []cryptography.Ed25519Box, epochHandler structures.EpochDataHandler) testRotationScenario {
@@ -336,7 +336,7 @@ func formatAnchorProofSummary(prefix string, anchors map[int]threads.SequenceAli
 	return strings.Join(lines, "\n")
 }
 
-func formatCatchUpTargets(targets map[int]structures.ExecutionStatsPerLeaderSequence) string {
+func formatCatchUpTargets(targets map[int]structures.ExecutionStats) string {
 	if len(targets) == 0 {
 		return "none"
 	}
@@ -355,7 +355,7 @@ func formatCatchUpTargets(targets map[int]structures.ExecutionStatsPerLeaderSequ
 	return strings.Join(parts, "; ")
 }
 
-func formatPerAnchorHeights(targets map[int]structures.ExecutionStatsPerLeaderSequence) string {
+func formatPerAnchorHeights(targets map[int]structures.ExecutionStats) string {
 	if len(targets) == 0 {
 		return "none"
 	}
@@ -427,10 +427,8 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 		return false
 	}
 
-	if metadata.SequenceAlignmentData.AnchorCatchUpTargets != nil {
-		if _, exists := metadata.SequenceAlignmentData.AnchorCatchUpTargets[anchorIndex]; exists {
-			return false
-		}
+	if _, exists := metadata.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; exists {
+		return false
 	}
 
 	if !utils.VerifyAggregatedFinalizationProof(alignmentData.Afp, epochHandler) {
@@ -498,44 +496,44 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 		return false
 	}
 
-	if metadata.SequenceAlignmentData.AnchorCatchUpTargets == nil {
-		metadata.SequenceAlignmentData.AnchorCatchUpTargets = make(map[int]structures.ExecutionStatsPerLeaderSequence)
+	if metadata.SequenceAlignmentData.LastBlocksByAnchors == nil {
+		metadata.SequenceAlignmentData.LastBlocksByAnchors = make(map[int]structures.ExecutionStats)
 	}
 
-	if _, exists := metadata.SequenceAlignmentData.AnchorCatchUpTargets[anchorIndex]; !exists {
-		metadata.SequenceAlignmentData.AnchorCatchUpTargets[anchorIndex] = earliestRotationBlock
+	if _, exists := metadata.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; !exists {
+		metadata.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex] = earliestRotationBlock
 	}
 
 	return true
 }
 
-func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, blockLimit int, epochHandler *structures.EpochDataHandler, anchorIndexMap map[string]int, fetcher testAnchorBlockFetcher) (structures.ExecutionStatsPerLeaderSequence, bool) {
+func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, blockLimit int, epochHandler *structures.EpochDataHandler, anchorIndexMap map[string]int, fetcher testAnchorBlockFetcher) (structures.ExecutionStats, bool) {
 
 	if epochHandler == nil || anchorIndexMap == nil || fetcher == nil || currentAnchor < 0 || foundInAnchorIndex >= len(globals.ANCHORS) {
-		return structures.ExecutionStatsPerLeaderSequence{}, false
+		return structures.ExecutionStats{}, false
 	}
 
 	searchLimit := blockLimit
-	earliestStats := structures.ExecutionStatsPerLeaderSequence{}
+	earliestStats := structures.ExecutionStats{}
 
 	for anchorIdx := foundInAnchorIndex; anchorIdx > currentAnchor; anchorIdx-- {
 		anchor := globals.ANCHORS[anchorIdx]
 		neededProofs := anchorIdx - currentAnchor
 		foundProofs := make(map[int]int)
-		proofStats := make(map[int]structures.ExecutionStatsPerLeaderSequence)
+		proofStats := make(map[int]structures.ExecutionStats)
 
 		for blockIndex := 0; blockIndex < searchLimit; blockIndex++ {
 			blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, blockIndex)
 			response := fetcher(blockID)
 
 			if response == nil || response.Block == nil {
-				return structures.ExecutionStatsPerLeaderSequence{}, false
+				return structures.ExecutionStats{}, false
 			}
 
 			block := response.Block
 
 			if block.Creator != anchor.Pubkey || block.Index != blockIndex || !block.VerifySignature() {
-				return structures.ExecutionStatsPerLeaderSequence{}, false
+				return structures.ExecutionStats{}, false
 			}
 
 			for _, proof := range block.ExtraData.AggregatedAnchorRotationProofs {
@@ -553,7 +551,7 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 
 				if _, alreadyFound := foundProofs[targetIdx]; !alreadyFound {
 					foundProofs[targetIdx] = blockIndex
-					proofStats[targetIdx] = structures.ExecutionStatsPerLeaderSequence{
+					proofStats[targetIdx] = structures.ExecutionStats{
 						Index: proof.VotingStat.Index,
 						Hash:  proof.VotingStat.Hash,
 					}
@@ -566,13 +564,13 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 		}
 
 		if len(foundProofs) != neededProofs {
-			return structures.ExecutionStatsPerLeaderSequence{}, false
+			return structures.ExecutionStats{}, false
 		}
 
 		nextLimit, ok := foundProofs[anchorIdx-1]
 
 		if !ok {
-			return structures.ExecutionStatsPerLeaderSequence{}, false
+			return structures.ExecutionStats{}, false
 		}
 
 		if stats, ok := proofStats[anchorIdx-1]; ok {
@@ -586,7 +584,7 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 		}
 	}
 
-	return structures.ExecutionStatsPerLeaderSequence{}, false
+	return structures.ExecutionStats{}, false
 }
 
 func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.ExecutionThreadMetadataHandler, epochHandler structures.EpochDataHandler, fetcher testAnchorBlockFetcher, maxSteps int) {
@@ -605,7 +603,7 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 			return
 		}
 
-		target, ok := metadata.SequenceAlignmentData.AnchorCatchUpTargets[anchorIndex]
+		target, ok := metadata.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]
 
 		if !ok {
 			return
@@ -645,10 +643,9 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 				return
 			}
 
-			metadata.SequenceAlignmentData.InfoAboutLastBlocksInEpoch[anchor.Pubkey] = structures.ExecutionStatsPerLeaderSequence{
-				Index:          target.Index,
-				Hash:           block.GetHash(),
-				FirstBlockHash: "",
+			metadata.SequenceAlignmentData.LastBlocksByLeaders[anchor.Pubkey] = structures.ExecutionStats{
+				Index: target.Index,
+				Hash:  block.GetHash(),
 			}
 
 			metadata.SequenceAlignmentData.CurrentAnchorAssumption = anchorIndex + 1

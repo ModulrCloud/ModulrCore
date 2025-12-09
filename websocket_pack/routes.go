@@ -173,7 +173,7 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 }
 
-func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connection *gws.Conn) {
+func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, connection *gws.Conn) {
 
 	if !globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Load() {
 		return
@@ -189,13 +189,13 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochIndex)
 
-	leaderToRotate := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToRotate]
+	leaderToFinalize := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToFinalize]
 
-	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToRotate {
+	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToFinalize {
 
 		localVotingData := structures.NewLeaderVotingStatTemplate()
 
-		localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToRotate), nil)
+		localVotingDataRaw, err := databases.FINALIZATION_VOTING_STATS.Get([]byte(strconv.Itoa(epochIndex)+":"+leaderToFinalize), nil)
 
 		if err == nil {
 
@@ -207,37 +207,18 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 		if localVotingData.Index > propSkipData.Index {
 
-			// Try to return with AFP for the first block
+			responseData := WsLeaderFinalizationProofResponseUpgrade{
+				Voter:           globals.CONFIGURATION.PublicKey,
+				ForLeaderPubkey: leaderToFinalize,
+				Status:          "UPGRADE",
+				SkipData:        localVotingData,
+			}
 
-			firstBlockID := strconv.Itoa(epochHandler.Id) + ":" + leaderToRotate + ":0"
-
-			afpForFirstBlockBytes, err := databases.EPOCH_DATA.Get([]byte("AFP:"+firstBlockID), nil)
+			jsonResponse, err := json.Marshal(responseData)
 
 			if err == nil {
 
-				var afpForFirstBlock structures.AggregatedFinalizationProof
-
-				err := json.Unmarshal(afpForFirstBlockBytes, &afpForFirstBlock)
-
-				if err == nil {
-
-					responseData := WsLeaderRotationProofResponseUpgrade{
-						Voter:            globals.CONFIGURATION.PublicKey,
-						ForLeaderPubkey:  leaderToRotate,
-						Status:           "UPGRADE",
-						AfpForFirstBlock: afpForFirstBlock,
-						SkipData:         localVotingData,
-					}
-
-					jsonResponse, err := json.Marshal(responseData)
-
-					if err == nil {
-
-						connection.WriteMessage(gws.OpcodeText, jsonResponse)
-
-					}
-
-				}
+				connection.WriteMessage(gws.OpcodeText, jsonResponse)
 
 			}
 
@@ -274,58 +255,41 @@ func GetLeaderRotationProof(parsedRequest WsLeaderRotationProofRequest, connecti
 
 			if afpIsOk {
 
-				dataToSignForLeaderRotation, firstBlockAfpIsOk := "", false
+				dataToSignForLeaderRotation := ""
 
 				if parsedRequest.SkipData.Index == -1 {
 
-					dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate
-					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:-1"
-					dataToSignForLeaderRotation += ":0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:" + epochFullID
-
-					firstBlockAfpIsOk = true
+					dataToSignForLeaderRotation = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize
+					dataToSignForLeaderRotation += ":-1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:"
+					dataToSignForLeaderRotation += epochFullID
 
 				} else if parsedRequest.SkipData.Index >= 0 {
 
-					blockIdOfFirstBlock := strconv.Itoa(epochIndex) + ":" + leaderToRotate + ":0"
-
-					if parsedRequest.AfpForFirstBlock.BlockId == blockIdOfFirstBlock && utils.VerifyAggregatedFinalizationProof(&parsedRequest.AfpForFirstBlock, epochHandler) {
-
-						firstBlockHash := parsedRequest.AfpForFirstBlock.BlockHash
-
-						dataToSignForLeaderRotation = "LEADER_ROTATION_PROOF:" + leaderToRotate +
-							":" + firstBlockHash +
-							":" + strconv.Itoa(propSkipData.Index) +
-							":" + propSkipData.Hash +
-							":" + epochFullID
-
-						firstBlockAfpIsOk = true
-
-					}
+					dataToSignForLeaderRotation = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize +
+						":" + strconv.Itoa(propSkipData.Index) +
+						":" + propSkipData.Hash +
+						":" + epochFullID
 
 				}
 
-				// If proof is ok - generate LRP(leader rotation proof)
+				// Finally - generate LRP(leader rotation proof)
 
-				if firstBlockAfpIsOk {
+				leaderRotationProofMessage := WsLeaderFinalizationProofResponseOk{
 
-					leaderRotationProofMessage := WsLeaderRotationProofResponseOk{
+					Voter: globals.CONFIGURATION.PublicKey,
 
-						Voter: globals.CONFIGURATION.PublicKey,
+					ForLeaderPubkey: leaderToFinalize,
 
-						ForLeaderPubkey: leaderToRotate,
+					Status: "OK",
 
-						Status: "OK",
+					Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
+				}
 
-						Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderRotation),
-					}
+				jsonResponse, err := json.Marshal(leaderRotationProofMessage)
 
-					jsonResponse, err := json.Marshal(leaderRotationProofMessage)
+				if err == nil {
 
-					if err == nil {
-
-						connection.WriteMessage(gws.OpcodeText, jsonResponse)
-
-					}
+					connection.WriteMessage(gws.OpcodeText, jsonResponse)
 
 				}
 

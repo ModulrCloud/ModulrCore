@@ -48,7 +48,7 @@ func RunBlockchain() {
 	go threads.SequenceAlignmentThread()
 
 	//✅ 6.Thread to jump between anchors and support SequenceAlignmentThread
-	go threads.SequenceAlignmentDataWatcher()
+	go threads.SequenceAlignmentDataWatcherThread()
 
 	//✅ 7.Start execution process - take blocks and execute transactions
 	go threads.ExecutionThread()

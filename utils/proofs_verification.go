@@ -47,7 +47,12 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 	return okSignatures >= majority
 }
 
-func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderFinalizationProof, epochHandler *structures.EpochDataHandler, firstBlockHash string) bool {
+func VerifyAggregatedFinalizationProofForAnchorBlock(proof *structures.AggregatedFinalizationProof) bool {
+
+	return true
+}
+
+func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
 
 	if proof == nil || epochHandler == nil || proof.EpochIndex != epochHandler.Id {
 		return false
@@ -60,10 +65,6 @@ func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderF
 	quorumMap := make(map[string]bool)
 	for _, pk := range epochHandler.Quorum {
 		quorumMap[strings.ToLower(pk)] = true
-	}
-
-	if firstBlockHash == "" {
-		firstBlockHash = structures.NewLeaderVotingStatTemplate().Hash
 	}
 
 	if proof.VotingStat.Index >= 0 {
@@ -82,7 +83,7 @@ func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderF
 		}
 	}
 
-	dataToVerify := strings.Join([]string{"LEADER_ROTATION_PROOF", proof.Leader, firstBlockHash, strconv.Itoa(proof.VotingStat.Index), proof.VotingStat.Hash, epochFullID}, ":")
+	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", proof.Leader, strconv.Itoa(proof.VotingStat.Index), proof.VotingStat.Hash, epochFullID}, ":")
 
 	okSignatures := 0
 	seen := make(map[string]bool)

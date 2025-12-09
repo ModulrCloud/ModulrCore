@@ -53,16 +53,16 @@ func (h *Handler) OnMessage(connection *gws.Conn, message *gws.Message) {
 
 		GetFinalizationProof(req, connection)
 
-	case "get_leader_rotation_proof":
+	case "get_leader_finalization_proof":
 
-		var req WsLeaderRotationProofRequest
+		var req WsLeaderFinalizationProofRequest
 
 		if err := json.Unmarshal(message.Bytes(), &req); err != nil {
-			connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"invalid_leader_rotation_proof_request"}`))
+			connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"invalid_leader_finalization_proof_request"}`))
 			return
 		}
 
-		GetLeaderRotationProof(req, connection)
+		GetLeaderFinalizationProof(req, connection)
 
 	case "get_block_with_afp":
 

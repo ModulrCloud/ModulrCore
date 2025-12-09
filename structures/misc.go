@@ -42,18 +42,16 @@ func (dtb *DelayedTransactionsBatch) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type ExecutionStatsPerLeaderSequence struct {
-	Index          int
-	Hash           string
-	FirstBlockHash string
+type ExecutionStats struct {
+	Index int
+	Hash  string
 }
 
-func NewExecutionStatsTemplate() ExecutionStatsPerLeaderSequence {
+func NewExecutionStatsTemplate() ExecutionStats {
 
-	return ExecutionStatsPerLeaderSequence{
-		Index:          -1,
-		Hash:           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		FirstBlockHash: "",
+	return ExecutionStats{
+		Index: -1,
+		Hash:  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 	}
 
 }

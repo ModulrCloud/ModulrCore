@@ -20,8 +20,8 @@ type ExecutionThreadMetadataHandler struct {
 
 	Statistics *Statistics `json:"statistics,omitempty"`
 
-	ExecutionData         map[string]ExecutionStatsPerLeaderSequence `json:"executionData"` // PUBKEY => {index:int, hash:""}
-	SequenceAlignmentData AlignmentDataHandler                       `json:"currentEpochAlignmentData"`
+	ExecutionData         map[string]ExecutionStats `json:"executionData"` // PUBKEY => {index:int, hash:""}
+	SequenceAlignmentData AlignmentDataHandler      `json:"currentEpochAlignmentData"`
 
 	AccountsCache           map[string]*Account          `json:"-"`
 	ValidatorsStoragesCache map[string]*ValidatorStorage `json:"-"`
@@ -58,8 +58,8 @@ type GenerationThreadMetadataHandler struct {
 }
 
 type AlignmentDataHandler struct {
-	CurrentAnchorAssumption       int                                        `json:"currentLeader"`
-	CurrentLeaderToExecBlocksFrom int                                        `json:"currentToExecute"`
-	InfoAboutLastBlocksInEpoch    map[string]ExecutionStatsPerLeaderSequence `json:"infoAboutLastBlocksInEpoch"` // PUBKEY => {index:int, hash:""}
-	AnchorCatchUpTargets          map[int]ExecutionStatsPerLeaderSequence    `json:"anchorCatchUpTargets,omitempty"`
+	CurrentAnchorAssumption       int                       `json:"currentLeader"`
+	CurrentLeaderToExecBlocksFrom int                       `json:"currentToExecute"`
+	LastBlocksByLeaders           map[string]ExecutionStats `json:"lastBlocksByLeaders"` // PUBKEY => {index:int, hash:""}
+	LastBlocksByAnchors           map[int]ExecutionStats    `json:"lastBlocksByAnchors,omitempty"`
 }
