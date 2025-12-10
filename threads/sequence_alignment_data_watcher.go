@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/modulrcloud/modulr-core/anchors_pack"
 	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -87,7 +88,7 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 		return false
 	}
 
-	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp) {
+	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
 		return false
 	}
 
@@ -141,9 +142,7 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 			return false
 		}
 
-		anchorForProof := globals.ANCHORS[i]
-
-		if !utils.VerifyAggregatedAnchorRotationProof(anchorData.AggregatedAnchorRotationProof.EpochIndex, anchorData.AggregatedAnchorRotationProof.Anchor, epochHandler, anchorForProof.Pubkey) {
+		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof, epochHandler) {
 			return false
 		}
 	}
@@ -196,9 +195,7 @@ func findEarliestAnchorRotationProof(currentAnchor, foundInAnchorIndex, blockLim
 					continue
 				}
 
-				expectedAnchor := globals.ANCHORS[targetIdx]
-
-				if !utils.VerifyAggregatedAnchorRotationProof(proof.EpochIndex, proof.Anchor, epochHandler, expectedAnchor.Pubkey) {
+				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof, epochHandler) {
 					continue
 				}
 

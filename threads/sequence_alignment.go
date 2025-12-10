@@ -87,7 +87,7 @@ func SequenceAlignmentThread() {
 
 				}
 
-			} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp) {
+			} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, epochHandlerRef) {
 
 				// Exec block with AFP. Go through ALFP, verify and fill the SequenceAlignmentData.LastBlocksByLeaders
 

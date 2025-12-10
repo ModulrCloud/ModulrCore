@@ -62,6 +62,21 @@ func GetQuorumMajority(epochHandler *structures.EpochDataHandler) int {
 	return majority
 }
 
+func GetAnchorsQuorumMajority() int {
+
+	quorumSize := len(globals.ANCHORS)
+
+	majority := (2 * quorumSize) / 3
+
+	majority += 1
+
+	if majority > quorumSize {
+		return quorumSize
+	}
+
+	return majority
+}
+
 func GetQuorumUrlsAndPubkeys(epochHandler *structures.EpochDataHandler) []structures.QuorumMemberData {
 
 	var toReturn []structures.QuorumMemberData

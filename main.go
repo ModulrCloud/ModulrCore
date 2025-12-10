@@ -48,6 +48,12 @@ func main() {
 
 	globals.ANCHORS = anchorsList
 
+	globals.ANCHORS_PUBKEYS = make([]string, len(anchorsList))
+
+	for i, anchor := range anchorsList {
+		globals.ANCHORS_PUBKEYS[i] = anchor.Pubkey
+	}
+
 	genesisRawJson, readError := os.ReadFile(globals.CHAINDATA_PATH + "/genesis.json")
 
 	if readError != nil {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/structures"
 )
 
@@ -47,9 +48,38 @@ func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationP
 	return okSignatures >= majority
 }
 
-func VerifyAggregatedFinalizationProofForAnchorBlock(proof *structures.AggregatedFinalizationProof) bool {
+func VerifyAggregatedFinalizationProofForAnchorBlock(proof *structures.AggregatedFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
 
-	return true
+	epochIndex := strconv.Itoa(epochHandler.Id)
+
+	dataThatShouldBeSigned := strings.Join([]string{proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochIndex}, ":")
+
+	majority := GetAnchorsQuorumMajority()
+
+	okSignatures := 0
+
+	seen := make(map[string]bool)
+
+	quorumMap := make(map[string]bool)
+
+	for _, pk := range globals.ANCHORS_PUBKEYS {
+		quorumMap[strings.ToLower(pk)] = true
+	}
+
+	for pubKey, signature := range proof.Proofs {
+
+		if cryptography.VerifySignature(dataThatShouldBeSigned, pubKey, signature) {
+
+			loweredPubKey := strings.ToLower(pubKey)
+
+			if quorumMap[loweredPubKey] && !seen[loweredPubKey] {
+				seen[loweredPubKey] = true
+				okSignatures++
+			}
+		}
+	}
+
+	return okSignatures >= majority
 }
 
 func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
@@ -99,23 +129,6 @@ func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderF
 	}
 
 	return okSignatures >= majority
-}
-
-func VerifyAggregatedAnchorRotationProof(epochIndex int, anchor string, epochHandler *structures.EpochDataHandler, expectedAnchor string) bool {
-
-	if epochHandler == nil {
-		return false
-	}
-
-	if epochIndex != epochHandler.Id {
-		return false
-	}
-
-	if !strings.EqualFold(anchor, expectedAnchor) {
-		return false
-	}
-
-	return true
 }
 
 func GetVerifiedAggregatedFinalizationProofByBlockId(blockID string, epochHandler *structures.EpochDataHandler) *structures.AggregatedFinalizationProof {

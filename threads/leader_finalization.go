@@ -34,7 +34,6 @@ var (
 	leaderFinalizationMutex  = sync.Mutex{}
 	leaderFinalizationStates = make(map[int]*EpochRotationState)
 	processingEpochId        = -1
-	defaultHash              = structures.NewLeaderVotingStatTemplate().Hash
 	finalizationProgressKey  = []byte("ALFP_PROGRESS")
 )
 

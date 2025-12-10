@@ -44,6 +44,12 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		{Pubkey: anchorKeys[2].Pub},
 	}
 
+	globals.ANCHORS_PUBKEYS = []string{
+		anchorKeys[0].Pub,
+		anchorKeys[1].Pub,
+		anchorKeys[2].Pub,
+	}
+
 	epochHandler := structures.EpochDataHandler{Id: 1, Hash: "epoch_hash", Quorum: []string{anchorKeys[0].Pub, anchorKeys[1].Pub, anchorKeys[2].Pub}}
 
 	scenario := buildRotationScenarioForTest(t, rng, anchorKeys, epochHandler)
@@ -484,9 +490,7 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 			return false
 		}
 
-		anchorForProof := globals.ANCHORS[i]
-
-		if !utils.VerifyAggregatedAnchorRotationProof(anchorData.AggregatedAnchorRotationProof.EpochIndex, anchorData.AggregatedAnchorRotationProof.Anchor, epochHandler, anchorForProof.Pubkey) {
+		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof, epochHandler) {
 			return false
 		}
 	}
@@ -543,9 +547,7 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 					continue
 				}
 
-				expectedAnchor := globals.ANCHORS[targetIdx]
-
-				if !utils.VerifyAggregatedAnchorRotationProof(proof.EpochIndex, proof.Anchor, epochHandler, expectedAnchor.Pubkey) {
+				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof, epochHandler) {
 					continue
 				}
 

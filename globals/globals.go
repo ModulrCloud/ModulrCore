@@ -83,6 +83,8 @@ var GENESIS structures.Genesis
 
 var ANCHORS []structures.Anchor
 
+var ANCHORS_PUBKEYS []string
+
 var MEMPOOL struct {
 	Slice []structures.Transaction
 	Mutex sync.Mutex
