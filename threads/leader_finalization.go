@@ -1,9 +1,11 @@
 package threads
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
+	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
@@ -365,6 +368,11 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 
 	LEADER_FINALIZATION_MUTEX.Lock()
 
+	proofsCopy := make(map[string]string, len(cache.Proofs))
+	for voter, sig := range cache.Proofs {
+		proofsCopy[voter] = sig
+	}
+
 	aggregated := structures.AggregatedLeaderFinalizationProof{
 		EpochIndex: epochId,
 		Leader:     leaderPubKey,
@@ -373,7 +381,7 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 			Hash:  cache.SkipData.Hash,
 			Afp:   cache.SkipData.Afp,
 		},
-		Signatures: cache.Proofs,
+		Signatures: proofsCopy,
 	}
 
 	key := []byte(fmt.Sprintf("ALFP:%d:%s", epochId, leaderPubKey))
@@ -383,4 +391,40 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 
 	LEADER_FINALIZATION_MUTEX.Unlock()
 
+	sendAggregatedLeaderFinalizationProofToAnchors(&aggregated)
+}
+
+func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.AggregatedLeaderFinalizationProof) {
+
+	if aggregated == nil {
+		return
+	}
+
+	payload := structures.AcceptLeaderFinalizationProofRequest{
+		LeaderFinalizations: []structures.AggregatedLeaderFinalizationProof{*aggregated},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	for _, anchor := range globals.ANCHORS {
+
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/accept_aggregated_leader_finalization_proof", anchor.AnchorUrl), bytes.NewBuffer(body))
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		resp.Body.Close()
+	}
 }
