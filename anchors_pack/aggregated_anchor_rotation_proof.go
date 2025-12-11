@@ -26,27 +26,24 @@ func BuildAnchorRotationProofPayload(anchor string, blockIndex int, blockHash st
 
 func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, epochHandler *structures.EpochDataHandler) bool {
 
-	if proof.VotingStat.Index < 0 || proof.VotingStat.Hash == "" {
-		return false
-	}
 	if proof.VotingStat.Afp.BlockId == "" {
 		return false
 	}
-	if slices.Index(globals.ANCHORS_PUBKEYS, proof.Anchor) < 0 {
+	if slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
 		return false
 	}
 	expectedBlockId := fmt.Sprintf("%d:%s:%d", proof.EpochIndex, proof.Anchor, proof.VotingStat.Index)
-	if !strings.EqualFold(proof.VotingStat.Afp.BlockId, expectedBlockId) {
+	if proof.VotingStat.Afp.BlockId != expectedBlockId {
 		return false
 	}
-	if !strings.EqualFold(proof.VotingStat.Hash, proof.VotingStat.Afp.BlockHash) {
+	if proof.VotingStat.Hash != proof.VotingStat.Afp.BlockHash {
 		return false
 	}
+
 	blockParts := strings.Split(proof.VotingStat.Afp.BlockId, ":")
-	if len(blockParts) != 3 {
-		return false
-	}
+
 	afpIndex, err := strconv.Atoi(blockParts[2])
+
 	if err != nil || afpIndex != proof.VotingStat.Index {
 		return false
 	}
@@ -73,9 +70,6 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, e
 		verified++
 	}
 
-	majority := utils.GetAnchorsQuorumMajority()
-	if verified < majority {
-		return false
-	}
-	return true
+	return verified >= utils.GetAnchorsQuorumMajority()
+
 }
