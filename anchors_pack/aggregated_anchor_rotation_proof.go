@@ -29,7 +29,7 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, e
 	if proof.VotingStat.Afp.BlockId == "" {
 		return false
 	}
-	if slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
+	if !slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
 		return false
 	}
 	expectedBlockId := fmt.Sprintf("%d:%s:%d", proof.EpochIndex, proof.Anchor, proof.VotingStat.Index)
