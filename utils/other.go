@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -32,8 +31,6 @@ const (
 )
 
 var SHUTDOWN_ONCE sync.Once
-
-var RANDOM_GENERATOR = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func StrToUint8(s string) uint8 {
 	v, err := strconv.ParseUint(s, 10, 8)
@@ -96,12 +93,6 @@ func GetUTCTimestampInMilliSeconds() int64 {
 func IsMyCoreVersionOld(thread structures.LogicalThread) bool {
 
 	return thread.GetCoreMajorVersion() > globals.CORE_MAJOR_VERSION
-
-}
-
-func GetRandomFromSlice(arr []structures.QuorumMemberData) structures.QuorumMemberData {
-
-	return arr[RANDOM_GENERATOR.Intn(len(arr))]
 
 }
 

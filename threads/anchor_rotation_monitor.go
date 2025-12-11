@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +16,8 @@ import (
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
 )
+
+var RANDOM_GENERATOR = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func AnchorRotationMonitorThread() {
 
@@ -43,7 +46,7 @@ func checkSequenceAlignmentData(anchorIndex int, epochHandler *structures.EpochD
 		return
 	}
 
-	targetAnchor := globals.ANCHORS[utils.RANDOM_GENERATOR.Intn(len(globals.ANCHORS))]
+	targetAnchor := globals.ANCHORS[RANDOM_GENERATOR.Intn(len(globals.ANCHORS))]
 
 	resp, err := client.Get(fmt.Sprintf("%s/sequence_alignment_data/%d/%d", targetAnchor.AnchorUrl, epochHandler.Id, anchorIndex))
 
