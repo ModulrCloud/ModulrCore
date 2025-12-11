@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -81,44 +82,50 @@ func findFirstBlockDataFromAlignment(epochIndex int) *FirstBlockData {
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 	for _, leader := range leaderSequence {
-		leaderStats, exists := alignmentData[leader]
-		if !exists || leaderStats.Index < 0 {
-			continue
-		}
 
-		blockID := fmt.Sprintf("%d:%s:%d", epochIndex, leader, 0)
-		response := getBlockAndAfpFromPoD(blockID)
-		if response == nil || response.Block == nil {
-			continue
-		}
+		if leaderStats, exists := alignmentData[leader]; exists {
 
-		block := response.Block
+			if leaderStats.Index >= 0 {
 
-		if block.Creator != leader || block.Index != 0 {
-			continue
-		}
+				if leaderStats.Index == 0 {
 
-		if block.Sig != "" && !block.VerifySignature() {
-			continue
-		}
+					return &FirstBlockData{FirstBlockCreator: leader, FirstBlockHash: leaderStats.Hash}
 
-		firstBlockHash := block.GetHash()
+				} else {
 
-		if leaderStats.Index > 0 {
-			if response.Afp == nil || response.Afp.BlockId != blockID || response.Afp.BlockHash != firstBlockHash {
+					blockID := fmt.Sprintf("%d:%s:%d", epochIndex, leader, 0)
+
+					block := block_pack.GetBlock(epochIndex, leader, 0, &epochHandlerCopy)
+
+					afp := utils.GetVerifiedAggregatedFinalizationProofByBlockId(blockID, &epochHandlerCopy)
+
+					if block == nil || afp == nil {
+						break
+					}
+
+					if block.Creator != leader || block.Index != 0 || !block.VerifySignature() {
+						break
+					}
+
+					firstBlockHash := block.GetHash()
+
+					if afp.BlockHash == firstBlockHash && afp.BlockId == blockID && utils.VerifyAggregatedFinalizationProof(afp, &epochHandlerCopy) {
+
+						return &FirstBlockData{FirstBlockCreator: leader, FirstBlockHash: firstBlockHash}
+
+					} else {
+						break
+					}
+
+				}
+
+			} else {
 				continue
 			}
 
-			if !utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandlerCopy) {
-				continue
-			}
 		} else {
-			if leaderStats.Hash != "" && leaderStats.Hash != firstBlockHash {
-				continue
-			}
+			break
 		}
-
-		return &FirstBlockData{FirstBlockCreator: leader, FirstBlockHash: firstBlockHash}
 	}
 
 	return nil
