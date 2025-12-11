@@ -33,6 +33,13 @@ func FirstBlockMonitorThread() {
 		}
 
 		if firstBlockData := findFirstBlockDataFromAlignment(epochUnderObservation); firstBlockData != nil {
+			hashPreview := firstBlockData.FirstBlockHash
+			if len(hashPreview) > 8 {
+				hashPreview = hashPreview[:8]
+			}
+
+			utils.LogWithTime(fmt.Sprintf("First block found for epoch %d: creator=%s, hash=%s...", epochUnderObservation, firstBlockData.FirstBlockCreator, hashPreview), utils.GREEN_COLOR)
+
 			if err := storeFirstBlockData(epochUnderObservation, firstBlockData); err != nil {
 				utils.LogWithTime(fmt.Sprintf("failed to store first block data for epoch %d: %v", epochUnderObservation, err), utils.RED_COLOR)
 			}
