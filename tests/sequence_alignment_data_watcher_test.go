@@ -173,22 +173,28 @@ func buildRotationScenarioForTest(t *testing.T, rng *rand.Rand, anchorKeys []cry
 		anchor0Blocks = anchor0At1
 	}
 	anchor0Hashes := addAnchorBlocksForScenario(blockMap, anchorKeys[0], epochHandler, anchor0Blocks+1, nil)
+	anchor0RotationAtAnchor1 := buildAggregatedAnchorRotationProof(anchorKeys, epochHandler, anchorKeys[0].Pub, anchor0At1, anchor0Hashes[anchor0At1])
+	anchor0RotationAtAnchor2 := buildAggregatedAnchorRotationProof(anchorKeys, epochHandler, anchorKeys[0].Pub, anchor0At2, anchor0Hashes[anchor0At2])
 
 	anchor1Blocks := anchor1At2
 	if afpIndexB > anchor1Blocks {
 		anchor1Blocks = afpIndexB
 	}
 	anchor1Hashes := addAnchorBlocksForScenario(blockMap, anchorKeys[1], epochHandler, anchor1Blocks+1, map[int][]anchors_pack.AggregatedAnchorRotationProof{
-		anchor0At1: {{EpochIndex: epochHandler.Id, Anchor: anchorKeys[0].Pub, VotingStat: structures.VotingStat{Index: anchor0At1, Hash: anchor0Hashes[anchor0At1]}}},
+		anchor0At1: {anchor0RotationAtAnchor1},
 	})
+	anchor1RotationAtAnchor2 := buildAggregatedAnchorRotationProof(anchorKeys, epochHandler, anchorKeys[1].Pub, anchor1At2, anchor1Hashes[anchor1At2])
 
 	addAnchorBlocksForScenario(blockMap, anchorKeys[2], epochHandler, afpIndexA, map[int][]anchors_pack.AggregatedAnchorRotationProof{
-		anchor1At2: {{EpochIndex: epochHandler.Id, Anchor: anchorKeys[1].Pub, VotingStat: structures.VotingStat{Index: anchor1At2, Hash: anchor1Hashes[anchor1At2]}}},
-		anchor0At2: {{EpochIndex: epochHandler.Id, Anchor: anchorKeys[0].Pub, VotingStat: structures.VotingStat{Index: anchor0At2, Hash: anchor0Hashes[anchor0At2]}}},
+		anchor1At2: {anchor1RotationAtAnchor2},
+		anchor0At2: {anchor0RotationAtAnchor2},
 	})
 
-	afpA := buildAggregatedFinalizationProof(anchorKeys, epochHandler, fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchorKeys[2].Pub, afpIndexA))
-	afpB := buildAggregatedFinalizationProof(anchorKeys, epochHandler, fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchorKeys[1].Pub, afpIndexB))
+	afpABlockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchorKeys[2].Pub, afpIndexA)
+	afpA := buildAggregatedFinalizationProof(anchorKeys, epochHandler, afpABlockID, fmt.Sprintf("block_hash_%s", afpABlockID))
+
+	afpBBlockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchorKeys[1].Pub, afpIndexB)
+	afpB := buildAggregatedFinalizationProof(anchorKeys, epochHandler, afpBBlockID, fmt.Sprintf("block_hash_%s", afpBBlockID))
 
 	return testRotationScenario{
 		blockMap:      blockMap,
@@ -197,15 +203,15 @@ func buildRotationScenarioForTest(t *testing.T, rng *rand.Rand, anchorKeys []cry
 			FoundInAnchorIndex: 2,
 			Afp:                &afpA,
 			Anchors: map[int]threads.SequenceAlignmentAnchorData{
-				0: {AggregatedAnchorRotationProof: anchors_pack.AggregatedAnchorRotationProof{EpochIndex: epochHandler.Id, Anchor: anchorKeys[0].Pub}, FoundInBlock: anchor0At1},
-				1: {AggregatedAnchorRotationProof: anchors_pack.AggregatedAnchorRotationProof{EpochIndex: epochHandler.Id, Anchor: anchorKeys[1].Pub}, FoundInBlock: anchor1At2},
+				0: {AggregatedAnchorRotationProof: anchor0RotationAtAnchor1, FoundInBlock: anchor0At1},
+				1: {AggregatedAnchorRotationProof: anchor1RotationAtAnchor2, FoundInBlock: anchor1At2},
 			},
 		},
 		responseB: threads.SequenceAlignmentDataResponse{
 			FoundInAnchorIndex: 1,
 			Afp:                &afpB,
 			Anchors: map[int]threads.SequenceAlignmentAnchorData{
-				0: {AggregatedAnchorRotationProof: anchors_pack.AggregatedAnchorRotationProof{EpochIndex: epochHandler.Id, Anchor: anchorKeys[0].Pub}, FoundInBlock: anchor0At1},
+				0: {AggregatedAnchorRotationProof: anchor0RotationAtAnchor1, FoundInBlock: anchor0At1},
 			},
 		},
 		anchor0ProofAtAnchor1: anchor0At1,
@@ -408,14 +414,34 @@ func afpBlockIndex(afp *structures.AggregatedFinalizationProof) string {
 	return parts[len(parts)-1]
 }
 
-func buildAggregatedFinalizationProof(anchorKeys []cryptography.Ed25519Box, epochHandler structures.EpochDataHandler, blockID string) structures.AggregatedFinalizationProof {
+func buildAggregatedFinalizationProof(anchorKeys []cryptography.Ed25519Box, epochHandler structures.EpochDataHandler, blockID string, blockHash string) structures.AggregatedFinalizationProof {
 
-	proof := structures.AggregatedFinalizationProof{PrevBlockHash: "prev_hash", BlockId: blockID, BlockHash: "block_hash", Proofs: make(map[string]string)}
+	proof := structures.AggregatedFinalizationProof{PrevBlockHash: "prev_hash", BlockId: blockID, BlockHash: blockHash, Proofs: make(map[string]string)}
 
-	dataToSign := fmt.Sprintf("%s:%s:%s:%s#%d", proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochHandler.Hash, epochHandler.Id)
+dataToSign := fmt.Sprintf("%s:%s:%s:%d", proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochHandler.Id)
 
 	for _, key := range anchorKeys {
 		proof.Proofs[key.Pub] = cryptography.GenerateSignature(key.Prv, dataToSign)
+	}
+
+	return proof
+}
+
+func buildAggregatedAnchorRotationProof(anchorKeys []cryptography.Ed25519Box, epochHandler structures.EpochDataHandler, anchorPub string, blockIndex int, blockHash string) anchors_pack.AggregatedAnchorRotationProof {
+	blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchorPub, blockIndex)
+
+	proof := anchors_pack.AggregatedAnchorRotationProof{
+		EpochIndex: epochHandler.Id,
+		Anchor:     anchorPub,
+		VotingStat: structures.VotingStat{Index: blockIndex, Hash: blockHash},
+		Signatures: make(map[string]string),
+	}
+
+	proof.VotingStat.Afp = buildAggregatedFinalizationProof(anchorKeys, epochHandler, blockID, blockHash)
+
+	signPayload := anchors_pack.BuildAnchorRotationProofPayload(anchorPub, blockIndex, blockHash, epochHandler.Id)
+	for _, key := range anchorKeys {
+		proof.Signatures[key.Pub] = cryptography.GenerateSignature(key.Prv, signPayload)
 	}
 
 	return proof
@@ -437,7 +463,7 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 		return false
 	}
 
-	if !utils.VerifyAggregatedFinalizationProof(alignmentData.Afp, epochHandler) {
+	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
 		return false
 	}
 
@@ -630,7 +656,7 @@ func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.E
 		if currentExec < target.Index {
 
 			if response.Afp != nil {
-				if response.Afp.BlockId != blockID || !utils.VerifyAggregatedFinalizationProof(response.Afp, &epochHandler) {
+				if response.Afp.BlockId != blockID || !utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, &epochHandler) {
 					return
 				}
 			}
