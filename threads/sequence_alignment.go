@@ -1,6 +1,7 @@
 package threads
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/modulrcloud/modulr-core/anchors_pack"
@@ -52,12 +53,13 @@ func SequenceAlignmentThread() {
 		}
 
 		anchorData := globals.ANCHORS[currentAnchorIndex]
+		epochId := epochHandlerRef.Id
 
 		for {
 
 			// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
 
-			blockId := strconv.Itoa(epochHandlerRef.Id) + ":" + anchorData.Pubkey + ":" + strconv.Itoa(currentAnchorBlockPointerObserved+1)
+			blockId := strconv.Itoa(epochId) + ":" + anchorData.Pubkey + ":" + strconv.Itoa(currentAnchorBlockPointerObserved+1)
 
 			response := getAnchorBlockAndAfpFromAnchorsPoD(blockId)
 
@@ -83,6 +85,16 @@ func SequenceAlignmentThread() {
 							Hash:  proof.VotingStat.Hash,
 						}
 
+						hashPreview := proof.VotingStat.Hash
+						if len(hashPreview) > 8 {
+							hashPreview = hashPreview[:8]
+						}
+
+						utils.LogWithTime(
+							fmt.Sprintf("Sequence alignment: last block for leader %s set at index %d (hash %s...) in epoch %d", proof.Leader, proof.VotingStat.Index, hashPreview, epochId),
+							utils.CYAN_COLOR,
+						)
+
 					}
 
 				}
@@ -103,6 +115,16 @@ func SequenceAlignmentThread() {
 							Index: proof.VotingStat.Index,
 							Hash:  proof.VotingStat.Hash,
 						}
+
+						hashPreview := proof.VotingStat.Hash
+						if len(hashPreview) > 8 {
+							hashPreview = hashPreview[:8]
+						}
+
+						utils.LogWithTime(
+							fmt.Sprintf("Sequence alignment: last block for leader %s set at index %d (hash %s...) in epoch %d", proof.Leader, proof.VotingStat.Index, hashPreview, epochId),
+							utils.CYAN_COLOR,
+						)
 
 					}
 
