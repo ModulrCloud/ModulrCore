@@ -26,6 +26,14 @@ type FirstBlockData struct {
 
 var FIRST_BLOCK_DATA FirstBlockData
 
+var blockWithAfpFetcher = getBlockAndAfpFromPoD
+
+func firstBlockDataKey(epochIndex int) []byte {
+
+	return []byte(fmt.Sprintf("FIRST_BLOCK_DATA:%d", epochIndex))
+
+}
+
 // Reads latest batch index from LevelDB.
 // Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
 func readLatestBatchIndex() int64 {
@@ -64,9 +72,29 @@ func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
 }
 
 func getFirstBlockDataFromDB(epochIndex int) *FirstBlockData {
-	// TBD
-	// FIRST_BLOCK_DATA: key
-	return nil
+
+	data, err := databases.APPROVEMENT_THREAD_METADATA.Get(firstBlockDataKey(epochIndex), nil)
+	if err != nil {
+
+		return nil
+
+	}
+
+	var firstBlockData FirstBlockData
+
+	if err := json.Unmarshal(data, &firstBlockData); err != nil {
+
+		return nil
+
+	}
+
+	if firstBlockData.FirstBlockCreator == "" || firstBlockData.FirstBlockHash == "" {
+
+		return nil
+
+	}
+
+	return &firstBlockData
 }
 
 func ExecuteDelayedTransaction(delayedTransaction map[string]string, contextTag string) {
