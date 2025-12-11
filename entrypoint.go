@@ -56,6 +56,9 @@ func RunBlockchain() {
 	//✅ 8.Thread to get consensus about the last block by each leader, grab proofs and send to anchors
 	go threads.LeadersFinalizationThread()
 
+	//✅ 9.Thread to asynchronously find and store first block data for the current epoch
+	go threads.FirstBlockMonitorThread()
+
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
 	// Set the atomic flag to true
