@@ -33,8 +33,9 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 	epochHandler := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 
 	epochIndex := epochHandler.Id
+	epochIdStr := strconv.Itoa(epochIndex)
 
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochIndex)
+	epochFullID := epochHandler.Hash + "#" + epochIdStr
 
 	itsLeader := epochHandler.LeadersSequence[epochHandler.CurrentLeaderIndex] == parsedRequest.Block.Creator
 
@@ -261,14 +262,14 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 					dataToSignForLeaderFinalization = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize
 					dataToSignForLeaderFinalization += ":-1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:"
-					dataToSignForLeaderFinalization += epochFullID
+					dataToSignForLeaderFinalization += epochIdStr
 
 				} else if parsedRequest.SkipData.Index >= 0 {
 
 					dataToSignForLeaderFinalization = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize +
 						":" + strconv.Itoa(propSkipData.Index) +
 						":" + propSkipData.Hash +
-						":" + epochFullID
+						":" + epochIdStr
 
 				}
 

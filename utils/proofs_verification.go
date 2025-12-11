@@ -16,7 +16,7 @@ import (
 
 func VerifyAggregatedFinalizationProof(proof *structures.AggregatedFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
 
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+	epochIdStr := strconv.Itoa(epochHandler.Id)
 
 	dataThatShouldBeSigned := strings.Join([]string{proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochFullID}, ":")
 
@@ -88,7 +88,7 @@ func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderF
 		return false
 	}
 
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+	epochIdStr := strconv.Itoa(epochHandler.Id)
 
 	majority := GetQuorumMajority(epochHandler)
 
@@ -113,7 +113,7 @@ func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderF
 		}
 	}
 
-	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", proof.Leader, strconv.Itoa(proof.VotingStat.Index), proof.VotingStat.Hash, epochFullID}, ":")
+	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", proof.Leader, strconv.Itoa(proof.VotingStat.Index), proof.VotingStat.Hash, epochIdStr}, ":")
 
 	okSignatures := 0
 	seen := make(map[string]bool)

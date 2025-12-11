@@ -194,7 +194,7 @@ func leaderTimeIsOut(epochHandler *structures.EpochDataHandler, networkParams *s
 func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandler, leaderIndex, majority int, state *EpochRotationState) {
 
 	leaderPubKey := epochHandler.LeadersSequence[leaderIndex]
-	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+	epochIdStr := strconv.Itoa(epochHandler.Id)
 
 	if leaderHasAlfp(epochHandler.Id, leaderPubKey) || state.waiter == nil {
 		return
@@ -222,7 +222,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 	}
 
 	for _, raw := range responses {
-		handleLeaderFinalizationResponse(raw, epochHandler, leaderPubKey, epochFullID, state)
+		handleLeaderFinalizationResponse(raw, epochHandler, leaderPubKey, epochIdStr, state)
 	}
 
 	LEADER_FINALIZATION_MUTEX.Lock()
@@ -267,7 +267,7 @@ func loadLeaderSkipData(epochId int, leaderPubKey string) structures.VotingStat 
 	return skipData
 }
 
-func handleLeaderFinalizationResponse(raw []byte, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *EpochRotationState) {
+func handleLeaderFinalizationResponse(raw []byte, epochHandler *structures.EpochDataHandler, leaderPubKey, epochIdStr string, state *EpochRotationState) {
 
 	var statusHolder map[string]any
 
@@ -284,7 +284,7 @@ func handleLeaderFinalizationResponse(raw []byte, epochHandler *structures.Epoch
 	case "OK":
 		var response websocket_pack.WsLeaderFinalizationProofResponseOk
 		if json.Unmarshal(raw, &response) == nil {
-			handleLeaderFinalizationOk(response, epochHandler, leaderPubKey, epochFullID, state)
+			handleLeaderFinalizationOk(response, epochHandler, leaderPubKey, epochIdStr, state)
 		}
 	case "UPGRADE":
 		var response websocket_pack.WsLeaderFinalizationProofResponseUpgrade
@@ -294,7 +294,7 @@ func handleLeaderFinalizationResponse(raw []byte, epochHandler *structures.Epoch
 	}
 }
 
-func handleLeaderFinalizationOk(response websocket_pack.WsLeaderFinalizationProofResponseOk, epochHandler *structures.EpochDataHandler, leaderPubKey, epochFullID string, state *EpochRotationState) {
+func handleLeaderFinalizationOk(response websocket_pack.WsLeaderFinalizationProofResponseOk, epochHandler *structures.EpochDataHandler, leaderPubKey, epochIdStr string, state *EpochRotationState) {
 
 	if response.ForLeaderPubkey != leaderPubKey {
 		return
@@ -302,7 +302,7 @@ func handleLeaderFinalizationOk(response websocket_pack.WsLeaderFinalizationProo
 
 	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
 
-	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", leaderPubKey, strconv.Itoa(cache.SkipData.Index), cache.SkipData.Hash, epochFullID}, ":")
+	dataToVerify := strings.Join([]string{"LEADER_FINALIZATION_PROOF", leaderPubKey, strconv.Itoa(cache.SkipData.Index), cache.SkipData.Hash, epochIdStr}, ":")
 
 	quorumMap := make(map[string]bool)
 	for _, pk := range epochHandler.Quorum {
