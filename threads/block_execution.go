@@ -17,7 +17,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-func ExecutionThread() {
+func BlockExecutionThread() {
 
 	for {
 
@@ -526,7 +526,7 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		for _, delayedTx := range nextEpochData.DelayedTransactions {
 
-			ExecuteDelayedTransaction(delayedTx, "EXECUTION_THREAD")
+			executeDelayedTransaction(delayedTx, "EXECUTION_THREAD")
 
 		}
 

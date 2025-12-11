@@ -26,93 +26,6 @@ type FirstBlockData struct {
 
 var FIRST_BLOCK_DATA FirstBlockData
 
-var blockWithAfpFetcher = getBlockAndAfpFromPoD
-
-func firstBlockDataKey(epochIndex int) []byte {
-
-	return []byte(fmt.Sprintf("FIRST_BLOCK_DATA:%d", epochIndex))
-
-}
-
-// Reads latest batch index from LevelDB.
-// Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
-func readLatestBatchIndex() int64 {
-
-	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
-
-	if err != nil || len(raw) == 0 {
-		return 0
-	}
-
-	if len(raw) == 8 {
-		return int64(binary.BigEndian.Uint64(raw))
-	}
-
-	// Legacy format: decimal string. Try to parse and migrate.
-	if v, perr := strconv.ParseInt(string(raw), 10, 64); perr == nil && v >= 0 {
-		var buf [8]byte
-		binary.BigEndian.PutUint64(buf[:], uint64(v))
-		_ = databases.APPROVEMENT_THREAD_METADATA.Put([]byte("LATEST_BATCH_INDEX"), buf[:], nil)
-		return v
-	}
-
-	return 0
-
-}
-
-// Writes latest batch index to LevelDB as 8-byte BigEndian.
-func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
-
-	var buf [8]byte
-
-	binary.BigEndian.PutUint64(buf[:], uint64(v))
-
-	batch.Put([]byte("LATEST_BATCH_INDEX"), buf[:])
-
-}
-
-func getFirstBlockDataFromDB(epochIndex int) *FirstBlockData {
-
-	data, err := databases.APPROVEMENT_THREAD_METADATA.Get(firstBlockDataKey(epochIndex), nil)
-	if err != nil {
-
-		return nil
-
-	}
-
-	var firstBlockData FirstBlockData
-
-	if err := json.Unmarshal(data, &firstBlockData); err != nil {
-
-		return nil
-
-	}
-
-	if firstBlockData.FirstBlockCreator == "" || firstBlockData.FirstBlockHash == "" {
-
-		return nil
-
-	}
-
-	return &firstBlockData
-}
-
-func ExecuteDelayedTransaction(delayedTransaction map[string]string, contextTag string) {
-
-	if delayedTxType, ok := delayedTransaction["type"]; ok {
-
-		// Now find the handler
-
-		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
-
-			funcHandler(delayedTransaction, contextTag)
-
-		}
-
-	}
-
-}
-
 func EpochRotationThread() {
 
 	for {
@@ -281,7 +194,7 @@ func EpochRotationThread() {
 
 						for _, delayedTransaction := range delayedTransactionsOrderByPriority {
 
-							ExecuteDelayedTransaction(delayedTransaction, "APPROVEMENT_THREAD")
+							executeDelayedTransaction(delayedTransaction, "APPROVEMENT_THREAD")
 
 						}
 
@@ -402,4 +315,89 @@ func EpochRotationThread() {
 
 	}
 
+}
+
+func firstBlockDataKey(epochIndex int) []byte {
+
+	return []byte(fmt.Sprintf("FIRST_BLOCK_DATA:%d", epochIndex))
+
+}
+
+func executeDelayedTransaction(delayedTransaction map[string]string, contextTag string) {
+
+	if delayedTxType, ok := delayedTransaction["type"]; ok {
+
+		// Now find the handler
+
+		if funcHandler, ok := system_contracts.DELAYED_TRANSACTIONS_MAP[delayedTxType]; ok {
+
+			funcHandler(delayedTransaction, contextTag)
+
+		}
+
+	}
+
+}
+
+// Reads latest batch index from LevelDB.
+// Supports legacy decimal-string format and migrates it to 8-byte BigEndian.
+func readLatestBatchIndex() int64 {
+
+	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("LATEST_BATCH_INDEX"), nil)
+
+	if err != nil || len(raw) == 0 {
+		return 0
+	}
+
+	if len(raw) == 8 {
+		return int64(binary.BigEndian.Uint64(raw))
+	}
+
+	// Legacy format: decimal string. Try to parse and migrate.
+	if v, perr := strconv.ParseInt(string(raw), 10, 64); perr == nil && v >= 0 {
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], uint64(v))
+		_ = databases.APPROVEMENT_THREAD_METADATA.Put([]byte("LATEST_BATCH_INDEX"), buf[:], nil)
+		return v
+	}
+
+	return 0
+
+}
+
+// Writes latest batch index to LevelDB as 8-byte BigEndian.
+func writeLatestBatchIndexBatch(batch *leveldb.Batch, v int64) {
+
+	var buf [8]byte
+
+	binary.BigEndian.PutUint64(buf[:], uint64(v))
+
+	batch.Put([]byte("LATEST_BATCH_INDEX"), buf[:])
+
+}
+
+func getFirstBlockDataFromDB(epochIndex int) *FirstBlockData {
+
+	data, err := databases.APPROVEMENT_THREAD_METADATA.Get(firstBlockDataKey(epochIndex), nil)
+	if err != nil {
+
+		return nil
+
+	}
+
+	var firstBlockData FirstBlockData
+
+	if err := json.Unmarshal(data, &firstBlockData); err != nil {
+
+		return nil
+
+	}
+
+	if firstBlockData.FirstBlockCreator == "" || firstBlockData.FirstBlockHash == "" {
+
+		return nil
+
+	}
+
+	return &firstBlockData
 }

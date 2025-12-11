@@ -16,7 +16,7 @@ import (
 	"github.com/modulrcloud/modulr-core/utils"
 )
 
-func SequenceAlignmentDataWatcherThread() {
+func AnchorRotationMonitorThread() {
 
 	client := &http.Client{Timeout: 5 * time.Second}
 

@@ -32,31 +32,31 @@ func RunBlockchain() {
 
 	//_________________________ RUN SEVERAL LOGICAL THREADS _________________________
 
-	//✅ 1.Thread to change the epoch for APPROVEMENT THREAD
+	//✅ 1.Thread to rotate the epoch
 	go threads.EpochRotationThread()
 
 	//✅ 2.Share our blocks within quorum members and get the finalization proofs
 	go threads.BlocksSharingAndProofsGrabingThread()
 
 	//✅ 3.Start to generate blocks
-	go threads.BlocksGenerationThread()
+	go threads.BlockGenerationThread()
 
-	//✅ 4.Start a separate thread to work with voting for blocks in a sync way (for security)
+	//✅ 4.Start a separate thread rotate the leaders and move from one to another
 	go threads.LeaderRotationThread()
 
 	//✅ 5.Thread to resolve the block sequence and prepare linear blocks data for ExecutionThread
 	go threads.SequenceAlignmentThread()
 
 	//✅ 6.Thread to jump between anchors and support SequenceAlignmentThread
-	go threads.SequenceAlignmentDataWatcherThread()
+	go threads.AnchorRotationMonitorThread()
 
-	//✅ 7.Start execution process - take blocks and execute transactions
-	go threads.ExecutionThread()
+	//✅ 7.Start execution process - take blocks and execute transactions to modify the state
+	go threads.BlockExecutionThread()
 
 	//✅ 8.Thread to get consensus about the last block by each leader, grab proofs and send to anchors
-	go threads.LeadersFinalizationThread()
+	go threads.LeaderFinalizationThread()
 
-	//✅ 9.Thread to asynchronously find and store first block data for the current epoch
+	//✅ 9.Thread to asynchronously find and store first block data in each epoch
 	go threads.FirstBlockMonitorThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________

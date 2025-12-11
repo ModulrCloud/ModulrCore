@@ -11,6 +11,37 @@ import (
 	"github.com/modulrcloud/modulr-core/utils"
 )
 
+func FirstBlockMonitorThread() {
+
+	var epochUnderObservation int
+	initialized := false
+
+	for {
+
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+		currentEpoch := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+		if !initialized || currentEpoch != epochUnderObservation {
+			epochUnderObservation = currentEpoch
+			initialized = true
+		}
+
+		if getFirstBlockDataFromDB(epochUnderObservation) != nil {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		if firstBlockData := findFirstBlockDataFromAlignment(epochUnderObservation); firstBlockData != nil {
+			if err := storeFirstBlockData(epochUnderObservation, firstBlockData); err != nil {
+				utils.LogWithTime(fmt.Sprintf("failed to store first block data for epoch %d: %v", epochUnderObservation, err), utils.RED_COLOR)
+			}
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func storeFirstBlockData(epochIndex int, data *FirstBlockData) error {
 
 	raw, err := json.Marshal(data)
@@ -49,7 +80,7 @@ func findFirstBlockDataFromAlignment(epochIndex int) *FirstBlockData {
 		}
 
 		blockID := fmt.Sprintf("%d:%s:%d", epochIndex, leader, 0)
-		response := blockWithAfpFetcher(blockID)
+		response := getBlockAndAfpFromPoD(blockID)
 		if response == nil || response.Block == nil {
 			continue
 		}
@@ -84,35 +115,4 @@ func findFirstBlockDataFromAlignment(epochIndex int) *FirstBlockData {
 	}
 
 	return nil
-}
-
-func FirstBlockMonitorThread() {
-
-	var epochUnderObservation int
-	initialized := false
-
-	for {
-
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		currentEpoch := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
-
-		if !initialized || currentEpoch != epochUnderObservation {
-			epochUnderObservation = currentEpoch
-			initialized = true
-		}
-
-		if getFirstBlockDataFromDB(epochUnderObservation) != nil {
-			time.Sleep(200 * time.Millisecond)
-			continue
-		}
-
-		if firstBlockData := findFirstBlockDataFromAlignment(epochUnderObservation); firstBlockData != nil {
-			if err := storeFirstBlockData(epochUnderObservation, firstBlockData); err != nil {
-				utils.LogWithTime(fmt.Sprintf("failed to store first block data for epoch %d: %v", epochUnderObservation, err), utils.RED_COLOR)
-			}
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
 }

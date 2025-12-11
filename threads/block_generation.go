@@ -21,7 +21,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-func BlocksGenerationThread() {
+func BlockGenerationThread() {
 
 	for {
 

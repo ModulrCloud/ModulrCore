@@ -101,5 +101,5 @@ See https://github.com/modulrcloud/net-spawner
 # Testing
 
 ```bash
-go test ./tests -v
+go test ./tests -count=1 -v
 ```
