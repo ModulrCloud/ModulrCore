@@ -413,7 +413,7 @@ func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.Aggre
 
 	for _, anchor := range globals.ANCHORS {
 
-		go func(anchor globals.Anchor) {
+		go func(anchor structures.Anchor) {
 
 			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/accept_aggregated_leader_finalization_proof", anchor.AnchorUrl), bytes.NewReader(body))
 			if err != nil {
