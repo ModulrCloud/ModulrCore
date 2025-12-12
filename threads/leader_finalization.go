@@ -25,6 +25,8 @@ import (
 type LeaderFinalizationCache struct {
 	SkipData structures.VotingStat
 	Proofs   map[string]string
+	// Timestamp of the last broadcast to anchors to avoid spamming
+	LastBroadcasted time.Time
 }
 
 type EpochRotationState struct {
@@ -51,6 +53,13 @@ func LeaderFinalizationThread() {
 		networkParams := getNetworkParameters()
 
 		if processingHandler == nil {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		if !weAreInEpochQuorum(processingHandler) {
+			PROCESSING_EPOCH_INDEX++
+			persistFinalizationProgress(PROCESSING_EPOCH_INDEX)
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
@@ -146,13 +155,24 @@ func getNetworkParameters() structures.NetworkParameters {
 	return params
 }
 
+func weAreInEpochQuorum(epochHandler *structures.EpochDataHandler) bool {
+
+	for _, quorumMember := range epochHandler.Quorum {
+		if strings.EqualFold(quorumMember, globals.CONFIGURATION.PublicKey) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func leadersReadyForAlfp(epochHandler *structures.EpochDataHandler, networkParams *structures.NetworkParameters) []int {
 
 	ready := make([]int, 0)
 
 	for idx := range epochHandler.LeadersSequence {
 
-		if leaderHasAlfp(epochHandler.Id, epochHandler.LeadersSequence[idx]) {
+		if leaderFinalizationConfirmedByAlignment(epochHandler.Id, epochHandler.LeadersSequence[idx]) {
 			continue
 		}
 
@@ -174,15 +194,56 @@ func leaderHasAlfp(epochId int, leader string) bool {
 	return err == nil
 }
 
+func loadAggregatedLeaderFinalizationProof(epochId int, leader string) *structures.AggregatedLeaderFinalizationProof {
+
+	key := []byte(fmt.Sprintf("ALFP:%d:%s", epochId, leader))
+	raw, err := databases.FINALIZATION_VOTING_STATS.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+
+	var proof structures.AggregatedLeaderFinalizationProof
+	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+
+	return &proof
+}
+
+func leaderFinalizationConfirmedByAlignment(epochId int, leader string) bool {
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	defer handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id != epochId {
+		return false
+	}
+
+	_, exists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[leader]
+	return exists
+}
+
 func allLeaderFinalizationProofsCollected(epochHandler *structures.EpochDataHandler) bool {
 
 	for _, leader := range epochHandler.LeadersSequence {
 		if !leaderHasAlfp(epochHandler.Id, leader) {
 			return false
 		}
+
+		if executionMetadataMatches(epochHandler.Id) && !leaderFinalizationConfirmedByAlignment(epochHandler.Id, leader) {
+			return false
+		}
 	}
 
 	return true
+}
+
+func executionMetadataMatches(epochId int) bool {
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	defer handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	return handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id == epochId
 }
 
 func leaderTimeIsOut(epochHandler *structures.EpochDataHandler, networkParams *structures.NetworkParameters, leaderIndex int) bool {
@@ -196,11 +257,19 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 	leaderPubKey := epochHandler.LeadersSequence[leaderIndex]
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
 
-	if leaderHasAlfp(epochHandler.Id, leaderPubKey) || state.waiter == nil {
+	if leaderFinalizationConfirmedByAlignment(epochHandler.Id, leaderPubKey) {
 		return
 	}
 
 	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
+
+	if leaderHasAlfp(epochHandler.Id, leaderPubKey) || state.waiter == nil {
+		if aggregated := loadAggregatedLeaderFinalizationProof(epochHandler.Id, leaderPubKey); aggregated != nil && shouldBroadcastLeaderFinalization(cache) {
+			markLeaderFinalizationBroadcast(cache)
+			sendAggregatedLeaderFinalizationProofToAnchors(aggregated)
+		}
+		return
+	}
 
 	request := websocket_pack.WsLeaderFinalizationProofRequest{
 		Route:                   "get_leader_finalization_proof",
@@ -391,7 +460,23 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 
 	LEADER_FINALIZATION_MUTEX.Unlock()
 
+	markLeaderFinalizationBroadcast(cache)
 	sendAggregatedLeaderFinalizationProofToAnchors(&aggregated)
+}
+
+func shouldBroadcastLeaderFinalization(cache *LeaderFinalizationCache) bool {
+
+	LEADER_FINALIZATION_MUTEX.Lock()
+	defer LEADER_FINALIZATION_MUTEX.Unlock()
+
+	return time.Since(cache.LastBroadcasted) > time.Second
+}
+
+func markLeaderFinalizationBroadcast(cache *LeaderFinalizationCache) {
+
+	LEADER_FINALIZATION_MUTEX.Lock()
+	cache.LastBroadcasted = time.Now()
+	LEADER_FINALIZATION_MUTEX.Unlock()
 }
 
 func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.AggregatedLeaderFinalizationProof) {
