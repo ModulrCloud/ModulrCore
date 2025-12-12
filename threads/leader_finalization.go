@@ -58,8 +58,10 @@ func LeaderFinalizationThread() {
 		}
 
 		if !weAreInEpochQuorum(processingHandler) {
+			currentEpoch := PROCESSING_EPOCH_INDEX
 			PROCESSING_EPOCH_INDEX++
 			persistFinalizationProgress(PROCESSING_EPOCH_INDEX)
+			cleanupLeaderFinalizationState(currentEpoch)
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
@@ -72,8 +74,10 @@ func LeaderFinalizationThread() {
 		}
 
 		if allLeaderFinalizationProofsCollected(processingHandler) {
+			currentEpoch := PROCESSING_EPOCH_INDEX
 			PROCESSING_EPOCH_INDEX++
 			persistFinalizationProgress(PROCESSING_EPOCH_INDEX)
+			cleanupLeaderFinalizationState(currentEpoch)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -144,6 +148,25 @@ func loadFinalizationProgress() int {
 func persistFinalizationProgress(epochId int) {
 
 	_ = databases.FINALIZATION_VOTING_STATS.Put([]byte("ALFP_PROGRESS"), []byte(strconv.Itoa(epochId)), nil)
+}
+
+func cleanupLeaderFinalizationState(epochId int) {
+
+	LEADER_FINALIZATION_MUTEX.Lock()
+	defer LEADER_FINALIZATION_MUTEX.Unlock()
+
+	state, ok := LEADER_FINALIZATION_STATES[epochId]
+	if !ok {
+		return
+	}
+
+	for _, conn := range state.wsConns {
+		if conn != nil {
+			_ = conn.Close()
+		}
+	}
+
+	delete(LEADER_FINALIZATION_STATES, epochId)
 }
 
 func getNetworkParameters() structures.NetworkParameters {
