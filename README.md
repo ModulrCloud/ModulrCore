@@ -103,3 +103,13 @@ See https://github.com/modulrcloud/net-spawner
 ```bash
 go test ./tests -count=1 -v
 ```
+
+# Static analysis & Linting & Code coverage
+
+```bash
+golangci-lint run
+```
+And
+```bash
+go test ./... -cover
+```
