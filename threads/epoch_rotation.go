@@ -43,7 +43,7 @@ func EpochRotationThread() {
 				// If epoch is not fresh - send the signal to persistent db that we finish it - not to create AFPs, ALFPs anymore
 				keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochHandlerRef.Id))
 
-				databases.FINALIZATION_VOTING_STATS.Put(keyValue, []byte("TRUE"), nil)
+				databases.EPOCH_DATA.Put(keyValue, []byte("TRUE"), nil)
 
 			}
 

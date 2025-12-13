@@ -106,7 +106,7 @@ func SignalAboutEpochRotationExists(epochIndex int) bool {
 
 	keyValue := []byte("EPOCH_FINISH:" + strconv.Itoa(epochIndex))
 
-	if readyToChangeEpochRaw, err := databases.FINALIZATION_VOTING_STATS.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
+	if readyToChangeEpochRaw, err := databases.EPOCH_DATA.Get(keyValue, nil); err == nil && string(readyToChangeEpochRaw) == "TRUE" {
 
 		return true
 
