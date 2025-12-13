@@ -346,7 +346,7 @@ func getBatchOfApprovedDelayedTxsByQuorum(indexOfLeader int) structures.DelayedT
 		Proofs:              map[string]string{},
 	}
 
-	if indexOfLeader != 0 {
+	if indexOfLeader != 0 || handlers.GENERATION_THREAD_METADATA.NextIndex != 0 {
 		return batch
 	}
 
