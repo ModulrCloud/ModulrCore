@@ -1,6 +1,7 @@
 package anchors_pack
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -72,4 +73,37 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, e
 
 	return verified >= utils.GetAnchorsQuorumMajority()
 
+}
+
+func (aarp *AggregatedAnchorRotationProof) UnmarshalJSON(data []byte) error {
+
+	type alias AggregatedAnchorRotationProof
+
+	var aux alias
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.Signatures == nil {
+		aux.Signatures = make(map[string]string)
+	}
+
+	*aarp = AggregatedAnchorRotationProof(aux)
+
+	return nil
+
+}
+
+func (aarp AggregatedAnchorRotationProof) MarshalJSON() ([]byte, error) {
+
+	type alias AggregatedAnchorRotationProof
+
+	aux := alias(aarp)
+
+	if aux.Signatures == nil {
+		aux.Signatures = make(map[string]string)
+	}
+
+	return json.Marshal(aux)
 }
