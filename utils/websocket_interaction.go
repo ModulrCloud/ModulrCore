@@ -37,27 +37,23 @@ const (
 	POD_READ_WRITE_DEADLINE = 2 * time.Second // timeout for read/write operations for POD (point of distribution)
 )
 
-// Guards open/close & replace of PoD conn
-var POD_MUTEX sync.Mutex
+var (
+	POD_MUTEX                                       sync.Mutex      // Guards open/close & replace of PoD conn
+	POD_WRITE_MUTEX                                 sync.Mutex      // Single writer guarantee for PoD
+	WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn // Connection with PoD itself
+)
 
-// Single writer guarantee for PoD
-var POD_WRITE_MUTEX sync.Mutex
+var (
+	ANCHORS_POD_MUTEX                                       sync.Mutex      // Guards open/close & replace of Anchors PoD conn
+	ANCHORS_POD_WRITE_MUTEX                                 sync.Mutex      // Single writer guarantee for Anchors PoD
+	WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION *websocket.Conn // Connection with anchors PoD itself
+)
 
-// Protects concurrent access to wsConnMap (map[string]*websocket.Conn)
-var WEBSOCKET_CONNECTION_MUTEX sync.RWMutex
-
-var WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn
-
-// Guards open/close & replace of Anchors PoD conn
-var ANCHORS_POD_MUTEX sync.Mutex
-
-// Single writer guarantee for Anchors PoD
-var ANCHORS_POD_WRITE_MUTEX sync.Mutex
-
-var WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION *websocket.Conn
-
-// Ensures single writer per websocket connection (gorilla/websocket requirement)
-var WEBSOCKET_WRITE_MUTEX sync.Map // key: pubkey -> *sync.Mutex
+var (
+	WEBSOCKET_CONNECTION_MUTEX sync.RWMutex // Protects concurrent access to wsConnMap (map[string]*websocket.Conn)
+	// key: pubkey -> *sync.Mutex
+	WEBSOCKET_WRITE_MUTEX sync.Map // Ensures single writer per websocket connection (gorilla/websocket requirement)
+)
 
 func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 
