@@ -269,7 +269,7 @@ func setGenesisToState() error {
 		return err
 	}
 
-	hashInput := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" + globals.GENESIS.NetworkId
+	hashInput := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" + globals.GENESIS.NetworkId + strconv.FormatUint(epochTimestamp, 10)
 
 	initEpochHash := utils.Blake3(hashInput)
 
