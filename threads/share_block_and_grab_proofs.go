@@ -34,6 +34,7 @@ type ProofsGrabber struct {
 var PROOFS_GRABBER_MUTEX = sync.RWMutex{}
 
 var WEBSOCKET_CONNECTIONS = make(map[string]*websocket.Conn) // quorumMember => websocket handler
+var WEBSOCKET_GUARDS_FOR_PROOFS = utils.NewWebsocketGuards()
 
 var FINALIZATION_PROOFS_CACHE = make(map[string]string) // quorumMember => finalization proof signa
 
@@ -114,11 +115,11 @@ func BlocksSharingAndProofsGrabingThread() {
 
 			// Also, open connections with quorum here. Create QuorumWaiter etc.
 
-			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS)
+			utils.OpenWebsocketConnectionsWithQuorum(epochHandlerRef.Quorum, WEBSOCKET_CONNECTIONS, WEBSOCKET_GUARDS_FOR_PROOFS)
 
 			// Create new QuorumWaiter
 
-			QUORUM_WAITER_FOR_FINALIZATION_PROOFS = utils.NewQuorumWaiter(len(epochHandlerRef.Quorum))
+			QUORUM_WAITER_FOR_FINALIZATION_PROOFS = utils.NewQuorumWaiter(len(epochHandlerRef.Quorum), WEBSOCKET_GUARDS_FOR_PROOFS)
 
 		} else {
 
