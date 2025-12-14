@@ -50,7 +50,6 @@ func LeaderFinalizationThread() {
 		}
 
 		processingHandler := getOrLoadEpochHandler(PROCESSING_EPOCH_INDEX)
-		networkParams := getNetworkParameters()
 
 		if processingHandler == nil {
 			time.Sleep(200 * time.Millisecond)
@@ -68,6 +67,8 @@ func LeaderFinalizationThread() {
 
 		state := ensureLeaderFinalizationState(processingHandler)
 		majority := utils.GetQuorumMajority(processingHandler)
+
+		networkParams := getNetworkParameters()
 
 		for _, leaderIndex := range leadersReadyForAlfp(processingHandler, &networkParams) {
 			tryCollectLeaderFinalizationProofs(processingHandler, leaderIndex, majority, state)
