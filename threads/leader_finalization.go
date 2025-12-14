@@ -30,10 +30,10 @@ type LeaderFinalizationCache struct {
 }
 
 type EpochRotationState struct {
-	caches  map[string]*LeaderFinalizationCache
-	wsConns map[string]*websocket.Conn
-	waiter  *utils.QuorumWaiter
-	guards  *utils.WebsocketGuards
+	Caches  map[string]*LeaderFinalizationCache
+	WsConns map[string]*websocket.Conn
+	Waiter  *utils.QuorumWaiter
+	Guards  *utils.WebsocketGuards
 }
 
 var (
@@ -97,13 +97,13 @@ func ensureLeaderFinalizationState(epochHandler *structures.EpochDataHandler) *E
 
 	guards := utils.NewWebsocketGuards()
 	state := &EpochRotationState{
-		caches:  make(map[string]*LeaderFinalizationCache),
-		wsConns: make(map[string]*websocket.Conn),
-		waiter:  utils.NewQuorumWaiter(len(epochHandler.Quorum), guards),
-		guards:  guards,
+		Caches:  make(map[string]*LeaderFinalizationCache),
+		WsConns: make(map[string]*websocket.Conn),
+		Waiter:  utils.NewQuorumWaiter(len(epochHandler.Quorum), guards),
+		Guards:  guards,
 	}
 
-	utils.OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, state.wsConns, guards)
+	utils.OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, state.WsConns, guards)
 	LEADER_FINALIZATION_STATES[epochHandler.Id] = state
 
 	return state
@@ -164,7 +164,7 @@ func cleanupLeaderFinalizationState(epochId int) {
 		return
 	}
 
-	for _, conn := range state.wsConns {
+	for _, conn := range state.WsConns {
 		if conn != nil {
 			_ = conn.Close()
 		}
@@ -290,7 +290,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 
 	cache := ensureLeaderFinalizationCache(state, epochHandler.Id, leaderPubKey)
 
-	if leaderHasAlfp(epochHandler.Id, leaderPubKey) || state.waiter == nil {
+	if leaderHasAlfp(epochHandler.Id, leaderPubKey) || state.Waiter == nil {
 		if aggregated := loadAggregatedLeaderFinalizationProof(epochHandler.Id, leaderPubKey); aggregated != nil && shouldBroadcastLeaderFinalization(cache) {
 			markLeaderFinalizationBroadcast(cache)
 			sendAggregatedLeaderFinalizationProofToAnchors(aggregated)
@@ -312,7 +312,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	responses, ok := state.waiter.SendAndWait(ctx, message, epochHandler.Quorum, state.wsConns, majority)
+	responses, ok := state.Waiter.SendAndWait(ctx, message, epochHandler.Quorum, state.WsConns, majority)
 	if !ok {
 		return
 	}
@@ -337,7 +337,7 @@ func ensureLeaderFinalizationCache(state *EpochRotationState, epochId int, leade
 	LEADER_FINALIZATION_MUTEX.Lock()
 	defer LEADER_FINALIZATION_MUTEX.Unlock()
 
-	if cache, ok := state.caches[key]; ok {
+	if cache, ok := state.Caches[key]; ok {
 		return cache
 	}
 
@@ -346,7 +346,7 @@ func ensureLeaderFinalizationCache(state *EpochRotationState, epochId int, leade
 		Proofs:   make(map[string]string),
 	}
 
-	state.caches[key] = cache
+	state.Caches[key] = cache
 
 	return cache
 }

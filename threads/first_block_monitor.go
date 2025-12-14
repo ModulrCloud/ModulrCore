@@ -15,6 +15,7 @@ import (
 func FirstBlockMonitorThread() {
 
 	var epochUnderObservation int
+
 	initialized := false
 
 	for {

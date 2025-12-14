@@ -31,20 +31,19 @@ type ProofsGrabber struct {
 	HuntingForBlockHash string
 }
 
-var PROOFS_GRABBER_MUTEX = sync.RWMutex{}
+var (
+	PROOFS_GRABBER       = ProofsGrabber{EpochId: -1}
+	PROOFS_GRABBER_MUTEX = sync.RWMutex{}
+)
 
-var WEBSOCKET_CONNECTIONS = make(map[string]*websocket.Conn) // quorumMember => websocket handler
-var WEBSOCKET_GUARDS_FOR_PROOFS = utils.NewWebsocketGuards()
+var (
+	WEBSOCKET_CONNECTIONS       = make(map[string]*websocket.Conn) // quorumMember => websocket handler
+	WEBSOCKET_GUARDS_FOR_PROOFS = utils.NewWebsocketGuards()
+)
 
 var FINALIZATION_PROOFS_CACHE = make(map[string]string) // quorumMember => finalization proof signa
 
-var PROOFS_GRABBER = ProofsGrabber{
-	EpochId: -1,
-}
-
-var BLOCK_TO_SHARE *block_pack.Block = &block_pack.Block{
-	Index: -1,
-}
+var BLOCK_TO_SHARE *block_pack.Block = &block_pack.Block{Index: -1}
 
 var QUORUM_WAITER_FOR_FINALIZATION_PROOFS *utils.QuorumWaiter
 
