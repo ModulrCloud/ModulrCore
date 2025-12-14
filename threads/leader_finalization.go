@@ -33,6 +33,7 @@ type EpochRotationState struct {
 	caches  map[string]*LeaderFinalizationCache
 	wsConns map[string]*websocket.Conn
 	waiter  *utils.QuorumWaiter
+	guards  *utils.WebsocketGuards
 }
 
 var (
@@ -94,13 +95,15 @@ func ensureLeaderFinalizationState(epochHandler *structures.EpochDataHandler) *E
 		return state
 	}
 
+	guards := utils.NewWebsocketGuards()
 	state := &EpochRotationState{
 		caches:  make(map[string]*LeaderFinalizationCache),
 		wsConns: make(map[string]*websocket.Conn),
-		waiter:  utils.NewQuorumWaiter(len(epochHandler.Quorum)),
+		waiter:  utils.NewQuorumWaiter(len(epochHandler.Quorum), guards),
+		guards:  guards,
 	}
 
-	utils.OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, state.wsConns)
+	utils.OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, state.wsConns, guards)
 	LEADER_FINALIZATION_STATES[epochHandler.Id] = state
 
 	return state
