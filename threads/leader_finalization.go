@@ -50,12 +50,14 @@ func LeaderFinalizationThread() {
 			PROCESSING_EPOCH_INDEX = loadFinalizationProgress()
 		}
 
-		processingHandler := getOrLoadEpochHandler(PROCESSING_EPOCH_INDEX)
+		snapshot := getOrLoadEpochSnapshot(PROCESSING_EPOCH_INDEX)
 
-		if processingHandler == nil {
+		if snapshot == nil {
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
+
+		processingHandler := &snapshot.EpochDataHandler
 
 		if !weAreInEpochQuorum(processingHandler) {
 			currentEpoch := PROCESSING_EPOCH_INDEX
@@ -69,7 +71,7 @@ func LeaderFinalizationThread() {
 		state := ensureLeaderFinalizationState(processingHandler)
 		majority := utils.GetQuorumMajority(processingHandler)
 
-		networkParams := getNetworkParameters()
+		networkParams := snapshot.NetworkParameters
 
 		for _, leaderIndex := range leadersReadyForAlfp(processingHandler, &networkParams) {
 			tryCollectLeaderFinalizationProofs(processingHandler, leaderIndex, majority, state)
@@ -109,7 +111,7 @@ func ensureLeaderFinalizationState(epochHandler *structures.EpochDataHandler) *E
 	return state
 }
 
-func getOrLoadEpochHandler(epochId int) *structures.EpochDataHandler {
+func getOrLoadEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
 
 	handlers.FINALIZATION_THREAD_METADATA.RWMutex.RLock()
 	handler, ok := handlers.FINALIZATION_THREAD_METADATA.EpochHandlers[epochId]
@@ -126,7 +128,7 @@ func getOrLoadEpochHandler(epochId int) *structures.EpochDataHandler {
 		return nil
 	}
 
-	var loaded structures.EpochDataHandler
+	var loaded structures.EpochDataSnapshot
 	if json.Unmarshal(raw, &loaded) != nil {
 		return nil
 	}
@@ -171,15 +173,6 @@ func cleanupLeaderFinalizationState(epochId int) {
 	}
 
 	delete(LEADER_FINALIZATION_STATES, epochId)
-}
-
-func getNetworkParameters() structures.NetworkParameters {
-
-	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
-	params := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters
-	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
-
-	return params
 }
 
 func weAreInEpochQuorum(epochHandler *structures.EpochDataHandler) bool {

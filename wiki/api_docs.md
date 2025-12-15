@@ -320,11 +320,11 @@ curl https://localhost:7332/account/6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE
 ## Epoch data
 
 ### `GET /epoch_data/{epochIndex}`
-Returns serialized epoch handler state stored under `EPOCH_HANDLER:{epochIndex}`.
+Returns serialized epoch snapshot stored under `EPOCH_HANDLER:{epochIndex}`.
 
 - **Path parameters**
   - `epochIndex`: Epoch number as a string.
-- **Success (200)**: Raw JSON payload previously stored for the epoch (often an `EpochDataHandler`).
+- **Success (200)**: Raw JSON payload for the epoch snapshot: the latest `EpochDataHandler` persisted for the epoch plus the `networkParameters` used during that epoch.
 - **Errors**
   - `400` — invalid epoch index.
   - `404` — no data for the requested epoch.
@@ -339,12 +339,32 @@ curl https://localhost:7332/epoch_data/42
 {
   "id": 42,
   "hash": "9f8c6d",
+  "startTimestamp": 1714042385123,
   "currentLeaderIndex": 3,
   "leadersSequence": [
     "ed25519_leader_0",
     "ed25519_leader_1",
     "ed25519_leader_2",
     "ed25519_leader_3"
-  ]
+  ],
+  "quorum": [
+    "ed25519_validator_0",
+    "ed25519_validator_5",
+    "ed25519_validator_8",
+    "ed25519_validator_9",
+    "ed25519_validator_12"
+  ],
+  "validatorsRegistry": [
+    "ed25519_validator_0",
+    "ed25519_validator_1",
+    "ed25519_validator_2"
+  ],
+  "networkParameters": {
+    "epochDuration": 60000,
+    "quorumSize": 5,
+    "minimalStakePerStaker": 1000000,
+    "validatorRequiredStake": 5000000,
+    "leadersCount": 12
+  }
 }
 ```

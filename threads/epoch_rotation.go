@@ -142,9 +142,12 @@ func EpochRotationThread() {
 
 						}
 
+						networkParamsCopy := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.CopyNetworkParameters()
+						snapshot := structures.EpochDataSnapshot{EpochDataHandler: *epochHandlerRef, NetworkParameters: networkParamsCopy}
+
 						keyBytes := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochHandlerRef.Id))
 
-						valBytes, marshalErr := json.Marshal(epochHandlerRef)
+						valBytes, marshalErr := json.Marshal(snapshot)
 
 						if marshalErr != nil {
 
