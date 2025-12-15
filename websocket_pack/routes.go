@@ -20,6 +20,31 @@ import (
 // Only one block creator can request proof for block at a choosen period of time T
 var BLOCK_CREATOR_REQUEST_MUTEX = sync.Mutex{}
 
+func getEpochHandlerForLeaderFinalization(epochIndex int) *structures.EpochDataHandler {
+
+	if epochIndex < 0 {
+		return nil
+	}
+
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.Id == epochIndex {
+		handlerCopy := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+		return &handlerCopy
+	}
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	key := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochIndex))
+	if raw, err := databases.EPOCH_DATA.Get(key, nil); err == nil {
+		var snapshot structures.EpochDataSnapshot
+		if json.Unmarshal(raw, &snapshot) == nil {
+			return &snapshot.EpochDataHandler
+		}
+	}
+
+	return nil
+}
+
 func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *gws.Conn) {
 
 	if !globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Load() {
@@ -179,14 +204,16 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 		return
 	}
 
-	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	epochHandler := getEpochHandlerForLeaderFinalization(parsedRequest.EpochIndex)
+	if epochHandler == nil {
+		return
+	}
 
-	defer handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
-
-	epochHandler := &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+	if parsedRequest.IndexOfLeaderToFinalize < 0 || parsedRequest.IndexOfLeaderToFinalize >= len(epochHandler.LeadersSequence) {
+		return
+	}
 
 	epochIndex := epochHandler.Id
-
 	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochIndex)
 
 	leaderToFinalize := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToFinalize]
@@ -224,7 +251,7 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 		} else {
 
-			//________________________________________________ Verify the proposed AFP ________________________________________________
+			//________________________________________________ Verify the proposed AFP __________________________________________________________________
 
 			afpIsOk := false
 
@@ -251,6 +278,7 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 			} else {
 
 				afpIsOk = true
+
 			}
 
 			if afpIsOk {
@@ -260,7 +288,9 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 				if parsedRequest.SkipData.Index == -1 {
 
 					dataToSignForLeaderFinalization = "LEADER_FINALIZATION_PROOF:" + leaderToFinalize
+
 					dataToSignForLeaderFinalization += ":-1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:"
+
 					dataToSignForLeaderFinalization += epochFullID
 
 				} else if parsedRequest.SkipData.Index >= 0 {
@@ -276,13 +306,10 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 				leaderFinalizationProofMessage := WsLeaderFinalizationProofResponseOk{
 
-					Voter: globals.CONFIGURATION.PublicKey,
-
+					Voter:           globals.CONFIGURATION.PublicKey,
 					ForLeaderPubkey: leaderToFinalize,
-
-					Status: "OK",
-
-					Sig: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderFinalization),
+					Status:          "OK",
+					Sig:             cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSignForLeaderFinalization),
 				}
 
 				jsonResponse, err := json.Marshal(leaderFinalizationProofMessage)

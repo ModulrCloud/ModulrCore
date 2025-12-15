@@ -293,6 +293,7 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 
 	request := websocket_pack.WsLeaderFinalizationProofRequest{
 		Route:                   "get_leader_finalization_proof",
+		EpochIndex:              epochHandler.Id,
 		IndexOfLeaderToFinalize: leaderIndex,
 		SkipData:                cache.SkipData,
 	}
