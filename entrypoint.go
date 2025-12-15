@@ -312,8 +312,10 @@ func setGenesisToState() error {
 	// Store epoch data for API
 
 	currentEpochDataHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+	currentNetworkParams := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.CopyNetworkParameters()
+	currentSnapshot := structures.EpochDataSnapshot{EpochDataHandler: currentEpochDataHandler, NetworkParameters: currentNetworkParams}
 
-	jsonedCurrentEpochDataHandler, err := json.Marshal(currentEpochDataHandler)
+	jsonedCurrentEpochDataHandler, err := json.Marshal(currentSnapshot)
 
 	if err != nil {
 		return fmt.Errorf("marshal current epoch handler: %w", err)

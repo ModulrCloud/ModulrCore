@@ -10,6 +10,11 @@ type EpochDataHandler struct {
 	CurrentLeaderIndex int      `json:"currentLeaderIndex"`
 }
 
+type EpochDataSnapshot struct {
+	EpochDataHandler
+	NetworkParameters NetworkParameters `json:"networkParameters"`
+}
+
 type NextEpochDataHandler struct {
 	NextEpochHash               string              `json:"nextEpochHash"`
 	NextEpochValidatorsRegistry []string            `json:"nextEpochValidatorsRegistry"`
