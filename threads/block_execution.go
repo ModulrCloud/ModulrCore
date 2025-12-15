@@ -143,7 +143,7 @@ func getBlockAndAfpFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespons
 func getAnchorBlockAndAfpFromAnchorsPoD(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse {
 
 	req := websocket_pack.WsAnchorBlockWithAfpRequest{
-		Route:   "get_block_with_afp",
+		Route:   "get_anchor_block_with_afp",
 		BlockId: blockID,
 	}
 
