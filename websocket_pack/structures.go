@@ -8,6 +8,7 @@ import (
 
 type WsLeaderFinalizationProofRequest struct {
 	Route                   string                `json:"route"`
+	EpochIndex              int                   `json:"epochIndex"`
 	IndexOfLeaderToFinalize int                   `json:"indexOfLeaderToFinalize"`
 	SkipData                structures.VotingStat `json:"skipData"`
 }
