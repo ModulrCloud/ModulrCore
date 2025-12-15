@@ -26,6 +26,8 @@ type FirstBlockData struct {
 
 var FIRST_BLOCK_DATA FirstBlockData
 
+const STUB_FOR_FIRST_BLOCK_SEARCH = true
+
 func EpochRotationThread() {
 
 	for {
@@ -58,7 +60,13 @@ func EpochRotationThread() {
 					// Find first block in this epoch
 					if FIRST_BLOCK_DATA.FirstBlockHash == "" {
 
-						firstBlockData := getFirstBlockDataFromDB(epochHandlerRef.Id)
+						var firstBlockData *FirstBlockData
+
+						if STUB_FOR_FIRST_BLOCK_SEARCH {
+							firstBlockData = getFirstBlockDataFromDBStub()
+						} else {
+							firstBlockData = getFirstBlockDataFromDB(epochHandlerRef.Id)
+						}
 
 						if firstBlockData != nil {
 
@@ -76,11 +84,17 @@ func EpochRotationThread() {
 
 					// 1. Fetch first block
 
-					firstBlock := block_pack.GetBlock(epochHandlerRef.Id, FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
+					var firstBlock *block_pack.Block
+
+					if STUB_FOR_FIRST_BLOCK_SEARCH {
+						firstBlock = &block_pack.Block{}
+					} else {
+						firstBlock = block_pack.GetBlock(epochHandlerRef.Id, FIRST_BLOCK_DATA.FirstBlockCreator, 0, epochHandlerRef)
+					}
 
 					// 2. Compare hashes
 
-					if firstBlock != nil && firstBlock.GetHash() == FIRST_BLOCK_DATA.FirstBlockHash {
+					if firstBlock != nil && (STUB_FOR_FIRST_BLOCK_SEARCH || firstBlock.GetHash() == FIRST_BLOCK_DATA.FirstBlockHash) {
 
 						// 3. Verify that quorum agreed batch of delayed transactions
 
@@ -143,6 +157,7 @@ func EpochRotationThread() {
 						}
 
 						networkParamsCopy := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.CopyNetworkParameters()
+
 						snapshot := structures.EpochDataSnapshot{EpochDataHandler: *epochHandlerRef, NetworkParameters: networkParamsCopy}
 
 						keyBytes := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochHandlerRef.Id))
@@ -403,4 +418,10 @@ func getFirstBlockDataFromDB(epochIndex int) *FirstBlockData {
 	}
 
 	return &firstBlockData
+}
+
+func getFirstBlockDataFromDBStub() *FirstBlockData {
+
+	return &FirstBlockData{FirstBlockHash: handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.Hash}
+
 }
