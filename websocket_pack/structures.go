@@ -64,3 +64,18 @@ type WsBlockWithAfpStoreRequest struct {
 	Block block_pack.Block                       `json:"block"`
 	Afp   structures.AggregatedFinalizationProof `json:"afp"`
 }
+
+type WsAggregatedLeaderFinalizationProofStoreRequest struct {
+	Route string                                       `json:"route"`
+	Proof structures.AggregatedLeaderFinalizationProof `json:"proof"`
+}
+
+type WsAggregatedLeaderFinalizationProofRequest struct {
+	Route      string `json:"route"`
+	EpochIndex int    `json:"epochIndex"`
+	Leader     string `json:"leader"`
+}
+
+type WsAggregatedLeaderFinalizationProofResponse struct {
+	Proof *structures.AggregatedLeaderFinalizationProof `json:"proof"`
+}

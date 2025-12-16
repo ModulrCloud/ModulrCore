@@ -27,6 +27,8 @@ type LeaderFinalizationCache struct {
 	Proofs   map[string]string
 	// Timestamp of the last broadcast to anchors to avoid spamming
 	LastBroadcasted time.Time
+	// Timestamp of the last PoD fetch to avoid spamming PoD
+	LastPodFetch time.Time
 }
 
 type EpochRotationState struct {
@@ -291,6 +293,8 @@ func tryCollectLeaderFinalizationProofs(epochHandler *structures.EpochDataHandle
 		return
 	}
 
+	requestLeaderFinalizationFromPoD(epochHandler, leaderPubKey, cache)
+
 	request := websocket_pack.WsLeaderFinalizationProofRequest{
 		Route:                   "get_leader_finalization_proof",
 		EpochIndex:              epochHandler.Id,
@@ -475,14 +479,24 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 	}
 
 	key := []byte(fmt.Sprintf("ALFP:%d:%s", epochId, leaderPubKey))
-	if value, err := json.Marshal(aggregated); err == nil {
-		_ = databases.FINALIZATION_VOTING_STATS.Put(key, value, nil)
-	}
+	persistAggregatedLeaderFinalizationProofDirect(&aggregated)
 
 	LEADER_FINALIZATION_MUTEX.Unlock()
 
 	markLeaderFinalizationBroadcast(cache)
 	sendAggregatedLeaderFinalizationProofToAnchors(&aggregated)
+	websocket_pack.SendAggregatedLeaderFinalizationProofToPoD(aggregated)
+}
+
+func persistAggregatedLeaderFinalizationProofDirect(aggregated *structures.AggregatedLeaderFinalizationProof) {
+	if aggregated == nil {
+		return
+	}
+
+	key := []byte(fmt.Sprintf("ALFP:%d:%s", aggregated.EpochIndex, aggregated.Leader))
+	if value, err := json.Marshal(aggregated); err == nil {
+		_ = databases.FINALIZATION_VOTING_STATS.Put(key, value, nil)
+	}
 }
 
 func shouldBroadcastLeaderFinalization(cache *LeaderFinalizationCache) bool {
@@ -536,4 +550,31 @@ func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.Aggre
 			resp.Body.Close()
 		}(anchor)
 	}
+}
+
+func requestLeaderFinalizationFromPoD(epochHandler *structures.EpochDataHandler, leaderPubKey string, cache *LeaderFinalizationCache) {
+
+	LEADER_FINALIZATION_MUTEX.Lock()
+	shouldRequest := time.Since(cache.LastPodFetch) > time.Second
+	if shouldRequest {
+		cache.LastPodFetch = time.Now()
+	}
+	LEADER_FINALIZATION_MUTEX.Unlock()
+
+	if !shouldRequest {
+		return
+	}
+
+	go func() {
+		aggregated := websocket_pack.GetAggregatedLeaderFinalizationProofFromPoD(epochHandler.Id, leaderPubKey)
+		if aggregated == nil {
+			return
+		}
+
+		if !utils.VerifyAggregatedLeaderFinalizationProof(aggregated, epochHandler) {
+			return
+		}
+
+		persistAggregatedLeaderFinalizationProofDirect(aggregated)
+	}()
 }
