@@ -58,3 +58,9 @@ type WsAnchorBlockWithAfpResponse struct {
 	Block *anchors_pack.AnchorBlock               `json:"block"`
 	Afp   *structures.AggregatedFinalizationProof `json:"afp"`
 }
+
+type WsBlockWithAfpStoreRequest struct {
+	Route string                                 `json:"route"`
+	Block block_pack.Block                       `json:"block"`
+	Afp   structures.AggregatedFinalizationProof `json:"afp"`
+}

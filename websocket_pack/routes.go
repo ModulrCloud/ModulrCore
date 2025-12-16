@@ -174,6 +174,8 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 										if err == nil {
 
+											go SendBlockAndAfpToPoD(parsedRequest.Block, parsedRequest.PreviousBlockAfp)
+
 											connection.WriteMessage(gws.OpcodeText, jsonResponse)
 
 										}
