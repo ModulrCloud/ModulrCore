@@ -478,7 +478,6 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 		Signatures: proofsCopy,
 	}
 
-	key := []byte(fmt.Sprintf("ALFP:%d:%s", epochId, leaderPubKey))
 	persistAggregatedLeaderFinalizationProofDirect(&aggregated)
 
 	LEADER_FINALIZATION_MUTEX.Unlock()
