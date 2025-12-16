@@ -9,7 +9,8 @@ import (
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
-	system_contracts "github.com/modulrcloud/modulr-core/system_contracts"
+	"github.com/modulrcloud/modulr-core/system_contracts"
+
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
