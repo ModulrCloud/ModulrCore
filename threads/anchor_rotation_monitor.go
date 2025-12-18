@@ -19,6 +19,26 @@ import (
 
 var RANDOM_GENERATOR = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+type executionThreadMetadataSnapshot struct {
+	EpochID                 int
+	CurrentAnchorAssumption int
+	AnchorStatsKnown        bool
+}
+
+func takeExecutionThreadMetadataSnapshot(anchorIndex int) executionThreadMetadataSnapshot {
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	defer handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	handler := handlers.EXECUTION_THREAD_METADATA.Handler
+	_, exists := handler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]
+
+	return executionThreadMetadataSnapshot{
+		EpochID:                 handler.EpochDataHandler.Id,
+		CurrentAnchorAssumption: handler.SequenceAlignmentData.CurrentAnchorAssumption,
+		AnchorStatsKnown:        exists,
+	}
+}
+
 func AnchorRotationMonitorThread() {
 
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -69,48 +89,65 @@ func checkSequenceAlignmentData(anchorIndex int, epochHandler *structures.EpochD
 		return
 	}
 
+	metadataSnapshot := takeExecutionThreadMetadataSnapshot(anchorIndex)
+	if metadataSnapshot.AnchorStatsKnown || metadataSnapshot.CurrentAnchorAssumption != anchorIndex || metadataSnapshot.EpochID != epochHandler.Id {
+		return
+	}
+
+	earliestRotationStats, ok := processSequenceAlignmentDataResponse(&alignmentData, anchorIndex, epochHandler)
+	if !ok {
+		return
+	}
+
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+	defer handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
-	processSequenceAlignmentDataResponse(&alignmentData, anchorIndex, epochHandler, &handlers.EXECUTION_THREAD_METADATA.Handler)
+	currentHandler := &handlers.EXECUTION_THREAD_METADATA.Handler
+	if currentHandler.EpochDataHandler.Id != metadataSnapshot.EpochID ||
+		currentHandler.SequenceAlignmentData.CurrentAnchorAssumption != metadataSnapshot.CurrentAnchorAssumption {
+		return
+	}
 
-	handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
+	if currentHandler.SequenceAlignmentData.LastBlocksByAnchors == nil {
+		currentHandler.SequenceAlignmentData.LastBlocksByAnchors = make(map[int]structures.ExecutionStats)
+	}
+
+	if _, exists := currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; !exists {
+		currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex] = earliestRotationStats
+	}
 
 }
 
-func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataResponse, anchorIndex int, epochHandler *structures.EpochDataHandler, execThreadHandler *structures.ExecutionThreadMetadataHandler) bool {
+func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataResponse, anchorIndex int, epochHandler *structures.EpochDataHandler) (structures.ExecutionStats, bool) {
 
-	if alignmentData == nil || alignmentData.Afp == nil || execThreadHandler == nil || epochHandler == nil {
-		return false
+	if alignmentData == nil || alignmentData.Afp == nil || epochHandler == nil {
+		return structures.ExecutionStats{}, false
 	}
 
 	if alignmentData.FoundInAnchorIndex <= anchorIndex || alignmentData.FoundInAnchorIndex >= len(globals.ANCHORS) {
-		return false
-	}
-
-	if _, exists := execThreadHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; exists {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	blockIdParts := strings.Split(alignmentData.Afp.BlockId, ":")
 
 	if len(blockIdParts) != 3 {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	epochIDFromBlock, err := strconv.Atoi(blockIdParts[0])
 
 	if err != nil || epochIDFromBlock != epochHandler.Id {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	blockIndexInAfp, err := strconv.Atoi(blockIdParts[2])
 
 	if err != nil {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	anchorFromBlock := blockIdParts[1]
@@ -118,7 +155,7 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 	expectedAnchor := globals.ANCHORS[alignmentData.FoundInAnchorIndex]
 
 	if anchorFromBlock != expectedAnchor.Pubkey {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	maxFoundInBlock := -1
@@ -135,31 +172,27 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 	}
 
 	if blockIndexInAfp != maxFoundInBlock+1 {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
 	for i := anchorIndex; i < alignmentData.FoundInAnchorIndex; i++ {
 		anchorData, exists := alignmentData.Anchors[i]
 
 		if !exists {
-			return false
+			return structures.ExecutionStats{}, false
 		}
 
 		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof) {
-			return false
+			return structures.ExecutionStats{}, false
 		}
 	}
 
 	earliestRotationStats, found := findEarliestAnchorRotationProof(anchorIndex, alignmentData.FoundInAnchorIndex, blockIndexInAfp, epochHandler, anchorIndexMap)
 	if !found {
-		return false
+		return structures.ExecutionStats{}, false
 	}
 
-	if _, exists := execThreadHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; !exists {
-		execThreadHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex] = earliestRotationStats
-	}
-
-	return true
+	return earliestRotationStats, true
 }
 
 func findEarliestAnchorRotationProof(currentAnchor, foundInAnchorIndex, blockLimit int, epochHandler *structures.EpochDataHandler, anchorIndexMap map[string]int) (structures.ExecutionStats, bool) {
