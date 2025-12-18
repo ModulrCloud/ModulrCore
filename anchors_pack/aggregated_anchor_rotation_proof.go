@@ -25,7 +25,7 @@ func BuildAnchorRotationProofPayload(anchor string, blockIndex int, blockHash st
 	return fmt.Sprintf("ANCHOR_ROTATION_PROOF:%s:%d:%s:%d", anchor, blockIndex, blockHash, epochIndex)
 }
 
-func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, epochHandler *structures.EpochDataHandler) bool {
+func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) bool {
 
 	if proof.VotingStat.Afp.BlockId == "" {
 		return false
@@ -51,7 +51,7 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof, e
 
 	dataToVerify := BuildAnchorRotationProofPayload(proof.Anchor, proof.VotingStat.Index, proof.VotingStat.Hash, proof.EpochIndex)
 
-	quorum := epochHandler.Quorum
+	quorum := globals.ANCHORS_PUBKEYS
 	verified := 0
 	seen := make(map[string]struct{})
 	for voter, signature := range proof.Signatures {

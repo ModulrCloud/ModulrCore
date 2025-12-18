@@ -145,7 +145,7 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 			return false
 		}
 
-		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof, epochHandler) {
+		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof) {
 			return false
 		}
 	}
@@ -198,7 +198,7 @@ func findEarliestAnchorRotationProof(currentAnchor, foundInAnchorIndex, blockLim
 					continue
 				}
 
-				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof, epochHandler) {
+				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof) {
 					continue
 				}
 

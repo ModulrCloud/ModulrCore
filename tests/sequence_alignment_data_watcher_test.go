@@ -418,7 +418,7 @@ func buildAggregatedFinalizationProof(anchorKeys []cryptography.Ed25519Box, epoc
 
 	proof := structures.AggregatedFinalizationProof{PrevBlockHash: "prev_hash", BlockId: blockID, BlockHash: blockHash, Proofs: make(map[string]string)}
 
-dataToSign := fmt.Sprintf("%s:%s:%s:%d", proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochHandler.Id)
+	dataToSign := fmt.Sprintf("%s:%s:%s:%d", proof.PrevBlockHash, proof.BlockId, proof.BlockHash, epochHandler.Id)
 
 	for _, key := range anchorKeys {
 		proof.Proofs[key.Pub] = cryptography.GenerateSignature(key.Prv, dataToSign)
@@ -516,7 +516,7 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 			return false
 		}
 
-		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof, epochHandler) {
+		if !anchors_pack.VerifyAggregatedAnchorRotationProof(&anchorData.AggregatedAnchorRotationProof) {
 			return false
 		}
 	}
@@ -573,7 +573,7 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 					continue
 				}
 
-				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof, epochHandler) {
+				if !anchors_pack.VerifyAggregatedAnchorRotationProof(&proof) {
 					continue
 				}
 
