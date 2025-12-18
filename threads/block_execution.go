@@ -37,9 +37,21 @@ func BlockExecutionThread() {
 
 		if infoAboutLastBlockExists && execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index {
 
-			// Move to the next leader
+			allBlocksInEpochWereExecuted := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom+1
 
-			epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom++
+			if allBlocksInEpochWereExecuted {
+
+				// Move to the next epoch
+
+				setupNextEpoch(&epochHandlerRef.EpochDataHandler)
+
+			} else {
+
+				// Move to the next leader
+
+				epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom++
+
+			}
 
 			// Here we need to skip the following logic and start next iteration
 
@@ -83,20 +95,6 @@ func BlockExecutionThread() {
 			} else {
 
 				break
-
-			}
-
-		}
-
-		if infoAboutLastBlockExists {
-
-			finishedToExecBlocksByLastLeader := execStatsOfLeader.Index == infoAboutLastBlockByThisLeader.Index
-
-			allBlocksWereExecuted := len(epochHandlerRef.EpochDataHandler.LeadersSequence) == epochHandlerRef.SequenceAlignmentData.CurrentLeaderToExecBlocksFrom+1
-
-			if allBlocksWereExecuted && finishedToExecBlocksByLastLeader && utils.EpochStillFresh(epochHandlerRef) {
-
-				setupNextEpoch(&epochHandlerRef.EpochDataHandler)
 
 			}
 
