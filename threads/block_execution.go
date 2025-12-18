@@ -551,12 +551,15 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
-		// Finally, clean useless data
+		// Finally, clean & nullify sequence data
 
 		handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
 
-			LastBlocksByLeaders: make(map[string]structures.ExecutionStats),
+			CurrentAnchorAssumption:         0,
+			CurrentAnchorBlockIndexObserved: -1,
+			CurrentLeaderToExecBlocksFrom:   0,
 
+			LastBlocksByLeaders: make(map[string]structures.ExecutionStats),
 			LastBlocksByAnchors: make(map[int]structures.ExecutionStats),
 		}
 

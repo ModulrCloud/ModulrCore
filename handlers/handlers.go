@@ -28,8 +28,11 @@ var EXECUTION_THREAD_METADATA = struct {
 		ValidatorsStoragesCache: make(map[string]*structures.ValidatorStorage),
 		ExecutionData:           make(map[string]structures.ExecutionStats),
 		SequenceAlignmentData: structures.AlignmentDataHandler{
-			LastBlocksByLeaders: make(map[string]structures.ExecutionStats),
-			LastBlocksByAnchors: make(map[int]structures.ExecutionStats),
+			CurrentAnchorAssumption:         0,
+			CurrentAnchorBlockIndexObserved: -1,
+			CurrentLeaderToExecBlocksFrom:   0,
+			LastBlocksByLeaders:             make(map[string]structures.ExecutionStats),
+			LastBlocksByAnchors:             make(map[int]structures.ExecutionStats),
 		},
 		Statistics: &structures.Statistics{LastHeight: -1},
 	},
