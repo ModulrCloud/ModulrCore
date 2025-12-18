@@ -26,120 +26,96 @@ func SequenceAlignmentThread() {
 
 	for {
 
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
 
-		epochHandlerRef := &handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
+		epochSnapshot := handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler
+		alignmentSnapshot := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData
+		currentAnchorIndex := alignmentSnapshot.CurrentAnchorAssumption
+		currentAnchorBlockPointerObserved := alignmentSnapshot.CurrentAnchorBlockIndexObserved
+		infoAboutAnchorLastBlock, infoAboutAnchorLastBlockExists := alignmentSnapshot.LastBlocksByAnchors[currentAnchorIndex]
 
-		anchorsAlignmentData := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByAnchors
-
-		currentAnchorIndex := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption
-
-		currentAnchorBlockPointerObserved := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved
-
-		infoAboutAnchorLastBlock, infoAboutAnchorLastBlockExists := anchorsAlignmentData[currentAnchorIndex] // {index,hash}
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 		if infoAboutAnchorLastBlockExists && infoAboutAnchorLastBlock.Index == currentAnchorBlockPointerObserved {
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+			if handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id == epochSnapshot.Id &&
+				handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption == currentAnchorIndex &&
+				handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved == currentAnchorBlockPointerObserved {
 
-			// Move to next anchor
+				handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption++
+				handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved = -1
+			}
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
+			continue
+		}
 
-			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption++
+		anchorData := globals.ANCHORS[currentAnchorIndex]
+		blockId := strconv.Itoa(epochSnapshot.Id) + ":" + anchorData.Pubkey + ":" + strconv.Itoa(currentAnchorBlockPointerObserved+1)
 
-			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved = -1
+		response := getAnchorBlockAndAfpFromAnchorsPoD(blockId)
+		if response == nil || response.Block == nil {
+			utils.LogWithTime(
+				fmt.Sprintf("Sequence alignment: no anchor block available for %s", blockId),
+				utils.YELLOW_COLOR,
+			)
+			continue
+		}
+
+		validLeaderStats := make(map[string]structures.ExecutionStats)
+		for _, proof := range response.Block.ExtraData.AggregatedLeaderFinalizationProofs {
+			if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, &epochSnapshot) {
+				continue
+			}
+
+			validLeaderStats[proof.Leader] = structures.ExecutionStats{
+				Index: proof.VotingStat.Index,
+				Hash:  proof.VotingStat.Hash,
+			}
+		}
+
+		afpValid := response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, &epochSnapshot)
+		responseBlockHash := response.Block.GetHash()
+
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+
+		if handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler.Id != epochSnapshot.Id ||
+			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption != currentAnchorIndex {
 
 			handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
-
 			continue
 
 		}
 
-		anchorData := globals.ANCHORS[currentAnchorIndex]
-		epochId := epochHandlerRef.Id
+		alignmentData := &handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData
+		observedIndex := alignmentData.CurrentAnchorBlockIndexObserved
+		infoAboutAnchorLastBlock, infoAboutAnchorLastBlockExists = alignmentData.LastBlocksByAnchors[currentAnchorIndex]
 
-		for {
+		currentBlockMatchesAnchor := infoAboutAnchorLastBlockExists && infoAboutAnchorLastBlock.Index == observedIndex && responseBlockHash == infoAboutAnchorLastBlock.Hash
 
-			// Try to get the next block + proof and do it until block will be unavailable or we finished with current block creator
-
-			blockId := strconv.Itoa(epochId) + ":" + anchorData.Pubkey + ":" + strconv.Itoa(currentAnchorBlockPointerObserved+1)
-
-			response := getAnchorBlockAndAfpFromAnchorsPoD(blockId)
-
-			// If no data - break
-			if response == nil || response.Block == nil {
-				break
-			}
-
-			if infoAboutAnchorLastBlockExists && infoAboutAnchorLastBlock.Index == currentAnchorBlockPointerObserved && response.Block.GetHash() == infoAboutAnchorLastBlock.Hash {
-
-				// Exec block without AFP
-
-				for _, proof := range response.Block.ExtraData.AggregatedLeaderFinalizationProofs {
-
-					if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, epochHandlerRef) {
-						continue
-					}
-
-					if _, exists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader]; !exists {
-
-						handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader] = structures.ExecutionStats{
-							Index: proof.VotingStat.Index,
-							Hash:  proof.VotingStat.Hash,
-						}
-
-						hashPreview := proof.VotingStat.Hash
-						if len(hashPreview) > 8 {
-							hashPreview = hashPreview[:8]
-						}
-
-						utils.LogWithTime(
-							fmt.Sprintf("Sequence alignment: last block for leader %s set at index %d (hash %s...) in epoch %d", proof.Leader, proof.VotingStat.Index, hashPreview, epochId),
-							utils.CYAN_COLOR,
-						)
-
-					}
-
-				}
-
-			} else if response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, epochHandlerRef) {
-
-				// Exec block with AFP. Go through ALFP, verify and fill the SequenceAlignmentData.LastBlocksByLeaders
-
-				for _, proof := range response.Block.ExtraData.AggregatedLeaderFinalizationProofs {
-
-					if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, epochHandlerRef) {
-						continue
-					}
-
-					if _, exists := handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader]; !exists {
-
-						handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.LastBlocksByLeaders[proof.Leader] = structures.ExecutionStats{
-							Index: proof.VotingStat.Index,
-							Hash:  proof.VotingStat.Hash,
-						}
-
-						hashPreview := proof.VotingStat.Hash
-						if len(hashPreview) > 8 {
-							hashPreview = hashPreview[:8]
-						}
-
-						utils.LogWithTime(
-							fmt.Sprintf("Sequence alignment: last block for leader %s set at index %d (hash %s...) in epoch %d", proof.Leader, proof.VotingStat.Index, hashPreview, epochId),
-							utils.CYAN_COLOR,
-						)
-
-					}
-
-				}
-
-			} else {
-
-				break
-
-			}
-
-			// Finally, increase the index to move to the next block
-			handlers.EXECUTION_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved++
-
+		if !(currentBlockMatchesAnchor || afpValid) {
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
+			continue
 		}
+
+		for leader, stats := range validLeaderStats {
+			if _, exists := alignmentData.LastBlocksByLeaders[leader]; !exists {
+
+				alignmentData.LastBlocksByLeaders[leader] = stats
+
+				hashPreview := stats.Hash
+				if len(hashPreview) > 8 {
+					hashPreview = hashPreview[:8]
+				}
+
+				utils.LogWithTime(
+					fmt.Sprintf("Sequence alignment: last block for leader %s set at index %d (hash %s...) in epoch %d", leader, stats.Index, hashPreview, epochSnapshot.Id),
+					utils.CYAN_COLOR,
+				)
+
+			}
+		}
+
+		alignmentData.CurrentAnchorBlockIndexObserved++
 
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
 
