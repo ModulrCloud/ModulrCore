@@ -593,6 +593,16 @@ func setupNextEpoch(epochHandler *structures.EpochDataHandler) {
 
 		}
 
+		if execThreadRawBytes, err := json.Marshal(&handlers.EXECUTION_THREAD_METADATA.Handler); err == nil {
+
+			dbBatch.Put([]byte("ET"), execThreadRawBytes)
+
+		} else {
+
+			panic("Impossible to store updated execution thread version to atomic batch")
+
+		}
+
 		if err := databases.STATE.Write(dbBatch, nil); err != nil {
 
 			panic("Impossible to modify the state when epoch finished")
