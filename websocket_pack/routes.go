@@ -206,12 +206,22 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 		return
 	}
 
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	activeEpochID := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.Id
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
 	epochHandler := getEpochHandlerForLeaderFinalization(parsedRequest.EpochIndex)
 	if epochHandler == nil {
 		return
 	}
 
+	isRequestForPastEpoch := parsedRequest.EpochIndex < activeEpochID
+
 	if parsedRequest.IndexOfLeaderToFinalize < 0 || parsedRequest.IndexOfLeaderToFinalize >= len(epochHandler.LeadersSequence) {
+		return
+	}
+
+	if !isRequestForPastEpoch && epochHandler.CurrentLeaderIndex <= parsedRequest.IndexOfLeaderToFinalize {
 		return
 	}
 
@@ -220,7 +230,7 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 	leaderToFinalize := epochHandler.LeadersSequence[parsedRequest.IndexOfLeaderToFinalize]
 
-	if epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToFinalize {
+	if isRequestForPastEpoch || epochHandler.CurrentLeaderIndex > parsedRequest.IndexOfLeaderToFinalize {
 
 		localVotingData := structures.NewLeaderVotingStatTemplate()
 
