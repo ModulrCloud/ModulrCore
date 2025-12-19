@@ -40,13 +40,13 @@ const (
 
 var (
 	POD_MUTEX                                       sync.Mutex      // Guards open/close & replace of PoD conn
-	POD_WRITE_MUTEX                                 sync.Mutex      // Single writer guarantee for PoD
+	POD_REQUEST_MUTEX                               sync.Mutex      // Single request (write+read) guarantee for PoD
 	WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION *websocket.Conn // Connection with PoD itself
 )
 
 var (
 	ANCHORS_POD_MUTEX                                       sync.Mutex      // Guards open/close & replace of Anchors PoD conn
-	ANCHORS_POD_WRITE_MUTEX                                 sync.Mutex      // Single writer guarantee for Anchors PoD
+	ANCHORS_POD_REQUEST_MUTEX                               sync.Mutex      // Single request (write+read) guarantee for Anchors PoD
 	WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION *websocket.Conn // Connection with anchors PoD itself
 )
 
@@ -102,19 +102,20 @@ func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 
 		POD_MUTEX.Unlock()
 
-		// single writer for this connection
-		POD_WRITE_MUTEX.Lock()
+		// single request (write+read) for this connection
+		POD_REQUEST_MUTEX.Lock()
 
 		_ = c.SetWriteDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
 
 		err := c.WriteMessage(websocket.TextMessage, msg)
 
-		POD_WRITE_MUTEX.Unlock()
-
 		if err != nil {
+			POD_REQUEST_MUTEX.Unlock()
 			POD_MUTEX.Lock()
-			_ = c.Close()
-			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == c {
+				_ = c.Close()
+				WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			}
 			POD_MUTEX.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
@@ -123,10 +124,14 @@ func SendWebsocketMessageToPoD(msg []byte) ([]byte, error) {
 		_ = c.SetReadDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
 		_, resp, err := c.ReadMessage()
 
+		POD_REQUEST_MUTEX.Unlock()
+
 		if err != nil {
 			POD_MUTEX.Lock()
-			_ = c.Close()
-			WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			if WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION == c {
+				_ = c.Close()
+				WEBSOCKET_CONNECTION_WITH_POINT_OF_DISTRIBUTION = nil
+			}
 			POD_MUTEX.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
@@ -166,19 +171,20 @@ func SendWebsocketMessageToAnchorsPoD(msg []byte) ([]byte, error) {
 
 		ANCHORS_POD_MUTEX.Unlock()
 
-		// single writer for this connection
-		ANCHORS_POD_WRITE_MUTEX.Lock()
+		// single request (write+read) for this connection
+		ANCHORS_POD_REQUEST_MUTEX.Lock()
 
 		_ = c.SetWriteDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
 
 		err := c.WriteMessage(websocket.TextMessage, msg)
 
-		ANCHORS_POD_WRITE_MUTEX.Unlock()
-
 		if err != nil {
+			ANCHORS_POD_REQUEST_MUTEX.Unlock()
 			ANCHORS_POD_MUTEX.Lock()
-			_ = c.Close()
-			WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION = nil
+			if WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION == c {
+				_ = c.Close()
+				WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION = nil
+			}
 			ANCHORS_POD_MUTEX.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
@@ -187,10 +193,14 @@ func SendWebsocketMessageToAnchorsPoD(msg []byte) ([]byte, error) {
 		_ = c.SetReadDeadline(time.Now().Add(POD_READ_WRITE_DEADLINE))
 		_, resp, err := c.ReadMessage()
 
+		ANCHORS_POD_REQUEST_MUTEX.Unlock()
+
 		if err != nil {
 			ANCHORS_POD_MUTEX.Lock()
-			_ = c.Close()
-			WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION = nil
+			if WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION == c {
+				_ = c.Close()
+				WEBSOCKET_CONNECTION_WITH_ANCHORS_POINT_OF_DISTRIBUTION = nil
+			}
 			ANCHORS_POD_MUTEX.Unlock()
 			time.Sleep(RETRY_INTERVAL)
 			continue
