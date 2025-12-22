@@ -259,7 +259,7 @@ func generateBlock() {
 
 		blockID := strconv.Itoa(epochIndex) + ":" + globals.CONFIGURATION.PublicKey + ":" + strconv.Itoa(blockCandidate.Index)
 
-		utils.LogWithTime("New block generated "+blockID+" (hash: "+blockHash[:8]+"...)", utils.CYAN_COLOR)
+		utils.LogWithTime("New block generated "+blockID+" (txs: "+strconv.Itoa(len(blockCandidate.Transactions))+", hash: "+blockHash[:8]+"...)", utils.CYAN_COLOR)
 
 		if blockBytes, serializeErr := json.Marshal(blockCandidate); serializeErr == nil {
 
