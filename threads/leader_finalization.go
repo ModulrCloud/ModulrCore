@@ -462,6 +462,11 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 
 	LEADER_FINALIZATION_MUTEX.Lock()
 
+	// Capture values for logging (log outside the mutex).
+	proofsCount := len(cache.Proofs)
+	skipIndex := cache.SkipData.Index
+	skipHash := cache.SkipData.Hash
+
 	proofsCopy := make(map[string]string, len(cache.Proofs))
 	for voter, sig := range cache.Proofs {
 		proofsCopy[voter] = sig
@@ -481,6 +486,22 @@ func persistAggregatedLeaderFinalizationProof(cache *LeaderFinalizationCache, ep
 	persistAggregatedLeaderFinalizationProofDirect(&aggregated)
 
 	LEADER_FINALIZATION_MUTEX.Unlock()
+
+	skipHashShort := skipHash
+	if len(skipHashShort) > 8 {
+		skipHashShort = skipHashShort[:8] + "..."
+	}
+	utils.LogWithTime(
+		fmt.Sprintf(
+			"ALFP collected & leader finalized (epoch=%d leader=%s proofs=%d index=%d hash=%s)",
+			epochId,
+			leaderPubKey,
+			proofsCount,
+			skipIndex,
+			skipHashShort,
+		),
+		utils.DEEP_GREEN_COLOR,
+	)
 
 	markLeaderFinalizationBroadcast(cache)
 	sendAggregatedLeaderFinalizationProofToAnchors(&aggregated)

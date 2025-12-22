@@ -267,19 +267,17 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 
 			afpIsOk := false
 
-			parts := strings.Split(propSkipData.Afp.BlockId, ":")
-
-			if len(parts) != 3 {
-				return
-			}
-
-			indexOfBlockInAfp, err := strconv.Atoi(parts[2])
-
-			if err != nil {
-				return
-			}
-
 			if propSkipData.Index > -1 {
+
+				parts := strings.Split(propSkipData.Afp.BlockId, ":")
+				if len(parts) != 3 {
+					return
+				}
+
+				indexOfBlockInAfp, err := strconv.Atoi(parts[2])
+				if err != nil {
+					return
+				}
 
 				if propSkipData.Hash == propSkipData.Afp.BlockHash && propSkipData.Index == indexOfBlockInAfp {
 
