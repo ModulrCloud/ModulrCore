@@ -214,6 +214,14 @@ func setGenesisToState() error {
 
 	validatorsRegistryForEpochHandler2 := []string{}
 
+	// Ensure caches exist during genesis init, since quorum/leader selection reads validator data via caches/DB.
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache == nil {
+		handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
+	}
+	if handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache == nil {
+		handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache = make(map[string]*structures.ValidatorStorage)
+	}
+
 	// __________________________________ Load info about accounts __________________________________
 
 	for accountPubkey, accountData := range globals.GENESIS.State {
@@ -243,6 +251,13 @@ func setGenesisToState() error {
 		approvementThreadBatch.Put([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), serializedStorage)
 
 		execThreadBatch.Put([]byte(validatorPubkey+"_VALIDATOR_STORAGE"), serializedStorage)
+
+		// Populate in-memory caches so helper functions (quorum/leader selection) can read validator stake/urls
+		// before the DB batch is committed.
+		key := validatorPubkey + "_VALIDATOR_STORAGE"
+		vsCopy := validatorStorage
+		handlers.APPROVEMENT_THREAD_METADATA.Handler.ValidatorsStoragesCache[key] = &vsCopy
+		handlers.EXECUTION_THREAD_METADATA.Handler.ValidatorsStoragesCache[key] = &vsCopy
 
 		validatorsRegistryForEpochHandler = append(validatorsRegistryForEpochHandler, validatorPubkey)
 
