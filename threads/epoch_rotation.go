@@ -160,8 +160,6 @@ func EpochRotationThread() {
 
 						snapshot := structures.EpochDataSnapshot{EpochDataHandler: *epochHandlerRef, NetworkParameters: networkParamsCopy}
 
-						keyBytes := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochHandlerRef.Id))
-
 						valBytes, marshalErr := json.Marshal(snapshot)
 
 						if marshalErr != nil {
@@ -174,19 +172,12 @@ func EpochRotationThread() {
 
 						}
 
-						if err := databases.EPOCH_DATA.Put(keyBytes, valBytes, nil); err != nil {
-
-							handlers.APPROVEMENT_THREAD_METADATA.RWMutex.Unlock()
-
-							globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(true)
-
-							panic(fmt.Sprintf("failed to store epoch handler: %v", err))
-
-						}
-
 						var daoVotingContractCalls, allTheRestContractCalls []map[string]string
 
 						atomicBatch := new(leveldb.Batch)
+
+						// Store snapshot of the finishing epoch in the same DB/batch as AT update for atomicity.
+						atomicBatch.Put([]byte("EPOCH_HANDLER:"+strconv.Itoa(epochHandlerRef.Id)), valBytes)
 
 						for _, delayedTransaction := range delayedTransactionsToExecute {
 
@@ -265,6 +256,16 @@ func EpochRotationThread() {
 						// Finally - assign new handler
 
 						handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = nextEpochHandler
+
+						// Store epoch data snapshot for API/finalization right away,
+						// so other threads don't have to wait for the next epoch to see EPOCH_HANDLER:<nextEpochId>.
+						nextSnapshot := structures.EpochDataSnapshot{
+							EpochDataHandler:  nextEpochHandler,
+							NetworkParameters: networkParamsCopy,
+						}
+						if nextValBytes, err := json.Marshal(nextSnapshot); err == nil {
+							atomicBatch.Put([]byte("EPOCH_HANDLER:"+strconv.Itoa(nextEpochId)), nextValBytes)
+						}
 
 						// And commit all the changes on AT as a single atomic batch
 

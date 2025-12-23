@@ -35,7 +35,8 @@ func getEpochHandlerForLeaderFinalization(epochIndex int) *structures.EpochDataH
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 	key := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochIndex))
-	if raw, err := databases.EPOCH_DATA.Get(key, nil); err == nil {
+	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB
+	if raw, err := databases.APPROVEMENT_THREAD_METADATA.Get(key, nil); err == nil {
 		var snapshot structures.EpochDataSnapshot
 		if json.Unmarshal(raw, &snapshot) == nil {
 			return &snapshot.EpochDataHandler

@@ -260,15 +260,6 @@ func setGenesisToState() error {
 
 	handlers.EXECUTION_THREAD_METADATA.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
 
-	// Commit changes
-	if err := databases.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
-		return err
-	}
-
-	if err := databases.STATE.Write(execThreadBatch, nil); err != nil {
-		return err
-	}
-
 	hashInput := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" + globals.GENESIS.NetworkId + strconv.FormatUint(epochTimestamp, 10)
 
 	initEpochHash := utils.Blake3(hashInput)
@@ -309,7 +300,7 @@ func setGenesisToState() error {
 
 	handlers.EXECUTION_THREAD_METADATA.Handler.EpochDataHandler = epochHandlerForExecThread
 
-	// Store epoch data for API
+	// Store epoch data snapshot for API/finalization
 
 	currentEpochDataHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 	currentNetworkParams := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.CopyNetworkParameters()
@@ -321,8 +312,18 @@ func setGenesisToState() error {
 		return fmt.Errorf("marshal current epoch handler: %w", err)
 	}
 
-	if err := databases.EPOCH_DATA.Put([]byte("EPOCH_HANDLER:"+strconv.Itoa(currentEpochDataHandler.Id)), jsonedCurrentEpochDataHandler, nil); err != nil {
-		return fmt.Errorf("store current epoch handler: %w", err)
+	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB.
+	// For genesis init we also store it via the same batch as validator metadata,
+	// so it becomes visible atomically with the rest of the genesis bootstrap data.
+	approvementThreadBatch.Put([]byte("EPOCH_HANDLER:"+strconv.Itoa(currentEpochDataHandler.Id)), jsonedCurrentEpochDataHandler)
+
+	// Commit changes
+	if err := databases.APPROVEMENT_THREAD_METADATA.Write(approvementThreadBatch, nil); err != nil {
+		return err
+	}
+
+	if err := databases.STATE.Write(execThreadBatch, nil); err != nil {
+		return err
 	}
 
 	return nil

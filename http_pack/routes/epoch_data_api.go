@@ -20,7 +20,9 @@ func GetEpochData(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	value, err := databases.EPOCH_DATA.Get([]byte("EPOCH_HANDLER:"+epochIndex), nil)
+	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB
+	// to be committed atomically with AT updates.
+	value, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte("EPOCH_HANDLER:"+epochIndex), nil)
 
 	if err == nil && value != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)

@@ -125,7 +125,9 @@ func getOrLoadEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
 	}
 
 	key := []byte("EPOCH_HANDLER:" + strconv.Itoa(epochId))
-	raw, err := databases.EPOCH_DATA.Get(key, nil)
+	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB
+	// to be committed atomically with AT updates.
+	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get(key, nil)
 	if err != nil {
 		return nil
 	}
@@ -198,8 +200,9 @@ func leadersReadyForAlfp(epochHandler *structures.EpochDataHandler, networkParam
 			continue
 		}
 
-		leaderFinished := idx < epochHandler.CurrentLeaderIndex ||
-			(idx == epochHandler.CurrentLeaderIndex && leaderTimeIsOut(epochHandler, networkParams, idx))
+		// Don't rely on CurrentLeaderIndex from a persisted snapshot:
+		// determine "leader finished" deterministically from epoch start timestamp + leadership window.
+		leaderFinished := leaderTimeIsOut(epochHandler, networkParams, idx)
 
 		if leaderFinished {
 			ready = append(ready, idx)
