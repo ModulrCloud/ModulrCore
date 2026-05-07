@@ -41,8 +41,9 @@ var APPROVEMENT_THREAD_METADATA = struct {
 // ExecutionThreadMetadataHandler. RWMutex guards both .ChainCursor and the touched/cache
 // maps that are read/written by the execution path.
 var EXECUTION_THREAD_METADATA = struct {
-	RWMutex     sync.RWMutex
-	ChainCursor structures.ChainCursor
+	RWMutex      sync.RWMutex
+	ChainCursor  structures.ChainCursor
+	RecoveryPlan *structures.RecoveryData
 
 	// Bounded AccountsCache + ValidatorsStoragesCache and their LRU bookkeeping.
 	// Caches are runtime-only accelerators, not part of the persisted state.

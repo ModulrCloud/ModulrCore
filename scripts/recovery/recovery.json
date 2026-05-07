@@ -1,5 +1,6 @@
 {
   "lastEpochIndex": 0,
-  "lastFinalizedAbsoluteHeight": 0,
+  "lastAbsoluteHeight": 0,
+  "genesis": {},
   "teamSig": ""
 }

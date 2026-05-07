@@ -31,7 +31,15 @@ func ResolveDbPath(dbName string) string {
 		return filepath.Join(globals.CHAINDATA_PATH, dbName)
 	}
 
-	return filepath.Join(globals.CHAINDATA_PATH, globals.GENESIS.NetworkId, dbName)
+	return ResolveDbPathForNetwork(dbName, globals.GENESIS.NetworkId)
+}
+
+func ResolveDbPathForNetwork(dbName string, networkId string) string {
+	if dbName == "STATE" {
+		return filepath.Join(globals.CHAINDATA_PATH, dbName)
+	}
+
+	return filepath.Join(globals.CHAINDATA_PATH, networkId, dbName)
 }
 
 func GetAccountFromExecThreadState(accountId string) *structures.Account {

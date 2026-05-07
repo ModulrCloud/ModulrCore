@@ -15,6 +15,8 @@ import (
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
+
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type Block struct {
@@ -88,7 +90,10 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 
 	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
 
-	blockAsBytes, err := databases.BLOCKS.Get([]byte(blockID), nil)
+	blockDb, closeBlockDb := getBlockDbForExecution()
+	defer closeBlockDb()
+
+	blockAsBytes, err := blockDb.Get([]byte(blockID), nil)
 
 	if err == nil {
 		var blockParsed *Block
@@ -159,4 +164,23 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 	}
 
 	return nil
+}
+
+func getBlockDbForExecution() (*leveldb.DB, func()) {
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	networkId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if networkId == "" || networkId == globals.GENESIS.NetworkId {
+		return databases.BLOCKS, func() {}
+	}
+
+	db, err := leveldb.OpenFile(utils.ResolveDbPathForNetwork("BLOCKS", networkId), nil)
+	if err != nil {
+		return databases.BLOCKS, func() {}
+	}
+
+	return db, func() {
+		_ = db.Close()
+	}
 }

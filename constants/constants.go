@@ -48,6 +48,7 @@ const (
 	DBKeyAlfpProgress              = "ALFP_PROGRESS"
 	DBKeyLastMileFinalizerTracker  = "LAST_MILE_FINALIZER_TRACKER"
 	DBKeyChainCursor               = "CHAIN_CURSOR"
+	DBKeyRecoveryActive            = "RECOVERY_ACTIVE"
 
 	DBKeyPrefixBlockIndex                   = "BLOCK_INDEX:"
 	DBKeyPrefixEpochData                    = "EPOCH_DATA:"
@@ -69,6 +70,7 @@ const (
 	DBKeyPrefixFirstBlockAggregatedHeightProof = "FIRST_BLOCK_AGGREGATED_HEIGHT_PROOF:"
 	DBKeyPrefixAggregatedAnchorEpochAckProof   = "ANCHOR_EPOCH_ACK_PROOF:"
 	DBKeyPrefixAlfp                            = "ALFP:"
+	DBKeyPrefixRecoveryData                    = "RECOVERY_DATA:"
 )
 
 // Signing prefixes (used as salts for cryptographic signatures).

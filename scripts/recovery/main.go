@@ -7,21 +7,21 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/structures"
+	"github.com/modulrcloud/modulr-core/utils"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 type recoveryData struct {
-	LastEpochIndex              int    `json:"lastEpochIndex"`
-	LastFinalizedAbsoluteHeight int64  `json:"lastFinalizedAbsoluteHeight"`
-	TeamSig                     string `json:"teamSig"`
+	LastEpochIndex     int                `json:"lastEpochIndex"`
+	LastAbsoluteHeight int64              `json:"lastAbsoluteHeight"`
+	Genesis            structures.Genesis `json:"genesis"`
+	TeamSig            string             `json:"teamSig"`
 }
 
 func main() {
@@ -70,16 +70,15 @@ func run(chaindataPath, teamPubkey, recoveryJSONPath string) error {
 		return err
 	}
 
-	deletedDelayedTxs, err := patchStateForRecovery(stateDB, cursor, data)
-	if err != nil {
+	if err := writeRecoveryPlan(stateDB, data); err != nil {
 		return err
 	}
 
-	fmt.Println("Recovery STATE patch applied successfully")
+	fmt.Println("Recovery plan registered successfully")
 	fmt.Printf("  lastEpochIndex: %d\n", data.LastEpochIndex)
-	fmt.Printf("  lastFinalizedAbsoluteHeight: %d\n", data.LastFinalizedAbsoluteHeight)
-	fmt.Printf("  deleted delayed transaction batches: %d\n", deletedDelayedTxs)
-	fmt.Printf("  next epoch offset: %d\n", data.LastEpochIndex+1)
+	fmt.Printf("  lastAbsoluteHeight: %d\n", data.LastAbsoluteHeight)
+	fmt.Printf("  next network id: %s\n", data.Genesis.NetworkId)
+	fmt.Printf("  transition key: %s%d\n", constants.DBKeyPrefixRecoveryData, data.LastAbsoluteHeight)
 
 	return nil
 }
@@ -99,26 +98,13 @@ func loadRecoveryData(path string) (recoveryData, error) {
 }
 
 func validateRecoveryData(data recoveryData, teamPubkey string) error {
-	if data.LastEpochIndex < 0 {
-		return fmt.Errorf("lastEpochIndex must be non-negative")
+	recoveryDataForValidation := structures.RecoveryData{
+		LastEpochIndex:     data.LastEpochIndex,
+		LastAbsoluteHeight: data.LastAbsoluteHeight,
+		Genesis:            data.Genesis,
+		TeamSig:            data.TeamSig,
 	}
-	if data.LastFinalizedAbsoluteHeight < 0 {
-		return fmt.Errorf("lastFinalizedAbsoluteHeight must be non-negative")
-	}
-	if data.TeamSig == "" {
-		return fmt.Errorf("teamSig is empty")
-	}
-
-	payload := buildRecoveryPayload(data.LastEpochIndex, data.LastFinalizedAbsoluteHeight)
-	if !cryptography.VerifySignature(payload, teamPubkey, data.TeamSig) {
-		return fmt.Errorf("invalid team signature for payload %q", payload)
-	}
-
-	return nil
-}
-
-func buildRecoveryPayload(lastEpochIndex int, lastFinalizedAbsoluteHeight int64) string {
-	return fmt.Sprintf("RECOVERY_RESTART:%d:%d", lastEpochIndex, lastFinalizedAbsoluteHeight)
+	return utils.ValidateRecoveryData(&recoveryDataForValidation, teamPubkey)
 }
 
 func loadChainCursor(stateDB *leveldb.DB) (structures.ChainCursor, error) {
@@ -140,18 +126,11 @@ func validateLocalCursor(cursor structures.ChainCursor, data recoveryData) error
 		return fmt.Errorf("CHAIN_CURSOR.statistics is nil")
 	}
 
-	if cursor.Statistics.LastHeight < data.LastFinalizedAbsoluteHeight {
-		return fmt.Errorf(
-			"local node is below recovery height: local=%d required=%d; start core again and wait for synchronization",
-			cursor.Statistics.LastHeight,
-			data.LastFinalizedAbsoluteHeight,
-		)
-	}
-	if cursor.Statistics.LastHeight > data.LastFinalizedAbsoluteHeight {
+	if cursor.Statistics.LastHeight > data.LastAbsoluteHeight {
 		return fmt.Errorf(
 			"local node is above recovery height: local=%d required=%d; restore/rollback chaindata to the recovery point first",
 			cursor.Statistics.LastHeight,
-			data.LastFinalizedAbsoluteHeight,
+			data.LastAbsoluteHeight,
 		)
 	}
 
@@ -171,70 +150,28 @@ func validateLocalCursor(cursor structures.ChainCursor, data recoveryData) error
 		)
 	}
 
-	if cursor.EpochStatistics == nil {
-		return fmt.Errorf("CHAIN_CURSOR.epochStatistics is nil; cannot persist %s%d", constants.DBKeyPrefixEpochStats, data.LastEpochIndex)
+	if data.Genesis.NetworkId == cursor.NetworkId {
+		return fmt.Errorf("recovery genesis must belong to a new network: cursor=%q genesis=%q", cursor.NetworkId, data.Genesis.NetworkId)
 	}
 
 	return nil
 }
 
-func patchStateForRecovery(stateDB *leveldb.DB, cursor structures.ChainCursor, data recoveryData) (int, error) {
+func writeRecoveryPlan(stateDB *leveldb.DB, data recoveryData) error {
 	batch := new(leveldb.Batch)
 
-	deletedDelayedTxs, err := deleteDelayedTransactionsFromEpoch(stateDB, batch, data.LastEpochIndex+1)
+	dataBytes, err := json.Marshal(data)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("marshal recovery data: %w", err)
 	}
 
-	statsBytes, err := json.Marshal(cursor.EpochStatistics)
-	if err != nil {
-		return 0, fmt.Errorf("marshal epoch statistics: %w", err)
-	}
-	batch.Put([]byte(constants.DBKeyPrefixEpochStats+strconv.Itoa(data.LastEpochIndex)), statsBytes)
-
-	cursor.EpochDataHandler = structures.EpochDataHandler{}
-	cursor.EpochOffset = data.LastEpochIndex + 1
-	cursor.Statistics.LastHeight = data.LastFinalizedAbsoluteHeight
-	cursor.EpochStatistics = nil
-
-	cursorBytes, err := json.Marshal(cursor)
-	if err != nil {
-		return 0, fmt.Errorf("marshal chain cursor: %w", err)
-	}
-	batch.Put([]byte(constants.DBKeyChainCursor), cursorBytes)
+	height := strconv.FormatInt(data.LastAbsoluteHeight, 10)
+	batch.Put([]byte(constants.DBKeyPrefixRecoveryData+height), dataBytes)
+	batch.Put([]byte(constants.DBKeyRecoveryActive), []byte(height))
 
 	if err := stateDB.Write(batch, &opt.WriteOptions{Sync: true}); err != nil {
-		return 0, fmt.Errorf("write recovery batch: %w", err)
+		return fmt.Errorf("write recovery registry batch: %w", err)
 	}
 
-	return deletedDelayedTxs, nil
-}
-
-func deleteDelayedTransactionsFromEpoch(stateDB *leveldb.DB, batch *leveldb.Batch, fromEpoch int) (int, error) {
-	prefix := []byte(constants.DBKeyPrefixDelayedTransactions)
-	it := stateDB.NewIterator(util.BytesPrefix(prefix), nil)
-	defer it.Release()
-
-	deleted := 0
-	for it.Next() {
-		key := string(it.Key())
-		rawEpoch := strings.TrimPrefix(key, constants.DBKeyPrefixDelayedTransactions)
-
-		epoch, err := strconv.Atoi(rawEpoch)
-		if err != nil {
-			continue
-		}
-		if epoch < fromEpoch {
-			continue
-		}
-
-		keyCopy := append([]byte(nil), it.Key()...)
-		batch.Delete(keyCopy)
-		deleted++
-	}
-	if err := it.Error(); err != nil {
-		return 0, fmt.Errorf("iterate delayed transactions: %w", err)
-	}
-
-	return deleted, nil
+	return nil
 }

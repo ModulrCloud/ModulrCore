@@ -173,15 +173,39 @@ func prepareBlockchain() error {
 		}
 	}
 
+	recoveryPlan, err := utils.LoadActiveRecoveryData()
+	if err != nil {
+		return err
+	}
+	hasRecoveryPlan := recoveryPlan != nil
+	if recoveryPlan != nil {
+		handlers.EXECUTION_THREAD_METADATA.RecoveryPlan = recoveryPlan
+		if err := applyRecoveryTransitionOnStartupIfReady(recoveryPlan); err != nil {
+			return err
+		}
+	}
+
 	// Defensive check: chaindata must belong to the same network iteration as the loaded genesis.
 	// Empty NetworkId means clean install (no cursor in STATE) — setGenesisToState() will populate it.
 	if handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId != "" &&
 		handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId != globals.GENESIS.NetworkId {
-		return fmt.Errorf(
-			"network id mismatch: chaindata belongs to %q but loaded genesis is %q — "+
-				"wrong genesis file or chaindata directory",
-			handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId, globals.GENESIS.NetworkId,
-		)
+		if isValidRecoveryPlanForCursor(recoveryPlan) {
+			utils.LogWithTime(
+				fmt.Sprintf(
+					"Recovery transition scheduled at height %d: execution cursor uses previous network %q, current consensus genesis is %q",
+					recoveryPlan.LastAbsoluteHeight,
+					handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId,
+					globals.GENESIS.NetworkId,
+				),
+				utils.YELLOW_COLOR,
+			)
+		} else {
+			return fmt.Errorf(
+				"network id mismatch: chaindata belongs to %q but loaded genesis is %q — "+
+					"wrong genesis file or chaindata directory",
+				handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId, globals.GENESIS.NetworkId,
+			)
+		}
 	}
 
 	// Load GT - Generation Thread handler
@@ -210,6 +234,11 @@ func prepareBlockchain() error {
 
 		handlers.APPROVEMENT_THREAD_METADATA.Handler = atHandler
 	}
+	if hasRecoveryPlan && handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion == -1 {
+		if err := initializeRecoveryConsensusMetadataFromGenesis(); err != nil {
+			return err
+		}
+	}
 
 	// Load FINALIZER_THREAD_METADATA (consensus/sequencing state, separate from execution).
 	if data, err := databases.FINALIZATION_THREAD_METADATA.Get([]byte(constants.DBKeyFinalizerThreadMetadata), nil); err == nil {
@@ -227,6 +256,24 @@ func prepareBlockchain() error {
 		}
 
 		handlers.FINALIZER_THREAD_METADATA.Handler = fHandler
+	}
+	if hasRecoveryPlan && handlers.FINALIZER_THREAD_METADATA.Handler.EpochDataHandler.Hash == "" {
+		handlers.FINALIZER_THREAD_METADATA.Handler.EpochDataHandler = handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
+		handlers.FINALIZER_THREAD_METADATA.Handler.SequenceAlignmentData = structures.AlignmentDataHandler{
+			CurrentAnchorAssumption:         0,
+			CurrentAnchorBlockIndexObserved: -1,
+			CurrentLeaderToExecBlocksFrom:   0,
+			LastBlocksByLeaders:             make(map[string]structures.ExecutionStats),
+			LastBlocksByAnchors:             make(map[int]structures.ExecutionStats),
+		}
+
+		serializedFinalizerThread, err := json.Marshal(handlers.FINALIZER_THREAD_METADATA.Handler)
+		if err != nil {
+			return fmt.Errorf("marshal recovery FINALIZER_THREAD metadata: %w", err)
+		}
+		if err := databases.FINALIZATION_THREAD_METADATA.Put([]byte(constants.DBKeyFinalizerThreadMetadata), serializedFinalizerThread, nil); err != nil {
+			return fmt.Errorf("save recovery FINALIZER_THREAD metadata: %w", err)
+		}
 	}
 
 	// Backfill ChainCursor statistics if missing (e.g. first run after accounts were created)
@@ -279,6 +326,100 @@ func prepareBlockchain() error {
 	}
 
 	return nil
+}
+
+func applyRecoveryTransitionOnStartupIfReady(plan *structures.RecoveryData) error {
+	cursor := &handlers.EXECUTION_THREAD_METADATA.ChainCursor
+	if cursor.Statistics == nil || cursor.Statistics.LastHeight != plan.LastAbsoluteHeight {
+		return nil
+	}
+
+	batch := new(leveldb.Batch)
+	if err := utils.ApplyRecoveryTransition(cursor, batch, plan); err != nil {
+		return err
+	}
+
+	cursorBytes, err := json.Marshal(cursor)
+	if err != nil {
+		return fmt.Errorf("marshal ChainCursor after recovery transition: %w", err)
+	}
+	batch.Put([]byte(constants.DBKeyChainCursor), cursorBytes)
+
+	if err := databases.STATE.Write(batch, nil); err != nil {
+		return fmt.Errorf("write startup recovery transition: %w", err)
+	}
+
+	handlers.EXECUTION_THREAD_METADATA.RecoveryPlan = nil
+	utils.LogWithTime(
+		fmt.Sprintf("Recovery transition applied on startup at height %d: next absolute epoch=%d network=%s", plan.LastAbsoluteHeight, cursor.EpochOffset, plan.Genesis.NetworkId),
+		utils.GREEN_COLOR,
+	)
+
+	return nil
+}
+
+func initializeRecoveryConsensusMetadataFromGenesis() error {
+	epochHandler, err := utils.BuildRecoveryGenesisEpochHandler(globals.GENESIS)
+	if err != nil {
+		return err
+	}
+
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters = globals.GENESIS.NetworkParameters.CopyNetworkParameters()
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = *epochHandler
+
+	batch := new(leveldb.Batch)
+	for _, validatorStorage := range globals.GENESIS.Validators {
+		stateKey := constants.DBKeyPrefixValidatorStorage + validatorStorage.Pubkey
+		serializedStorage, err := json.Marshal(validatorStorage)
+		if err != nil {
+			return fmt.Errorf("marshal recovery consensus validator: %w", err)
+		}
+		batch.Put([]byte(stateKey), serializedStorage)
+
+		validatorCopy := validatorStorage
+		utils.PutApprovementValidatorCache(stateKey, &validatorCopy)
+	}
+
+	snapshot := structures.EpochDataSnapshot{
+		EpochDataHandler:  *epochHandler,
+		NetworkParameters: globals.GENESIS.NetworkParameters.CopyNetworkParameters(),
+	}
+	snapshotBytes, err := json.Marshal(snapshot)
+	if err != nil {
+		return fmt.Errorf("marshal recovery consensus epoch snapshot: %w", err)
+	}
+	batch.Put([]byte(constants.DBKeyPrefixEpochHandler+"0"), snapshotBytes)
+
+	serializedApprovementThread, err := json.Marshal(handlers.APPROVEMENT_THREAD_METADATA.Handler)
+	if err != nil {
+		return fmt.Errorf("marshal recovery APPROVEMENT_THREAD metadata: %w", err)
+	}
+	batch.Put([]byte(constants.DBKeyApprovementThreadMetadata), serializedApprovementThread)
+
+	if err := databases.APPROVEMENT_THREAD_METADATA.Write(batch, nil); err != nil {
+		return fmt.Errorf("save recovery APPROVEMENT_THREAD metadata: %w", err)
+	}
+
+	return nil
+}
+
+func isValidRecoveryPlanForCursor(plan *structures.RecoveryData) bool {
+	if plan == nil {
+		return false
+	}
+	cursor := &handlers.EXECUTION_THREAD_METADATA.ChainCursor
+	if cursor.NetworkId == "" || cursor.NetworkId == globals.GENESIS.NetworkId {
+		return false
+	}
+	if plan.Genesis.NetworkId != globals.GENESIS.NetworkId {
+		return false
+	}
+	if cursor.Statistics == nil {
+		return false
+	}
+
+	return cursor.Statistics.LastHeight < plan.LastAbsoluteHeight
 }
 
 func applyCacheConfig() {

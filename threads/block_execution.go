@@ -711,11 +711,33 @@ func updateExecutionStatistics(block *block_pack.Block, currentBlockId string, b
 
 	stateBatch.Put([]byte(fmt.Sprintf(constants.DBKeyPrefixBlockIndex+"%d", toAbsoluteHeight(cursor.Statistics.LastHeight))), []byte(currentBlockId))
 
+	if err := applyRecoveryTransitionIfNeeded(cursor, stateBatch); err != nil {
+		panic("Impossible to apply recovery transition: " + err.Error())
+	}
+
 	if err := persistChainCursor(stateBatch); err != nil {
 		panic("Impossible to add ChainCursor to atomic batch")
 	}
 
 	return fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, cursor.Statistics.LastHeight)
+}
+
+func applyRecoveryTransitionIfNeeded(cursor *structures.ChainCursor, stateBatch *leveldb.Batch) error {
+	plan := handlers.EXECUTION_THREAD_METADATA.RecoveryPlan
+	if plan == nil || cursor.Statistics == nil || cursor.Statistics.LastHeight != plan.LastAbsoluteHeight {
+		return nil
+	}
+	if err := utils.ApplyRecoveryTransition(cursor, stateBatch, plan); err != nil {
+		return err
+	}
+	handlers.EXECUTION_THREAD_METADATA.RecoveryPlan = nil
+
+	utils.LogWithTime(
+		fmt.Sprintf("Recovery transition applied at height %d: next absolute epoch=%d network=%s", plan.LastAbsoluteHeight, cursor.EpochOffset, plan.Genesis.NetworkId),
+		utils.GREEN_COLOR,
+	)
+
+	return nil
 }
 
 func getExecutionNetworkId() string {
