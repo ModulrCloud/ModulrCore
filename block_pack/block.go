@@ -42,6 +42,10 @@ func NewBlock(transactions []structures.Transaction, extraData ExtraDataToBlock,
 }
 
 func (block *Block) GetHash() string {
+	return block.GetHashForNetwork(globals.GENESIS.NetworkId)
+}
+
+func (block *Block) GetHashForNetwork(networkId string) string {
 	jsonedTransactions, err := json.Marshal(block.Transactions)
 
 	if err != nil {
@@ -59,7 +63,7 @@ func (block *Block) GetHash() string {
 		strconv.FormatInt(block.Time, 10),
 		string(jsonedTransactions),
 		string(jsonedExtraData),
-		globals.GENESIS.NetworkId,
+		networkId,
 		block.Epoch,
 		strconv.Itoa(block.Index),
 		block.PrevHash,
@@ -74,6 +78,10 @@ func (block *Block) SignBlock() {
 
 func (block *Block) VerifySignature() bool {
 	return cryptography.VerifySignature(block.GetHash(), block.Creator, block.Sig)
+}
+
+func (block *Block) VerifySignatureForNetwork(networkId string) bool {
+	return cryptography.VerifySignature(block.GetHashForNetwork(networkId), block.Creator, block.Sig)
 }
 
 func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *Block {

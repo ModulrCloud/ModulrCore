@@ -115,7 +115,8 @@ func BlockExecutionThread() {
 			continue
 		}
 
-		if block.GetHash() != heightProof.BlockHash {
+		executionNetworkId := getExecutionNetworkId()
+		if block.GetHashForNetwork(executionNetworkId) != heightProof.BlockHash {
 			utils.LogWithTimeThrottled(
 				"exec:hash_mismatch:"+heightProof.BlockId,
 				5*time.Second,
@@ -148,7 +149,7 @@ func fetchAggregatedHeightProofAndBlock(absoluteHeight int) (*structures.Aggrega
 		if epochHandler != nil && utils.VerifyAggregatedHeightProof(combined.AggregatedHeightProof, epochHandler) {
 			storeAggregatedHeightProof(combined.AggregatedHeightProof)
 			var block *block_pack.Block
-			if combined.Block != nil && combined.Block.VerifySignature() {
+			if combined.Block != nil && combined.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
 				block = combined.Block
 			}
 			return combined.AggregatedHeightProof, block
@@ -277,13 +278,13 @@ func fetchBlockForExecution(blockId string) *block_pack.Block {
 	blockRaw, err := databases.BLOCKS.Get([]byte(blockId), nil)
 	if err == nil {
 		var block block_pack.Block
-		if json.Unmarshal(blockRaw, &block) == nil && block.VerifySignature() {
+		if json.Unmarshal(blockRaw, &block) == nil && block.VerifySignatureForNetwork(getExecutionNetworkId()) {
 			return &block
 		}
 	}
 
 	response := getBlockAndAfpFromPoD(blockId)
-	if response != nil && response.Block != nil && response.Block.VerifySignature() {
+	if response != nil && response.Block != nil && response.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
 		return response.Block
 	}
 
@@ -434,7 +435,7 @@ func getBlockFromNetworkById(blockID string, epochHandler *structures.EpochDataH
 		return nil
 	}
 	// Basic sanity checks: ensure the fetched block matches the requested ID and is signed by its creator.
-	if b.Creator != creator || b.Index != index || !b.VerifySignature() {
+	if b.Creator != creator || b.Index != index || !b.VerifySignatureForNetwork(getExecutionNetworkId()) {
 		return nil
 	}
 	return b
@@ -581,19 +582,6 @@ func nextBlockId(blockId string) string {
 }
 
 func executeBlock(block *block_pack.Block) {
-	// Invariant: cursor.NetworkId and genesis.NetworkId must be in sync at execution time.
-	// Block.GetHash() already mixes in globals.GENESIS.NetworkId, so a foreign block would fail
-	// signature verification — but this explicit check makes a runtime drift loud and obvious
-	// instead of surfacing as "invalid signature".
-	if handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId != globals.GENESIS.NetworkId {
-		utils.LogWithTime(fmt.Sprintf(
-			"FATAL: NetworkId drift during execution: cursor=%q genesis=%q",
-			handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId, globals.GENESIS.NetworkId,
-		), utils.RED_COLOR)
-		utils.GracefulShutdown()
-		return
-	}
-
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
 	stateBatch, logMsg, ok := buildExecutionBatch(block)
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
@@ -708,7 +696,7 @@ func persistTouchedState(stateBatch *leveldb.Batch) {
 }
 
 func updateExecutionStatistics(block *block_pack.Block, currentBlockId string, blockFees uint64, stateBatch *leveldb.Batch, cursor *structures.ChainCursor) string {
-	blockHash := block.GetHash()
+	blockHash := block.GetHashForNetwork(cursor.NetworkId)
 
 	cursor.Statistics.LastHeight++
 	cursor.Statistics.LastBlockHash = blockHash
@@ -728,6 +716,18 @@ func updateExecutionStatistics(block *block_pack.Block, currentBlockId string, b
 	}
 
 	return fmt.Sprintf("Executed block %s ✅ [%d]", currentBlockId, cursor.Statistics.LastHeight)
+}
+
+func getExecutionNetworkId() string {
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	defer handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	networkId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId
+	if networkId == "" {
+		return globals.GENESIS.NetworkId
+	}
+
+	return networkId
 }
 
 func sendFeesToValidatorAccount(blockCreatorPubkey string, feeFromBlock uint64) {
