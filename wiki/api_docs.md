@@ -11,6 +11,19 @@ This document describes every HTTP endpoint registered in [`server.go`](../http_
   - coin -> units for inputs
   - units -> coin for display
 
+## Recovery mode
+
+When `RECOVERY_MODE=true`, the node starts a read-only recovery HTTP API and does not start normal consensus/generation execution routes. In this mode, recovery endpoints are available only for the restart procedure, and the node is expected not to sign normal consensus/proof messages.
+
+The recovery router exposes:
+
+- `GET /recovery/last_finalized_height`
+- `GET /recovery/genesis_template`
+- `GET /get_validator_endpoints`
+- `GET /get_validator_ws_endpoints`
+
+Normal transaction submission and regular live node APIs are not part of the recovery router.
+
 ## Live statistics
 
 ### `GET /last_height`
@@ -358,6 +371,151 @@ curl https://localhost:7332/validator/6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKs
   },
   "validatorURL": "https://validator.example.com",
   "wssValidatorURL": "wss://validator.example.com/ws"
+}
+```
+
+### `GET /get_validator_endpoints`
+Returns HTTP and WSS endpoints for a comma-separated list of validator public keys.
+
+This endpoint is available in both normal mode and `RECOVERY_MODE`. During recovery, anchors and devops scripts use it to resolve validator URLs without relying on a local file.
+
+- **Query parameters**
+  - `pubkeys`: comma-separated validator public keys. The node caps the list size to avoid accidental oversized responses.
+- **Success (200)**: Object keyed by validator pubkey. Each value contains:
+  - `validatorUrl`: HTTP endpoint.
+  - `wssValidatorUrl`: WebSocket endpoint.
+- **Errors**
+  - `400` — missing or empty `pubkeys` query parameter.
+
+**Example request**
+```bash
+curl 'https://localhost:7332/get_validator_endpoints?pubkeys=6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE,9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK'
+```
+
+**Example response**
+```json
+{
+  "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": {
+    "validatorUrl": "https://validator-1.example.com",
+    "wssValidatorUrl": "wss://validator-1.example.com/ws"
+  },
+  "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK": {
+    "validatorUrl": "https://validator-2.example.com",
+    "wssValidatorUrl": "wss://validator-2.example.com/ws"
+  }
+}
+```
+
+### `GET /get_validator_ws_endpoints`
+Returns only WSS endpoints for a comma-separated list of validator public keys.
+
+This endpoint is available in both normal mode and `RECOVERY_MODE`. Anchors use it when they need WebSocket URLs for core quorum members.
+
+- **Query parameters**
+  - `pubkeys`: comma-separated validator public keys.
+- **Success (200)**: Object keyed by validator pubkey, with WSS URL string values.
+- **Errors**
+  - `400` — missing or empty `pubkeys` query parameter.
+
+**Example request**
+```bash
+curl 'https://localhost:7332/get_validator_ws_endpoints?pubkeys=6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE'
+```
+
+**Example response**
+```json
+{
+  "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": "wss://validator-1.example.com/ws"
+}
+```
+
+## Recovery API
+
+Recovery API endpoints are available only when the node is started with `RECOVERY_MODE=true`. Responses are signed by the responding node and wrapped in a common envelope:
+
+```json
+{
+  "pubKey": "validator_pubkey",
+  "payload": {},
+  "signature": "base64_ed25519_signature"
+}
+```
+
+The signature is generated over the raw JSON `payload` bytes. Recovery scripts verify the envelope against `pubKey` before using the payload.
+
+### `GET /recovery/last_finalized_height`
+Returns the node's latest finalized absolute height as a signed recovery response.
+
+The recovery script queries the discovered latest core quorum and accepts only responses that can be verified and grouped into a core quorum majority.
+
+- **Success (200)**: Signed envelope whose payload is:
+  - `lastHeight`: latest finalized absolute height.
+  - `blockId`: block id at that height.
+  - `blockHash`: block hash.
+  - `epochId`: epoch id for that finalized height.
+- **Errors**
+  - `404` — no finalized height or no aggregated height proof is available.
+  - `500` — failed to marshal the signed payload.
+
+**Example response**
+```json
+{
+  "pubKey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+  "payload": {
+    "lastHeight": 12048,
+    "blockId": "42:6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE:18",
+    "blockHash": "f7c0...",
+    "epochId": 42
+  },
+  "signature": "MEUCIQ..."
+}
+```
+
+### `GET /recovery/genesis_template`
+Returns a signed template used by the devops recovery script to build the new restart genesis.
+
+The template is derived from the node's current `APPROVEMENT_THREAD_METADATA`, because the approvement thread has the next validator registry and network parameters needed for the restart. The script requires a majority of the discovered core quorum to return the same template and checks that `sourceEpochId` and `sourceEpochHash` match the AERP selected from anchors.
+
+- **Success (200)**: Signed envelope whose payload is:
+  - `sourceEpochId`: epoch id of the template source.
+  - `sourceEpochHash`: epoch hash of the template source.
+  - `coreMajorVersion`: core major version to place into the generated genesis.
+  - `networkParameters`: network parameters to place into the generated genesis.
+  - `validators`: validator set to place into the generated genesis.
+- **Errors**
+  - `404` — no approvement thread metadata is available.
+  - `500` — failed to load validator storage or marshal the signed payload.
+
+**Example response**
+```json
+{
+  "pubKey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+  "payload": {
+    "sourceEpochId": 43,
+    "sourceEpochHash": "9f8c6d...",
+    "coreMajorVersion": 1,
+    "networkParameters": {
+      "VALIDATOR_REQUIRED_STAKE": 5000000,
+      "MINIMAL_STAKE_PER_STAKER": 1000000,
+      "QUORUM_SIZE": 5,
+      "EPOCH_DURATION": 60000,
+      "LEADERSHIP_DURATION": 15000,
+      "BLOCK_TIME": 1000,
+      "MAX_BLOCK_SIZE_IN_BYTES": 1048576,
+      "TXS_LIMIT_PER_BLOCK": 1000
+    },
+    "validators": [
+      {
+        "pubkey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+        "percentage": 10,
+        "totalStaked": 1500000000,
+        "stakers": {},
+        "validatorURL": "https://validator-1.example.com",
+        "wssValidatorURL": "wss://validator-1.example.com/ws"
+      }
+    ]
+  },
+  "signature": "MEUCIQ..."
 }
 ```
 

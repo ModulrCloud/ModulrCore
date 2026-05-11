@@ -46,8 +46,10 @@ Permanent chain state — accounts, validators, transaction receipts, block inde
 | `VALIDATOR_STORAGE:{pubkey}` | Validator JSON | `block_execution.go` (via `persistTouchedState`) | Validator data (stake, metadata) |
 | `{accountPubkey}` | Account JSON (balance, nonce, etc.) | `block_execution.go` (via `persistTouchedState`) | Account state |
 | `DELAYED_TRANSACTIONS:{epochId}` | `[]map[string]string` JSON | `block_execution.go` (`addDelayedTransactionsToBatch`) | Delayed tx payloads queued for `epochId` (actually targets epoch+2) |
+| `RECOVERY_ACTIVE` | absolute height string | `scripts/recovery`, `block_execution.go`, `entrypoint.go` | Active recovery transition height. Present only while a data-driven recovery plan is scheduled. |
+| `RECOVERY_DATA:{height}` | `RecoveryData` JSON | `scripts/recovery`, `block_execution.go`, `entrypoint.go` | Team-signed recovery object for the transition at `height`: last epoch, last absolute height, generated restart genesis, and team signature. |
 
-**Recovery**: **Preserved**. STATE holds the permanent world state. On a network restart, the operator wipes `CHAIN_CURSOR.EpochDataHandler` (its `Hash == ""` is the genesis-init sentinel) while keeping `Statistics`, `NetworkParameters`, `HeightOffset`, `EpochOffset`, accounts and validators intact.
+**Recovery**: **Preserved**. STATE holds the permanent world state. With data-driven recovery, the local recovery script verifies the team-signed `recovery.json` and stores it under `RECOVERY_DATA:{height}` plus `RECOVERY_ACTIVE`. The node can then start with the new genesis while `CHAIN_CURSOR.NetworkId` still points to the old network. When execution reaches the signed transition height, the runtime transition patches `CHAIN_CURSOR`, writes the final old-epoch statistics/snapshot, stages the restart genesis data, and removes the recovery keys.
 
 ---
 
@@ -112,9 +114,10 @@ All voting/finalization-related data: proofs grabber state, ALFPs, height attest
 ┌──────────────────────────────────────────────────────────────────────┐
 │                          RECOVERY ACTION                             │
 ├──────────────────────┬───────────────────────────────────────────────┤
-│  BLOCKS              │  WIPE                                         │
-│  STATE               │  PRESERVE (reset CHAIN_CURSOR.EpochDataHandler│
-│                      │  and bump HeightOffset / EpochOffset)         │
+│  BLOCKS              │  KEEP old network BLOCKS until runtime        │
+│                      │  transition if old-era execution needs them   │
+│  STATE               │  PRESERVE; store RECOVERY_DATA/ACTIVE first,  │
+│                      │  then patch CHAIN_CURSOR at runtime           │
 │  EPOCH_DATA          │  WIPE                                         │
 │  APPROVEMENT_THREAD_ │  WIPE                                         │
 │  METADATA            │                                               │
@@ -131,8 +134,11 @@ All voting/finalization-related data: proofs grabber state, ALFPs, height attest
 - `EPOCH_DATA:{epochId}` — historical epoch snapshots (use absolute epoch id)
 - `VALIDATOR_STORAGE:{pubkey}` — latest validator state
 - `{accountPubkey}` — latest account balances
-- `CHAIN_CURSOR` — preserve `Statistics`, `NetworkParameters`, `HeightOffset`, `EpochOffset`; reset `EpochDataHandler` (Hash == "") and `EpochStatistics`; bump offsets and overwrite `NetworkId` / `CoreMajorVersion` from the new genesis
+- `CHAIN_CURSOR` — preserved until the runtime transition; at transition height the node patches `EpochOffset`, `NetworkId`, `CoreMajorVersion`, `NetworkParameters`, `EpochDataHandler`, and `EpochStatistics`
+- `RECOVERY_ACTIVE` — transition height while recovery is scheduled
+- `RECOVERY_DATA:{height}` — team-signed recovery plan while recovery is scheduled
 
 ### Keys to REMOVE or RESET in STATE during recovery:
 
 - `DELAYED_TRANSACTIONS:{epochId}` — stale delayed tx queues from pre-crash epochs
+- `RECOVERY_ACTIVE` and `RECOVERY_DATA:{height}` — removed automatically after the runtime transition succeeds
