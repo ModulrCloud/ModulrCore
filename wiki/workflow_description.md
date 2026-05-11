@@ -10,6 +10,8 @@ This document gives a short, schematic view of the normal interaction between `m
 
 The two networks do not need to have the same epoch number or leader schedule. Anchors can run independently and slightly ahead. Their job is not to execute core blocks, but to persist and acknowledge core finality data.
 
+Recovery APIs are not part of this normal workflow. They are exposed only when a node is started with `RECOVERY_MODE=true`. In that mode, the node provides read-only recovery data and is expected not to generate blocks or sign normal consensus/proof messages.
+
 ## Validators, Quorum, and Leaders
 
 `modulr-core` has a global validator set. For each epoch, the protocol selects two working groups from that validator set:
@@ -186,12 +188,14 @@ flowchart TD
 
 After the core network knows the finalized boundary of the epoch, it builds an `AggregatedEpochRotationProof` (AERP). The AERP describes the transition from epoch `N` to epoch `N+1`, including the next quorum and next leader schedule.
 
+The AERP also carries the next epoch start timestamp. Anchors use that timestamp to time proactive ALFP collection correctly for later core epochs. The first core epoch is skipped by proactive collection because anchors do not yet have a trusted AERP-derived start timestamp for it.
+
 ```mermaid
 flowchart LR
     A["All leader ALFPs<br/>are available and anchored"]
     B["Core quorum determines<br/>epoch boundary"]
     C["Core quorum signs<br/>epoch rotation"]
-    D["AggregatedEpochRotationProof<br/>(N -> N+1)"]
+    D["AggregatedEpochRotationProof<br/>(N -> N+1)<br/>next quorum, leaders,<br/>next epoch start timestamp"]
 
     A --> B --> C --> D
 ```
@@ -250,7 +254,7 @@ In short:
 2. Core quorum finalizes heights.
 3. Core quorum creates ALFPs for finished leaders.
 4. Anchors include ALFPs in anchor blocks.
-5. Core quorum creates the AERP for the next epoch.
+5. Core quorum creates the AERP for the next epoch, including the next epoch start timestamp.
 6. Anchors persist the AERP and sign ACKs.
 7. Core aggregates anchor ACKs.
 8. The next core epoch starts sequencing.
