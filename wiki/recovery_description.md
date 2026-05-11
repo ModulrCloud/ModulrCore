@@ -176,6 +176,145 @@ flowchart TD
     A --> B --> D --> C --> E --> F --> G
 ```
 
+## Phase 3: Build the Restart Genesis
+
+After the recovery script knows the recovery point `(Y, X)`, it asks the same discovered core quorum for a signed genesis template.
+
+The template is not a full genesis file. It contains only the fields that must be carried into the restarted network:
+
+- `CORE_MAJOR_VERSION`
+- `NETWORK_PARAMETERS`
+- `VALIDATORS`
+- source epoch id and source epoch hash
+
+The script verifies validator signatures and requires a core quorum majority to return the same template. It also checks that the template source matches the winning AERP from Phase 1.
+
+```mermaid
+flowchart TD
+    A["Recovery point:<br/>epoch Y, height X"]
+    B["Query discovered core quorum:<br/>/recovery/genesis_template"]
+    C["Verify validator signatures"]
+    D["Group identical templates"]
+    E{"Majority agrees?"}
+    F["Accepted genesis template"]
+    G["Reject recovery artifact generation"]
+
+    A --> B --> C --> D --> E
+    E -- yes --> F
+    E -- no --> G
+```
+
+The devops recovery script then builds the new genesis itself:
+
+1. Generates a new `NETWORK_ID`.
+2. Chooses a fresh `FIRST_EPOCH_START_TIMESTAMP`.
+3. Copies `CORE_MAJOR_VERSION`, `NETWORK_PARAMETERS`, and `VALIDATORS` from the accepted template.
+4. Omits `STATE` and `EVM_ALLOC`, because recovery preserves `STATE` from the old chain instead of seeding balances from genesis.
+
+```mermaid
+flowchart LR
+    T["Majority genesis template"]
+    N["Generate new NETWORK_ID"]
+    S["Set FIRST_EPOCH_START_TIMESTAMP"]
+    G["New restart genesis<br/>without STATE / EVM_ALLOC"]
+
+    T --> G
+    N --> G
+    S --> G
+```
+
+## Phase 4: Produce a Team-Signed Recovery Artifact
+
+The devops recovery script writes a `recovery.json` artifact for node operators. The artifact contains:
+
+- `lastEpochIndex`: `Y`
+- `lastAbsoluteHeight`: `X`
+- `genesis`: the generated restart genesis
+- `teamSig`: project-team signature
+
+The signed payload is:
+
+```text
+RECOVERY_RESTART:<lastEpochIndex>:<lastAbsoluteHeight>:<blake3(canonicalGenesisJSON)>
+```
+
+```mermaid
+flowchart TD
+    A["Recovery point:<br/>Y, X"]
+    B["Generated restart genesis"]
+    C["Hash canonical genesis JSON"]
+    D["Build payload:<br/>RECOVERY_RESTART:Y:X:genesisHash"]
+    E["Sign with team private key"]
+    F["Write recovery.json"]
+
+    A --> D
+    B --> C --> D --> E --> F
+```
+
+## Phase 5: Local Operator Registration
+
+Each validator operator runs the local `modulr-core/scripts/recovery` command with the team-signed `recovery.json`.
+
+The local script does not immediately rewrite `CHAIN_CURSOR` to the new network. Instead, it verifies the team signature and stores the recovery plan in `STATE`:
+
+- `RECOVERY_DATA:<X>` -> signed recovery object
+- `RECOVERY_ACTIVE` -> `X`
+
+This lets the node start immediately with the new genesis while still knowing the exact old-chain height where execution must switch to the new era.
+
+```mermaid
+sequenceDiagram
+    participant Operator
+    participant LocalScript as local recovery script
+    participant State as STATE DB
+
+    Operator->>LocalScript: recovery.json
+    LocalScript->>LocalScript: Verify team signature
+    LocalScript->>LocalScript: Validate local cursor height
+    LocalScript->>State: Put RECOVERY_DATA:X
+    LocalScript->>State: Put RECOVERY_ACTIVE = X
+```
+
+## Phase 6: Runtime Transition
+
+On startup, the node loads the normal `globals.GENESIS`, which is already the new restart genesis.
+
+If `CHAIN_CURSOR.NetworkId` still points to the old network, the mismatch is allowed only when a valid active recovery plan exists in `STATE`. Until the execution thread reaches `lastAbsoluteHeight = X`, it continues executing old-era blocks and can read them from the old network-specific `BLOCKS` database.
+
+When execution reaches height `X`, the recovery transition is applied atomically:
+
+1. Store final epoch statistics for epoch `Y`.
+2. Delete stale delayed transactions from future old-era epochs.
+3. Patch `CHAIN_CURSOR.EpochOffset = Y + 1`.
+4. Keep `CHAIN_CURSOR.Statistics.LastHeight = X`.
+5. Replace cursor network data with the generated genesis data.
+6. Build the new genesis epoch handler.
+7. Stage new genesis validators/accounts when needed.
+8. Remove `RECOVERY_ACTIVE` and `RECOVERY_DATA:<X>`.
+
+After that, the node continues in the restarted network. For API and explorer consumers, history remains linear: the next block is absolute height `X+1`, and the next epoch is absolute epoch `Y+1`.
+
+```mermaid
+flowchart TD
+    A["Node starts with new genesis"]
+    B{"Cursor NetworkId<br/>matches genesis?"}
+    C["Normal startup"]
+    D{"Valid RECOVERY_ACTIVE<br/>plan exists?"}
+    E["Continue old-era execution<br/>until height X"]
+    F["Reject startup"]
+    G{"LastHeight == X?"}
+    H["Apply recovery transition"]
+    I["Continue new era:<br/>height X+1, epoch Y+1"]
+
+    A --> B
+    B -- yes --> C
+    B -- no --> D
+    D -- no --> F
+    D -- yes --> E --> G
+    G -- no --> E
+    G -- yes --> H --> I
+```
+
 ## End-to-End Recovery View
 
 ```mermaid
@@ -188,25 +327,28 @@ flowchart TD
     F["Query core quorum for<br/>last finalized height"]
     G["Verify validator signatures"]
     H["Select majority height"]
-    I["Recovery result:<br/>latest epoch Y, latest height X"]
+    I["Recovery point:<br/>latest epoch Y, latest height X"]
+    J["Query core quorum for<br/>genesis template"]
+    K["Build new restart genesis"]
+    L["Sign recovery.json<br/>with team key"]
+    M["Operator stores recovery plan<br/>in STATE"]
+    N["Node transitions at height X<br/>during runtime"]
 
     A --> B --> C --> D --> E --> F --> G --> H --> I
+    I --> J --> K --> L --> M --> N
 ```
 
 ## Result
 
-The recovery script produces the two values needed to restart the network linearly:
+The recovery process produces a signed `recovery.json` artifact, not just two scalar values.
+
+It contains:
 
 - `Y`: the latest valid core epoch known through anchors.
 - `X`: the latest finalized absolute height agreed by the latest core quorum.
+- a generated restart genesis.
+- a team signature over the recovery restart payload.
 
-Operators can then prepare node state for the next era:
+Operators register that artifact locally. The node then performs the cursor transition itself when execution reaches `X`.
 
-1. Preserve `STATE`.
-2. Reset ephemeral databases.
-3. Set `CHAIN_CURSOR.EpochOffset = Y + 1`.
-4. Set `CHAIN_CURSOR.Statistics.LastHeight = X`.
-5. Clear `CHAIN_CURSOR.EpochDataHandler` so the new genesis initializes the next era.
-6. Start the network with the new `genesis.json`.
-
-After startup, the new era begins at absolute epoch `Y+1` and absolute height `X+1`.
+After the transition, the new era begins at absolute epoch `Y+1` and absolute height `X+1`.
