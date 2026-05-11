@@ -6,6 +6,7 @@ import (
 	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/globals"
+	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/http_pack/helpers"
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
@@ -55,19 +56,52 @@ func GetRecoveryLastFinalizedHeight(ctx *fasthttp.RequestCtx) {
 		EpochId:    proofInfo.EpochId,
 	}
 
+	writeSignedRecoveryPayload(ctx, payload)
+}
+
+func GetRecoveryGenesisTemplate(ctx *fasthttp.RequestCtx) {
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	atHandler := handlers.APPROVEMENT_THREAD_METADATA.Handler
+	epochHandler := atHandler.EpochDataHandler
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	if atHandler.CoreMajorVersion < 0 || epochHandler.Hash == "" {
+		helpers.WriteErr(ctx, fasthttp.StatusNotFound, "No approvement thread metadata available")
+		return
+	}
+
+	validators := make([]structures.ValidatorStorage, 0, len(epochHandler.ValidatorsRegistry))
+	for _, validatorPubkey := range epochHandler.ValidatorsRegistry {
+		validatorStorage := utils.GetValidatorFromApprovementThreadState(validatorPubkey)
+		if validatorStorage == nil {
+			helpers.WriteErr(ctx, fasthttp.StatusInternalServerError, "Failed to load validator storage")
+			return
+		}
+		validators = append(validators, *validatorStorage)
+	}
+
+	payload := structures.RecoveryGenesisTemplatePayload{
+		SourceEpochId:     epochHandler.Id,
+		SourceEpochHash:   epochHandler.Hash,
+		CoreMajorVersion:  atHandler.CoreMajorVersion,
+		NetworkParameters: atHandler.NetworkParameters.CopyNetworkParameters(),
+		Validators:        validators,
+	}
+
+	writeSignedRecoveryPayload(ctx, payload)
+}
+
+func writeSignedRecoveryPayload(ctx *fasthttp.RequestCtx, payload any) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		helpers.WriteErr(ctx, fasthttp.StatusInternalServerError, "Failed to marshal payload")
 		return
 	}
 
-	sig := cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, string(payloadBytes))
-
 	resp := RecoverySignedResponse{
 		PubKey:    globals.CONFIGURATION.PublicKey,
 		Payload:   payloadBytes,
-		Signature: sig,
+		Signature: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, string(payloadBytes)),
 	}
-
 	helpers.WriteJSON(ctx, fasthttp.StatusOK, resp)
 }

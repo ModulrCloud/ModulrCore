@@ -56,6 +56,7 @@ func createRecoveryRouter() fasthttp.RequestHandler {
 	// websocket consensus routes, or background consensus threads are available
 	// when RECOVERY_MODE is enabled.
 	r.GET("/recovery/last_finalized_height", routes.GetRecoveryLastFinalizedHeight)
+	r.GET("/recovery/genesis_template", routes.GetRecoveryGenesisTemplate)
 	r.GET("/get_validator_endpoints", routes.GetValidatorEndpoints)
 	r.GET("/get_validator_ws_endpoints", routes.GetValidatorWsEndpoints)
 
