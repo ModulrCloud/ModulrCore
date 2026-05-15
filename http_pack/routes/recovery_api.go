@@ -15,10 +15,11 @@ import (
 )
 
 type RecoveryLastFinalizedHeightPayload struct {
-	LastHeight int    `json:"lastHeight"`
-	BlockId    string `json:"blockId"`
-	BlockHash  string `json:"blockHash"`
-	EpochId    int    `json:"epochId"`
+	LastHeight int                               `json:"lastHeight"`
+	BlockId    string                            `json:"blockId"`
+	BlockHash  string                            `json:"blockHash"`
+	EpochId    int                               `json:"epochId"`
+	Proof      *structures.AggregatedHeightProof `json:"proof"`
 }
 
 type RecoverySignedResponse struct {
@@ -36,24 +37,25 @@ func GetRecoveryLastFinalizedHeight(ctx *fasthttp.RequestCtx) {
 
 	lastHeight := int(tracker.NextHeight - 1)
 
-	var proofInfo *structures.AggregatedHeightProofInfo
+	var proof *structures.AggregatedHeightProof
 	for h := lastHeight; h >= 0 && h > lastHeight-10; h-- {
-		if info := utils.LoadAggregatedHeightProofInfo(h); info != nil {
-			proofInfo = info
+		if loadedProof := utils.LoadAggregatedHeightProof(h); loadedProof != nil {
+			proof = loadedProof
 			break
 		}
 	}
 
-	if proofInfo == nil {
+	if proof == nil {
 		helpers.WriteErr(ctx, fasthttp.StatusNotFound, "No aggregated height proof found")
 		return
 	}
 
 	payload := RecoveryLastFinalizedHeightPayload{
-		LastHeight: proofInfo.AbsoluteHeight,
-		BlockId:    proofInfo.BlockId,
-		BlockHash:  proofInfo.BlockHash,
-		EpochId:    proofInfo.EpochId,
+		LastHeight: proof.AbsoluteHeight,
+		BlockId:    proof.BlockId,
+		BlockHash:  proof.BlockHash,
+		EpochId:    proof.EpochId,
+		Proof:      proof,
 	}
 
 	writeSignedRecoveryPayload(ctx, payload)

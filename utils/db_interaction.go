@@ -241,9 +241,7 @@ func GetValidatorFromExecThreadState(validatorPubkey string) *structures.Validat
 	return vs
 }
 
-// LoadAggregatedHeightProofInfo reads an AggregatedHeightProof from FINALIZATION_THREAD_METADATA
-// and returns a summary suitable for the recovery API.
-func LoadAggregatedHeightProofInfo(absoluteHeight int) *structures.AggregatedHeightProofInfo {
+func LoadAggregatedHeightProof(absoluteHeight int) *structures.AggregatedHeightProof {
 	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedHeightProof, absoluteHeight))
 
 	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
@@ -253,6 +251,17 @@ func LoadAggregatedHeightProofInfo(absoluteHeight int) *structures.AggregatedHei
 
 	var proof structures.AggregatedHeightProof
 	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+
+	return &proof
+}
+
+// LoadAggregatedHeightProofInfo reads an AggregatedHeightProof from FINALIZATION_THREAD_METADATA
+// and returns a summary suitable for lightweight callers.
+func LoadAggregatedHeightProofInfo(absoluteHeight int) *structures.AggregatedHeightProofInfo {
+	proof := LoadAggregatedHeightProof(absoluteHeight)
+	if proof == nil {
 		return nil
 	}
 

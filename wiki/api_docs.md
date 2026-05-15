@@ -453,6 +453,7 @@ The recovery script queries the discovered latest core quorum and accepts only r
   - `blockId`: block id at that height.
   - `blockHash`: block hash.
   - `epochId`: epoch id for that finalized height.
+  - `proof`: full `AggregatedHeightProof`, including quorum signatures.
 - **Errors**
   - `404` — no finalized height or no aggregated height proof is available.
   - `500` — failed to marshal the signed payload.
@@ -465,7 +466,18 @@ The recovery script queries the discovered latest core quorum and accepts only r
     "lastHeight": 12048,
     "blockId": "42:6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE:18",
     "blockHash": "f7c0...",
-    "epochId": 42
+    "epochId": 42,
+    "proof": {
+      "absoluteHeight": 12048,
+      "blockId": "42:6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE:18",
+      "blockHash": "f7c0...",
+      "epochId": 42,
+      "heightInEpoch": 18,
+      "proofs": {
+        "validator_1_pubkey": "base64_signature",
+        "validator_2_pubkey": "base64_signature"
+      }
+    }
   },
   "signature": "MEUCIQ..."
 }
