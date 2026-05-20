@@ -36,6 +36,8 @@ go run ./tests_e2e/harness scenario alfp_pull_smoke
 
 go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
 
+go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -129,9 +131,20 @@ that core quorum transition, and checks that core stores an
 `AggregatedAnchorEpochAckProof` exposed via `/aggregated_anchor_epoch_ack_proof/1`
 for the transition payload `0 -> 1`.
 
+### `recovery_latest_quorum_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
+```
+
+This scenario verifies the recovery-facing anchors-core API. It prepares a fast
+`1 core + 1 anchor` network, waits until anchors-core applies the core quorum
+transition `0 -> 1`, calls `/recovery/latest_core_quorum`, verifies the outer
+anchor signature over the raw payload, and checks that the signed payload points
+to the latest core quorum proof for `0 -> 1` with validator endpoints.
+
 ## Next Milestones
 
 1. Add richer readiness checks for WS endpoints and expected runtime state.
 2. Add consensus scenarios:
-   - Recovery latest quorum collection from anchors.
    - Recovery restart smoke flow.

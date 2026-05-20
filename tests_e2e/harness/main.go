@@ -48,6 +48,7 @@ func printUsage(out io.Writer) {
   go run ./tests_e2e/harness scenario bootstrap_smoke
   go run ./tests_e2e/harness scenario alfp_pull_smoke
   go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
+  go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
   go run ./tests_e2e/harness start  -manifest tests_e2e/manifests/example.json
   go run ./tests_e2e/harness status [-run-dir tests_e2e/runs/latest]
   go run ./tests_e2e/harness logs   -node core-1 [-stream stdout] [-lines 120]
