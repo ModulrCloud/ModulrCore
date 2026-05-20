@@ -43,3 +43,4 @@ local_scripts/
 point-*
 REFACTORING_MANIFEST.md
 last-mile-finalizer.md
+tests_e2e/runs/

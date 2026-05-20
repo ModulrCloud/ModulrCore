@@ -1,0 +1,19 @@
+{
+  "name": "manual-local-run",
+  "nodes": [
+    {
+      "name": "core-1",
+      "role": "core",
+      "repoPath": "/absolute/path/to/modulr-core",
+      "chaindataPath": "/absolute/path/to/core-1-chaindata",
+      "command": ["go", "run", "."]
+    },
+    {
+      "name": "anchor-1",
+      "role": "anchor",
+      "repoPath": "/absolute/path/to/modulr-anchors-core",
+      "chaindataPath": "/absolute/path/to/anchor-1-chaindata",
+      "command": ["go", "run", "."]
+    }
+  ]
+}
