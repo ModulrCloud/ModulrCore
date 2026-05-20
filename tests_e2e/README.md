@@ -42,6 +42,8 @@ go run ./tests_e2e/harness scenario multi_node_quorum_smoke
 
 go run ./tests_e2e/harness scenario multi_node_one_anchor_down_smoke
 
+go run ./tests_e2e/harness scenario multi_node_one_core_down_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -172,6 +174,19 @@ rotation, verifies the remaining anchors still let core collect an
 `AggregatedAnchorEpochAckProof` with majority `3/4` signatures, and then
 restarts a majority of anchors in `RECOVERY_MODE` to confirm recovery latest
 quorum responses are still available from enough anchors.
+
+### `multi_node_one_core_down_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario multi_node_one_core_down_smoke
+```
+
+This scenario verifies degraded core-quorum behavior. It starts a fast
+`4 core + 4 anchors` network, stops one core validator before the first core
+epoch rotation, verifies the remaining validators still produce the core epoch
+rotation proof, confirms every anchor applies that transition, and then checks
+that recovery latest quorum responses expose a core rotation proof with majority
+`3/4` core signatures.
 
 ## Next Milestones
 
