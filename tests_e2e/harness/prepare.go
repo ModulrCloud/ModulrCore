@@ -26,6 +26,11 @@ func prepareCmd(args []string) error {
 	anchorCommand := fs.String("anchor-command", "go run .", "command used to start each anchor node")
 	basePort := fs.Int("base-port", 19000, "base TCP port for generated configs")
 	overwrite := fs.Bool("overwrite", false, "remove an existing generated run directory before preparing")
+	coreEpochDurationMs := fs.Int64("core-epoch-duration-ms", 30_000, "core epoch duration in milliseconds")
+	coreLeadershipDurationMs := fs.Int64("core-leadership-duration-ms", 5_000, "core leadership duration in milliseconds")
+	coreBlockTimeMs := fs.Int64("core-block-time-ms", 1_000, "core block time in milliseconds")
+	anchorEpochDurationMs := fs.Int64("anchor-epoch-duration-ms", 30_000, "anchor epoch duration in milliseconds")
+	anchorBlockTimeMs := fs.Int64("anchor-block-time-ms", 1_000, "anchor block time in milliseconds")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -93,14 +98,14 @@ func prepareCmd(args []string) error {
 		"NETWORK_ID":                  randomHex(32),
 		"CORE_MAJOR_VERSION":          0,
 		"FIRST_EPOCH_START_TIMESTAMP": now,
-		"NETWORK_PARAMETERS":          coreNetworkParams(*coreCount),
+		"NETWORK_PARAMETERS":          coreNetworkParams(*coreCount, *coreEpochDurationMs, *coreLeadershipDurationMs, *coreBlockTimeMs),
 		"VALIDATORS":                  coreValidators,
 		"STATE":                       coreState,
 	}
 	anchorGenesis := map[string]any{
 		"NETWORK_ID":                  randomHex(32),
 		"FIRST_EPOCH_START_TIMESTAMP": now,
-		"NETWORK_PARAMETERS":          anchorNetworkParams(*anchorCount),
+		"NETWORK_PARAMETERS":          anchorNetworkParams(*anchorCount, *anchorEpochDurationMs, *anchorBlockTimeMs),
 		"ANCHORS":                     anchors,
 	}
 	coreGenesisForAnchors := map[string]any{
@@ -283,24 +288,24 @@ func percentageForIndex(index int, total int) uint8 {
 	return uint8(value)
 }
 
-func coreNetworkParams(quorumSize int) map[string]any {
+func coreNetworkParams(quorumSize int, epochDurationMs, leadershipDurationMs, blockTimeMs int64) map[string]any {
 	return map[string]any{
 		"VALIDATOR_REQUIRED_STAKE": uint64(50_000_000_000),
 		"MINIMAL_STAKE_PER_STAKER": uint64(2_000_000_000),
 		"QUORUM_SIZE":              quorumSize,
-		"EPOCH_DURATION":           int64(30_000),
-		"LEADERSHIP_DURATION":      int64(5_000),
-		"BLOCK_TIME":               int64(1_000),
+		"EPOCH_DURATION":           epochDurationMs,
+		"LEADERSHIP_DURATION":      leadershipDurationMs,
+		"BLOCK_TIME":               blockTimeMs,
 		"MAX_BLOCK_SIZE_IN_BYTES":  int64(12_288_000),
 		"TXS_LIMIT_PER_BLOCK":      30_000,
 	}
 }
 
-func anchorNetworkParams(quorumSize int) map[string]any {
+func anchorNetworkParams(quorumSize int, epochDurationMs, blockTimeMs int64) map[string]any {
 	return map[string]any{
 		"QUORUM_SIZE":                             quorumSize,
-		"EPOCH_DURATION":                          int64(30_000),
-		"BLOCK_TIME":                              int64(1_000),
+		"EPOCH_DURATION":                          epochDurationMs,
+		"BLOCK_TIME":                              blockTimeMs,
 		"MAX_BLOCK_SIZE_IN_BYTES":                 int64(12_288_000),
 		"TXS_LIMIT_PER_BLOCK":                     30_000,
 		"MAX_EPOCHS_TO_SUPPORT":                   16,

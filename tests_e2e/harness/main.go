@@ -46,6 +46,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintf(out, `usage:
   go run ./tests_e2e/harness prepare [-core 1] [-anchors 1] [-overwrite]
   go run ./tests_e2e/harness scenario bootstrap_smoke
+  go run ./tests_e2e/harness scenario alfp_pull_smoke
   go run ./tests_e2e/harness start  -manifest tests_e2e/manifests/example.json
   go run ./tests_e2e/harness status [-run-dir tests_e2e/runs/latest]
   go run ./tests_e2e/harness logs   -node core-1 [-stream stdout] [-lines 120]

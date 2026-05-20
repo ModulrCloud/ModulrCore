@@ -32,6 +32,8 @@ go run ./tests_e2e/harness prepare \
 
 go run ./tests_e2e/harness scenario bootstrap_smoke
 
+go run ./tests_e2e/harness scenario alfp_pull_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -99,11 +101,23 @@ for HTTP health checks, confirms that the core height advances, verifies that
 the anchor remains healthy, and then stops the run. On failure it prints recent
 logs for each node to make the runtime issue visible immediately.
 
+### `alfp_pull_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario alfp_pull_smoke
+```
+
+This scenario verifies the anchor-side proactive ALFP fallback. It prepares a
+fast `1 core + 1 anchor` network, starts a local proxy that blocks only
+`/accept_aggregated_leader_finalization_proof` POSTs from core to anchor, lets
+all other anchor HTTP traffic pass through, and then waits until the anchor logs
+show that it built an ALFP locally from the core quorum and included it in an
+anchor block.
+
 ## Next Milestones
 
 1. Add richer readiness checks for WS endpoints and expected runtime state.
 2. Add consensus scenarios:
-   - ALFP fallback from anchors to direct core quorum polling.
    - Epoch rotation requiring anchor majority ACK.
    - Recovery latest quorum collection from anchors.
    - Recovery restart smoke flow.
