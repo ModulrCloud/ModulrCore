@@ -34,6 +34,8 @@ go run ./tests_e2e/harness scenario bootstrap_smoke
 
 go run ./tests_e2e/harness scenario alfp_pull_smoke
 
+go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -114,10 +116,22 @@ all other anchor HTTP traffic pass through, and then waits until the anchor logs
 show that it built an ALFP locally from the core quorum and included it in an
 anchor block.
 
+### `epoch_anchor_ack_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
+```
+
+This scenario verifies the core-to-anchor epoch rotation contract. It prepares a
+fast `1 core + 1 anchor` network, waits until core collects and sends an
+`AggregatedEpochRotationProof` for `0 -> 1`, verifies that anchors-core applies
+that core quorum transition, and checks that core stores an
+`AggregatedAnchorEpochAckProof` exposed via `/aggregated_anchor_epoch_ack_proof/1`
+for the transition payload `0 -> 1`.
+
 ## Next Milestones
 
 1. Add richer readiness checks for WS endpoints and expected runtime state.
 2. Add consensus scenarios:
-   - Epoch rotation requiring anchor majority ACK.
    - Recovery latest quorum collection from anchors.
    - Recovery restart smoke flow.

@@ -28,6 +28,8 @@ func scenarioCmd(args []string) error {
 		return bootstrapSmokeScenario(args[1:])
 	case "alfp_pull_smoke":
 		return alfpPullSmokeScenario(args[1:])
+	case "epoch_anchor_ack_smoke":
+		return epochAnchorAckSmokeScenario(args[1:])
 	default:
 		return fmt.Errorf("unknown scenario %q", args[0])
 	}
@@ -224,6 +226,111 @@ func alfpPullSmokeScenario(args []string) error {
 	return nil
 }
 
+func epochAnchorAckSmokeScenario(args []string) error {
+	fs := flag.NewFlagSet("scenario epoch_anchor_ack_smoke", flag.ExitOnError)
+	runRoot := fs.String("run-root", filepath.Join("tests_e2e", "runs", "scenarios"), "directory for scenario run state")
+	runID := fs.String("run-id", "epoch-anchor-ack-smoke-"+time.Now().UTC().Format("20060102T150405Z"), "run identifier")
+	coreRepo := fs.String("core-repo", ".", "path to modulr-core repository")
+	anchorsRepo := fs.String("anchors-repo", "../modulr-anchors-core", "path to modulr-anchors-core repository")
+	basePort := fs.Int("base-port", 19000, "base TCP port for generated configs")
+	healthTimeout := fs.Duration("health-timeout", 30*time.Second, "timeout for startup health checks")
+	observeTimeout := fs.Duration("observe-timeout", 60*time.Second, "timeout for observing epoch rotation and anchor ACK")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	runDir := filepath.Join(*runRoot, *runID)
+	manifestPath := filepath.Join(runDir, "manifest.json")
+	fmt.Printf("scenario epoch_anchor_ack_smoke: preparing run %s\n", *runID)
+	if err := prepareCmd([]string{
+		"-core", "1",
+		"-anchors", "1",
+		"-run-root", *runRoot,
+		"-run-id", *runID,
+		"-core-repo", *coreRepo,
+		"-anchors-repo", *anchorsRepo,
+		"-base-port", fmt.Sprint(*basePort),
+		"-core-epoch-duration-ms", "8000",
+		"-core-leadership-duration-ms", "1000",
+		"-core-block-time-ms", "700",
+		"-anchor-epoch-duration-ms", "8000",
+		"-anchor-block-time-ms", "700",
+		"-overwrite",
+	}); err != nil {
+		return err
+	}
+
+	fmt.Println("scenario epoch_anchor_ack_smoke: starting nodes")
+	if err := startCmd([]string{
+		"-manifest", manifestPath,
+		"-run-root", *runRoot,
+		"-run-id", *runID,
+		"-health-timeout", healthTimeout.String(),
+	}); err != nil {
+		if state, loadErr := loadState(runDir); loadErr == nil {
+			printScenarioDiagnostics(state, 120)
+		}
+		return err
+	}
+
+	state, err := loadState(runDir)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = stopState(state, 5*time.Second)
+	}()
+
+	coreNode, err := findNodeByRole(state, "core")
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+	anchorNode, err := findNodeByRole(state, "anchor")
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+
+	if _, err := waitForLogPatternFrom(coreNode.StdoutLog, regexp.MustCompile(`Aggregated epoch rotation proof sent for epoch 0->1`), 0, *observeTimeout); err != nil {
+		printScenarioDiagnostics(state, 160)
+		return err
+	}
+	if _, err := waitForLogPatternFrom(anchorNode.StdoutLog, regexp.MustCompile(`Core quorum catch-up: applied epoch rotation proof 0 -> 1`), 0, *observeTimeout); err != nil {
+		printScenarioDiagnostics(state, 160)
+		return err
+	}
+	if _, err := waitForLogPatternFrom(coreNode.StdoutLog, regexp.MustCompile(`Aggregated anchor epoch ack proof collected and delivered for epoch 0->1`), 0, *observeTimeout); err != nil {
+		printScenarioDiagnostics(state, 160)
+		return err
+	}
+
+	ack, err := waitForCoreAnchorEpochAckProof(coreNode, 1, *observeTimeout)
+	if err != nil {
+		printScenarioDiagnostics(state, 160)
+		return err
+	}
+	if ack.EpochID != 0 || ack.NextEpochID != 1 {
+		printScenarioDiagnostics(state, 160)
+		return fmt.Errorf("unexpected anchor epoch ACK proof range: got %d->%d, want 0->1", ack.EpochID, ack.NextEpochID)
+	}
+	if len(ack.Proofs) == 0 {
+		printScenarioDiagnostics(state, 160)
+		return errors.New("anchor epoch ACK proof has no signatures")
+	}
+	if err := assertNodeAlive(coreNode); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+	if err := assertNodeAlive(anchorNode); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+
+	fmt.Printf("PASS epoch_anchor_ack_smoke: core stored anchor epoch ACK proof for %d->%d with %d signatures\n", ack.EpochID, ack.NextEpochID, len(ack.Proofs))
+	return nil
+}
+
 func waitForCoreHeight(node NodeState, minExclusive int64, timeout time.Duration) (int64, error) {
 	if node.HealthURL == "" {
 		return -1, fmt.Errorf("%s has no health URL", node.Name)
@@ -297,6 +404,50 @@ func fetchLiveStatsEpoch(client http.Client, liveStatsURL string) (int, error) {
 		}
 	}
 	return -1, errors.New("live_stats epoch has no id")
+}
+
+type anchorEpochAckProofResponse struct {
+	EpochID       int               `json:"epochId"`
+	NextEpochID   int               `json:"nextEpochId"`
+	EpochDataHash string            `json:"epochDataHash"`
+	Proofs        map[string]string `json:"proofs"`
+}
+
+func waitForCoreAnchorEpochAckProof(node NodeState, lookupEpochID int, timeout time.Duration) (anchorEpochAckProofResponse, error) {
+	if node.HealthURL == "" {
+		return anchorEpochAckProofResponse{}, fmt.Errorf("%s has no health URL", node.Name)
+	}
+	endpoint := strings.TrimSuffix(node.HealthURL, "/live_stats") + fmt.Sprintf("/aggregated_anchor_epoch_ack_proof/%d", lookupEpochID)
+	deadline := time.Now().Add(timeout)
+	client := http.Client{Timeout: 750 * time.Millisecond}
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		if err := assertNodeAlive(node); err != nil {
+			return anchorEpochAckProofResponse{}, err
+		}
+		var payload anchorEpochAckProofResponse
+		if err := fetchJSONStatusOK(client, endpoint, &payload); err == nil {
+			return payload, nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return anchorEpochAckProofResponse{}, fmt.Errorf("core did not expose anchor epoch ACK proof for lookup epoch %d within %s: %v", lookupEpochID, timeout, lastErr)
+}
+
+func fetchJSONStatusOK(client http.Client, url string, target any) error {
+	resp, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %s returned %d", url, resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(target)
 }
 
 func waitForLogPatternFrom(path string, pattern *regexp.Regexp, from int, timeout time.Duration) (int, error) {
