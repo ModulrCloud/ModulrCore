@@ -38,6 +38,8 @@ go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
 
 go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
 
+go run ./tests_e2e/harness scenario multi_node_quorum_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -142,6 +144,19 @@ This scenario verifies the recovery-facing anchors-core API. It prepares a fast
 transition `0 -> 1`, calls `/recovery/latest_core_quorum`, verifies the outer
 anchor signature over the raw payload, and checks that the signed payload points
 to the latest core quorum proof for `0 -> 1` with validator endpoints.
+
+### `multi_node_quorum_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario multi_node_quorum_smoke
+```
+
+This scenario verifies the same contracts with a real quorum shape. By default
+it prepares a fast `4 core + 4 anchors` network, waits for the core epoch
+rotation `0 -> 1`, confirms every anchor applies that core quorum transition,
+checks that core exposes an `AggregatedAnchorEpochAckProof` with at least anchor
+majority signatures, and then restarts a majority of anchors in `RECOVERY_MODE`
+to verify they each return a signed `/recovery/latest_core_quorum` response.
 
 ## Next Milestones
 
