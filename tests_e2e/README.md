@@ -13,6 +13,8 @@ scenarios will be added on top of this foundation.
 - Write `configs.json`, `genesis.json`, `anchors.json`, and `core_genesis.json`.
 - Produce a manifest that can be passed directly to `start`.
 - Start multiple node processes from a JSON manifest.
+- Wait for node HTTP health URLs before returning from `start`.
+- Run the `bootstrap_smoke` scenario to verify a generated mini-network.
 - Set `CHAINDATA_PATH` per node.
 - Capture `stdout` and `stderr` logs per node.
 - Store run metadata in `tests_e2e/runs/<run-id>/state.json`.
@@ -25,10 +27,14 @@ scenarios will be added on top of this foundation.
 ```bash
 go run ./tests_e2e/harness prepare \
   -core 1 \
-  -anchors 1
+  -anchors 1 \
+  -overwrite
+
+go run ./tests_e2e/harness scenario bootstrap_smoke
 
 go run ./tests_e2e/harness start \
-  -manifest tests_e2e/runs/latest/manifest.json
+  -manifest tests_e2e/runs/latest/manifest.json \
+  -health-timeout 25s
 
 go run ./tests_e2e/harness status
 
@@ -43,6 +49,8 @@ go run ./tests_e2e/harness stop
 `prepare` writes generated node directories under `tests_e2e/runs/<run-id>/network/`.
 Use `-core-command` and `-anchor-command` if you want to run prebuilt binaries
 instead of `go run .`.
+If you reuse a `-run-id`, pass `-overwrite` to remove the previous generated
+chaindata first. Scenario commands do this automatically.
 
 ## Manifest Format
 
@@ -56,6 +64,7 @@ instead of `go run .`.
       "repoPath": "/absolute/path/to/modulr-core",
       "workDir": "/absolute/path/to/core-1-chaindata",
       "chaindataPath": "/absolute/path/to/core-1-chaindata",
+      "healthURL": "http://localhost:19000/live_stats",
       "command": ["go", "run", "."]
     }
   ]
@@ -69,13 +78,31 @@ Each `chaindataPath` must already contain the files required by the node:
 
 Generated manifests set `workDir` to the node chaindata directory and use
 `go run /absolute/path/to/repo` by default. This allows `modulr-core` to read
-the generated `version.txt` from the node directory during local runs.
+the generated `version.txt` from the node directory during local runs. Anchor
+nodes keep `workDir` pointed at the `modulr-anchors-core` repository because
+`go run .` must execute inside that module; their config still comes from
+`CHAINDATA_PATH`.
+
+If `healthURL` is present, `start` waits until the URL returns a non-5xx HTTP
+response. Pass `-wait-health=false` to start processes without waiting.
+
+## Scenarios
+
+### `bootstrap_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario bootstrap_smoke
+```
+
+This scenario prepares a `1 core + 1 anchor` network, starts both nodes, waits
+for HTTP health checks, confirms that the core height advances, verifies that
+the anchor remains healthy, and then stops the run. On failure it prints recent
+logs for each node to make the runtime issue visible immediately.
 
 ## Next Milestones
 
-1. Add health checks that wait for HTTP/WS endpoints to become ready.
-2. Add scenario commands, starting with `network_bootstrap_smoke`.
-3. Add consensus scenarios:
+1. Add richer readiness checks for WS endpoints and expected runtime state.
+2. Add consensus scenarios:
    - ALFP fallback from anchors to direct core quorum polling.
    - Epoch rotation requiring anchor majority ACK.
    - Recovery latest quorum collection from anchors.
