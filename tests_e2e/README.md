@@ -46,6 +46,8 @@ go run ./tests_e2e/harness scenario multi_node_one_core_down_smoke
 
 go run ./tests_e2e/harness scenario multi_node_alfp_pull_after_push_failure
 
+go run ./tests_e2e/harness scenario multi_node_recovery_majority_latest_quorum
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -201,6 +203,19 @@ starts a fast `4 core + 4 anchors` network, rewrites all core configs so one
 anchor is reached through a local proxy, blocks ALFP POST delivery to that
 anchor, and then verifies the anchor proactively builds the missing ALFP from
 the core quorum and includes it in an anchor block.
+
+### `multi_node_recovery_majority_latest_quorum`
+
+```bash
+go run ./tests_e2e/harness scenario multi_node_recovery_majority_latest_quorum
+```
+
+This scenario verifies recovery latest-quorum convergence across an anchor
+majority. It starts a fast `4 core + 4 anchors` network, waits until core and
+anchors reach at least epoch `2`, stops the normal network, restarts only
+majority `3/4` anchors in `RECOVERY_MODE`, and verifies that their signed
+`/recovery/latest_core_quorum` responses agree on the same latest core
+epoch/hash.
 
 ## Next Milestones
 
