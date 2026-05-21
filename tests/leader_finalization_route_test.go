@@ -2,15 +2,18 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	_ "github.com/modulrcloud/modulr-core/tests/testenv"
 
+	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
@@ -128,6 +131,79 @@ func TestGetLeaderFinalizationProofReturnsUpgradeForHigherLocalVotingStat(t *tes
 	}
 }
 
+func TestGetFinalizationProofDoesNotSignConflictingBlocksConcurrently(t *testing.T) {
+	validator := configureLeaderFinalizationRouteState(t)
+	leader := cryptography.GenerateKeyPair("", "", nil)
+	epochHandler := structures.EpochDataHandler{
+		Id:                 2,
+		Hash:               "epoch-hash",
+		Quorum:             []string{validator.Pub},
+		LeadersSequence:    []string{leader.Pub},
+		CurrentLeaderIndex: 0,
+		StartTimestamp:     uint64(time.Now().UnixMilli()),
+	}
+	setActiveApprovementEpochForLeaderFinalizationTest(epochHandler, structures.NetworkParameters{EpochDuration: int64(time.Hour / time.Millisecond)})
+
+	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+	blockA := buildSignedFinalizationBlockForTest(t, leader, epochFullID, 0, "conflict-a")
+	blockB := buildSignedFinalizationBlockForTest(t, leader, epochFullID, 0, "conflict-b")
+	if blockA.GetHash() == blockB.GetHash() {
+		t.Fatalf("test setup produced identical block hashes")
+	}
+
+	serverURL := startLeaderFinalizationWebsocketServer(t)
+	requests := []websocket_pack.WsFinalizationProofRequest{
+		{
+			Route: constants.WsRouteGetFinalizationProof,
+			Block: blockA,
+		},
+		{
+			Route: constants.WsRouteGetFinalizationProof,
+			Block: blockB,
+		},
+	}
+
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	responses := make([]map[string]any, len(requests))
+	errs := make([]error, len(requests))
+	for i := range requests {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start
+			responses[idx], errs[idx] = requestFinalizationProofFromServer(serverURL, requests[idx])
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for _, err := range errs {
+		if err != nil {
+			t.Fatalf("finalization proof request failed: %v", err)
+		}
+	}
+
+	signedHashes := make(map[string]bool)
+	for _, resp := range responses {
+		if sig, _ := resp["finalizationProof"].(string); sig == "" {
+			continue
+		}
+		votedForHash, _ := resp["votedForHash"].(string)
+		if votedForHash == "" {
+			t.Fatalf("signed response is missing votedForHash: %+v", resp)
+		}
+		signedHashes[votedForHash] = true
+	}
+
+	if len(signedHashes) == 0 {
+		t.Fatalf("expected one block to receive a finalization signature, got responses %+v", responses)
+	}
+	if len(signedHashes) > 1 {
+		t.Fatalf("validator signed conflicting hashes for the same block id: %+v responses=%+v", signedHashes, responses)
+	}
+}
+
 func configureLeaderFinalizationRouteState(t *testing.T) cryptography.Ed25519Box {
 	t.Helper()
 
@@ -138,6 +214,7 @@ func configureLeaderFinalizationRouteState(t *testing.T) cryptography.Ed25519Box
 	databases.FINALIZATION_THREAD_METADATA = openTempDB(t)
 	databases.EPOCH_DATA = openTempDB(t)
 	databases.APPROVEMENT_THREAD_METADATA = openTempDB(t)
+	databases.BLOCKS = openTempDB(t)
 
 	t.Cleanup(func() {
 		globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(true)
@@ -182,6 +259,31 @@ func requestLeaderFinalizationProof(t *testing.T, request websocket_pack.WsLeade
 	return resp
 }
 
+func requestFinalizationProofFromServer(serverURL string, request websocket_pack.WsFinalizationProofRequest) (map[string]any, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(serverURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("dial websocket test server: %w", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(request); err != nil {
+		return nil, fmt.Errorf("write websocket request: %w", err)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return nil, fmt.Errorf("set read deadline: %w", err)
+	}
+	_, raw, err := conn.ReadMessage()
+	if err != nil {
+		return nil, fmt.Errorf("read websocket response: %w", err)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("decode websocket response %q: %w", raw, err)
+	}
+	return resp, nil
+}
+
 func startLeaderFinalizationWebsocketServer(t *testing.T) string {
 	t.Helper()
 
@@ -200,6 +302,33 @@ func startLeaderFinalizationWebsocketServer(t *testing.T) string {
 	t.Cleanup(server.Close)
 
 	return "ws" + strings.TrimPrefix(server.URL, "http")
+}
+
+func buildSignedFinalizationBlockForTest(t *testing.T, leader cryptography.Ed25519Box, epochFullID string, index int, variant string) block_pack.Block {
+	t.Helper()
+
+	block := block_pack.Block{
+		Creator: leader.Pub,
+		Time:    int64(1000 + index),
+		Epoch:   epochFullID,
+		Transactions: []structures.Transaction{
+			{
+				Nonce:   uint64(index + 1),
+				Payload: map[string]string{"variant": variant},
+			},
+		},
+		ExtraData: block_pack.ExtraDataToBlock{
+			Rest: map[string]string{"variant": variant},
+		},
+		Index:    index,
+		PrevHash: constants.ZeroHash,
+	}
+	block.Sig = cryptography.GenerateSignature(leader.Prv, block.GetHash())
+	if !block.VerifySignature() {
+		t.Fatalf("test block signature does not verify")
+	}
+
+	return block
 }
 
 func buildCoreLeaderVotingStatForTest(
