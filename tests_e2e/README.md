@@ -48,6 +48,8 @@ go run ./tests_e2e/harness scenario multi_node_alfp_pull_after_push_failure
 
 go run ./tests_e2e/harness scenario multi_node_recovery_majority_latest_quorum
 
+go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -216,6 +218,20 @@ anchors reach at least epoch `2`, stops the normal network, restarts only
 majority `3/4` anchors in `RECOVERY_MODE`, and verifies that their signed
 `/recovery/latest_core_quorum` responses agree on the same latest core
 epoch/hash.
+
+### `multi_node_lagging_anchor_catchup`
+
+```bash
+go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
+```
+
+This scenario verifies recovery in-memory catch-up for a lagging anchor. It
+starts a fast `4 core + 4 anchors` network, waits until all anchors know epoch
+`1`, stops one anchor, lets the remaining `3/4` anchors and core advance to at
+least epoch `2`, then restarts the lagging anchor in `RECOVERY_MODE` alongside
+peer recovery anchors. The lagging anchor must return a signed
+`/recovery/latest_core_quorum` response showing that its durable view started at
+epoch `1` and caught up in memory to the latest core quorum proof.
 
 ## Next Milestones
 
