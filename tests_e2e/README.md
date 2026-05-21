@@ -50,6 +50,8 @@ go run ./tests_e2e/harness scenario multi_node_recovery_majority_latest_quorum
 
 go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
 
+go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majority
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -227,11 +229,24 @@ go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
 
 This scenario verifies recovery in-memory catch-up for a lagging anchor. It
 starts a fast `4 core + 4 anchors` network, waits until all anchors know epoch
-`1`, stops one anchor, lets the remaining `3/4` anchors and core advance to at
-least epoch `2`, then restarts the lagging anchor in `RECOVERY_MODE` alongside
-peer recovery anchors. The lagging anchor must return a signed
-`/recovery/latest_core_quorum` response showing that its durable view started at
-epoch `1` and caught up in memory to the latest core quorum proof.
+`1`, snapshots one anchor, lets the full network advance to at least epoch `2`,
+then restores the old anchor snapshot and restarts anchors in `RECOVERY_MODE`.
+The lagging anchor must return a signed `/recovery/core_quorum/2` response
+showing that its durable view started at epoch `1` and caught up in memory to
+the target core quorum proof.
+
+### `multi_node_network_partition_no_false_majority`
+
+```bash
+go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majority
+```
+
+This scenario verifies that recovery tooling cannot treat an anchor minority as
+a valid recovery majority. It starts a fast `4 core + 4 anchors` network, waits
+until all anchors know at least epoch `2`, stops the normal network, restarts
+only `2/4` anchors in `RECOVERY_MODE`, and verifies that their individual
+signed `/recovery/core_quorum/2` responses are valid but still below the
+required `3/4` anchor majority.
 
 ## Next Milestones
 
