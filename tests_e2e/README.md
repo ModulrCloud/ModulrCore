@@ -3,9 +3,53 @@
 This directory contains a local process harness for running `modulr-core` and
 `modulr-anchors-core` nodes as background OS processes during E2E testing.
 
-The first milestone is intentionally small: the harness manages processes,
-logs, and run state from a manifest. Network config generation and consensus
-scenarios will be added on top of this foundation.
+These tests are not unit tests or mocked integration tests: the harness
+generates real local network configs, starts real node processes, captures logs,
+and verifies behavior through HTTP endpoints plus runtime log evidence.
+
+```text
+                         go run ./tests_e2e/harness scenario <name>
+                                           |
+                                           v
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              E2E Harness                                    │
+│                                                                             │
+│  1. prepare run directory                                                   │
+│  2. generate node configs                                                   │
+│  3. spawn real background OS processes                                      │
+│  4. verify runtime behavior                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+          |                         |                         |
+          v                         v                         v
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────────┐
+│ Generated Files   │     │ Background Nodes  │     │ Harness Checks        │
+│                   │     │                   │     │                       │
+│ runs/<id>/network │     │ core-1 ... core-N │<----│ HTTP health endpoints │
+│ manifest.json     │     │ anchor-1 ... N    │<----│ recovery endpoints    │
+│ configs/genesis   │     │ real PIDs         │<----│ process liveness      │
+└───────────────────┘     └───────────────────┘     └───────────────────────┘
+                                    |
+                                    v
+                          ┌───────────────────┐
+                          │ Runtime Evidence  │
+                          │                   │
+                          │ logs/core-*.log   │
+                          │ logs/anchor-*.log │
+                          │ state.json        │
+                          └───────────────────┘
+                                    ^
+                                    |
+                          ┌───────────────────┐
+                          │ Log Assertions    │
+                          │                   │
+                          │ epoch rotation    │
+                          │ ALFP collection   │
+                          │ recovery catch-up │
+                          │ quorum signatures │
+                          └───────────────────┘
+
+Result: PASS, or diagnostics with the recent stdout/stderr logs for each node.
+```
 
 ## Current Capabilities
 
@@ -248,8 +292,3 @@ only `2/4` anchors in `RECOVERY_MODE`, and verifies that their individual
 signed `/recovery/core_quorum/2` responses are valid but still below the
 required `3/4` anchor majority.
 
-## Next Milestones
-
-1. Add richer readiness checks for WS endpoints and expected runtime state.
-2. Add consensus scenarios:
-   - Recovery restart smoke flow.
