@@ -70,6 +70,7 @@ const (
 	DBKeyPrefixFirstBlockAggregatedHeightProof = "FIRST_BLOCK_AGGREGATED_HEIGHT_PROOF:"
 	DBKeyPrefixAggregatedAnchorEpochAckProof   = "ANCHOR_EPOCH_ACK_PROOF:"
 	DBKeyPrefixAlfp                            = "ALFP:"
+	DBKeyPrefixFinalizationVote                = "FINALIZATION_VOTE:"
 	DBKeyPrefixRecoveryData                    = "RECOVERY_DATA:"
 )
 

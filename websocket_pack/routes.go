@@ -142,13 +142,15 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 				return
 			}
 
-			existingBlockRaw, err := databases.BLOCKS.Get([]byte(proposedBlockId), nil)
-			if err == nil {
-				var existingBlock block_pack.Block
-				if json.Unmarshal(existingBlockRaw, &existingBlock) != nil || existingBlock.GetHash() != proposedBlockHash {
+			voteKey := []byte(constants.DBKeyPrefixFinalizationVote + proposedBlockId)
+			if existingVote, err := databases.FINALIZATION_THREAD_METADATA.Get(voteKey, nil); err == nil {
+				if string(existingVote) != proposedBlockHash {
 					sendNotReady(connection)
 					return
 				}
+			} else if err := databases.FINALIZATION_THREAD_METADATA.Put(voteKey, []byte(proposedBlockHash), nil); err != nil {
+				sendNotReady(connection)
+				return
 			}
 
 			var futureVotingDataToStore structures.VotingStat
