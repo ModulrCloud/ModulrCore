@@ -152,6 +152,11 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 		proposedBlockId := strconv.Itoa(epochIndex) + ":" + parsedRequest.Block.Creator + ":" + strconv.Itoa(int(parsedRequest.Block.Index))
 		previousBlockIndex := int(parsedRequest.Block.Index - 1)
 
+		if parsedRequest.Block.Epoch != epochFullID {
+			sendNotReady(connection)
+			return
+		}
+
 		if parsedRequest.Block.VerifySignature() && !utils.SignalAboutEpochRotationExists(epochIndex) {
 			BLOCK_CREATOR_REQUEST_MUTEX.Lock()
 

@@ -8,11 +8,14 @@
 package threads
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/modulrcloud/modulr-core/anchors_pack"
+	"github.com/modulrcloud/modulr-core/constants"
+	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -71,6 +74,7 @@ func SequenceAlignmentThread() {
 		}
 
 		validLeaderStats := make(map[string]structures.ExecutionStats)
+		validLeaderAfps := make([]structures.AggregatedFinalizationProof, 0, len(response.Block.ExtraData.AggregatedLeaderFinalizationProofs))
 		for _, proof := range response.Block.ExtraData.AggregatedLeaderFinalizationProofs {
 			if !utils.VerifyAggregatedLeaderFinalizationProof(&proof, &epochSnapshot) {
 				continue
@@ -79,6 +83,9 @@ func SequenceAlignmentThread() {
 			validLeaderStats[proof.Leader] = structures.ExecutionStats{
 				Index: proof.VotingStat.Index,
 				Hash:  proof.VotingStat.Hash,
+			}
+			if proof.VotingStat.Index >= 0 {
+				validLeaderAfps = append(validLeaderAfps, proof.VotingStat.Afp)
 			}
 		}
 
@@ -102,6 +109,12 @@ func SequenceAlignmentThread() {
 		if !currentBlockMatchesAnchor && !afpValid {
 			handlers.FINALIZER_THREAD_METADATA.RWMutex.Unlock()
 			continue
+		}
+
+		for _, afp := range validLeaderAfps {
+			if raw, err := json.Marshal(afp); err == nil {
+				_ = databases.EPOCH_DATA.Put([]byte(constants.DBKeyPrefixAfp+afp.BlockId), raw, nil)
+			}
 		}
 
 		for leader, stats := range validLeaderStats {

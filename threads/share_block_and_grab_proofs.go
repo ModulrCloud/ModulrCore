@@ -96,6 +96,8 @@ func BlocksSharingAndProofsGrabingThread() {
 				FINALIZATION_PROOFS_CACHE = make(map[string]string)
 			}
 
+			BLOCK_TO_SHARE = nil
+
 			// And store new descriptor
 
 			if serialized, err := json.Marshal(PROOFS_GRABBER); err == nil {
@@ -137,8 +139,10 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 	acceptedHash := PROOFS_GRABBER.AcceptedHash
 	afpPrev := PROOFS_GRABBER.AfpForPrevious
 
-	// Try to reuse in-memory block if it matches; otherwise we'll load it outside lock.
-	reuseBlock := BLOCK_TO_SHARE != nil && strconv.Itoa(epochHandler.Id)+":"+globals.CONFIGURATION.PublicKey+":"+strconv.Itoa(BLOCK_TO_SHARE.Index) == blockIdForHunting
+	// Try to reuse in-memory block only if it belongs to this exact epoch.
+	reuseBlock := BLOCK_TO_SHARE != nil &&
+		BLOCK_TO_SHARE.Epoch == epochFullId &&
+		strconv.Itoa(epochHandler.Id)+":"+globals.CONFIGURATION.PublicKey+":"+strconv.Itoa(BLOCK_TO_SHARE.Index) == blockIdForHunting
 	var blockToShare block_pack.Block
 	if reuseBlock {
 		blockToShare = *BLOCK_TO_SHARE
