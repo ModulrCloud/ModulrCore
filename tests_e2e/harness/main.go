@@ -57,6 +57,7 @@ func printUsage(out io.Writer) {
   go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
   go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majority
   go run ./tests_e2e/harness scenario recovery_script_style
+  go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
   go run ./tests_e2e/harness start  -manifest tests_e2e/manifests/example.json
   go run ./tests_e2e/harness status [-run-dir tests_e2e/runs/latest]
   go run ./tests_e2e/harness logs   -node core-1 [-stream stdout] [-lines 120]

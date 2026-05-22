@@ -149,9 +149,7 @@ func getOrLoadEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
 	}
 	ALFP_GRABBING_MUTEX.Unlock()
 
-	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB
-	// to be committed atomically with AT updates.
-	loaded := utils.GetEpochSnapshot(epochId)
+	loaded := loadAlfpEpochSnapshot(epochId)
 	if loaded == nil {
 		return nil
 	}
@@ -166,6 +164,37 @@ func getOrLoadEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
 	ALFP_GRABBING_MUTEX.Unlock()
 
 	return loaded
+}
+
+func loadAlfpEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
+	if epochId < 0 {
+		return nil
+	}
+
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.Id == epochId {
+		snapshot := structures.EpochDataSnapshot{
+			EpochDataHandler:  handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler,
+			NetworkParameters: handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters,
+		}
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+		return &snapshot
+	}
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	absoluteEpochId := epochId + handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if snapshot := utils.GetEpochSnapshot(absoluteEpochId); snapshot != nil {
+		return snapshot
+	}
+
+	if absoluteEpochId != epochId {
+		return nil
+	}
+
+	return utils.GetEpochSnapshot(epochId)
 }
 
 func loadAlfpProgress() int {

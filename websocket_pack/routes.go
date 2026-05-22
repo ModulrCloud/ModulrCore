@@ -92,11 +92,41 @@ func getEpochHandlerForLeaderFinalization(epochIndex int) *structures.EpochDataH
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
 	// EPOCH_HANDLER snapshots are stored in APPROVEMENT_THREAD_METADATA DB
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	absoluteEpochIndex := epochIndex + handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if snapshot := utils.GetEpochSnapshot(absoluteEpochIndex); snapshot != nil {
+		return &snapshot.EpochDataHandler
+	}
+
+	if absoluteEpochIndex != epochIndex {
+		if snapshot := getEpochSnapshotFromApprovementDB(epochIndex); snapshot != nil {
+			return &snapshot.EpochDataHandler
+		}
+		return nil
+	}
+
 	if snapshot := utils.GetEpochSnapshot(epochIndex); snapshot != nil {
 		return &snapshot.EpochDataHandler
 	}
 
 	return nil
+}
+
+func getEpochSnapshotFromApprovementDB(epochIndex int) *structures.EpochDataSnapshot {
+	key := []byte(constants.DBKeyPrefixEpochHandler + strconv.Itoa(epochIndex))
+	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+
+	var snapshot structures.EpochDataSnapshot
+	if json.Unmarshal(raw, &snapshot) != nil {
+		return nil
+	}
+
+	return &snapshot
 }
 
 func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *gws.Conn) {

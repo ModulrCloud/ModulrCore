@@ -1,5 +1,7 @@
 package structures
 
+import "encoding/json"
+
 // ChainCursor is the permanent state descriptor stored in STATE DB under CHAIN_CURSOR key.
 // It is the single source of truth for everything related to block execution
 // (consensus position + permanent world-state metadata). There is no separate
@@ -23,6 +25,11 @@ type ChainCursor struct {
 	HeightOffset int64 `json:"heightOffset"`
 	EpochOffset  int   `json:"epochOffset"`
 
+	// LastExecutedLocalHeight is the execution-thread cursor inside the current
+	// network era. It resets on recovery while Statistics.LastHeight continues
+	// tracking the global historical height.
+	LastExecutedLocalHeight int64 `json:"lastExecutedLocalHeight"`
+
 	NetworkId string `json:"networkId"`
 
 	CoreMajorVersion  int               `json:"coreMajorVersion"`
@@ -35,4 +42,31 @@ type ChainCursor struct {
 
 	// EpochStatistics tracks metrics within the current epoch (reset on epoch rotation).
 	EpochStatistics *Statistics `json:"epochStatistics,omitempty"`
+}
+
+func (cursor *ChainCursor) UnmarshalJSON(data []byte) error {
+	type alias ChainCursor
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	var aux alias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*cursor = ChainCursor(aux)
+	if _, ok := raw["lastExecutedLocalHeight"]; !ok {
+		cursor.LastExecutedLocalHeight = -1
+		if cursor.Statistics != nil {
+			cursor.LastExecutedLocalHeight = cursor.Statistics.LastHeight - cursor.HeightOffset
+			if cursor.LastExecutedLocalHeight < -1 {
+				cursor.LastExecutedLocalHeight = -1
+			}
+		}
+	}
+
+	return nil
 }

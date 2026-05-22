@@ -28,12 +28,13 @@ func TestApplyRecoveryTransitionStagesNewNetworkAndCleansRecoveryState(t *testin
 	mustPutJSONToStateDB(t, constants.DBKeyPrefixRecoveryData+"42", structures.RecoveryData{LastAbsoluteHeight: 42})
 
 	cursor := &structures.ChainCursor{
-		NetworkId:         "old-network",
-		CoreMajorVersion:  1,
-		NetworkParameters: structures.NetworkParameters{QuorumSize: 1},
-		EpochDataHandler:  structures.EpochDataHandler{Id: 3, Hash: "old-epoch"},
-		Statistics:        &structures.Statistics{LastHeight: 42, BlocksGenerated: 9},
-		EpochStatistics:   &structures.Statistics{LastHeight: 42, BlocksGenerated: 3},
+		NetworkId:               "old-network",
+		CoreMajorVersion:        1,
+		NetworkParameters:       structures.NetworkParameters{QuorumSize: 1},
+		EpochDataHandler:        structures.EpochDataHandler{Id: 3, Hash: "old-epoch"},
+		LastExecutedLocalHeight: 42,
+		Statistics:              &structures.Statistics{LastHeight: 42, BlocksGenerated: 9},
+		EpochStatistics:         &structures.Statistics{LastHeight: 42, BlocksGenerated: 3},
 	}
 	genesisParams := structures.NetworkParameters{QuorumSize: 2, EpochDuration: 10_000, LeadershipDuration: 1_000}
 	genesis := structures.Genesis{
@@ -78,8 +79,11 @@ func TestApplyRecoveryTransitionStagesNewNetworkAndCleansRecoveryState(t *testin
 		t.Fatalf("failed to commit recovery transition batch: %v", err)
 	}
 
-	if cursor.EpochOffset != 4 || cursor.NetworkId != genesis.NetworkId || cursor.CoreMajorVersion != genesis.CoreMajorVersion {
+	if cursor.HeightOffset != 43 || cursor.EpochOffset != 4 || cursor.NetworkId != genesis.NetworkId || cursor.CoreMajorVersion != genesis.CoreMajorVersion {
 		t.Fatalf("unexpected cursor after recovery transition: %+v", cursor)
+	}
+	if cursor.LastExecutedLocalHeight != -1 {
+		t.Fatalf("expected recovery transition to reset local execution cursor, got %d", cursor.LastExecutedLocalHeight)
 	}
 	if !reflect.DeepEqual(cursor.NetworkParameters, genesisParams) {
 		t.Fatalf("unexpected cursor network params: %+v", cursor.NetworkParameters)
@@ -89,7 +93,10 @@ func TestApplyRecoveryTransitionStagesNewNetworkAndCleansRecoveryState(t *testin
 		len(cursor.EpochDataHandler.LeadersSequence) != len(genesis.Validators) {
 		t.Fatalf("unexpected recovery genesis epoch handler: %+v", cursor.EpochDataHandler)
 	}
-	if cursor.EpochStatistics == nil || cursor.EpochStatistics.LastHeight != cursor.Statistics.LastHeight || cursor.EpochStatistics.BlocksGenerated != 0 {
+	if cursor.Statistics == nil || cursor.Statistics.LastHeight != 42 || cursor.Statistics.BlocksGenerated != 9 {
+		t.Fatalf("expected recovery transition to preserve lifetime statistics, got %+v", cursor.Statistics)
+	}
+	if cursor.EpochStatistics == nil || cursor.EpochStatistics.LastHeight != -1 || cursor.EpochStatistics.BlocksGenerated != 0 {
 		t.Fatalf("unexpected reset epoch statistics: %+v", cursor.EpochStatistics)
 	}
 

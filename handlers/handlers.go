@@ -59,9 +59,10 @@ var EXECUTION_THREAD_METADATA = struct {
 	ValidatorsTouched       map[string]*structures.ValidatorStorage
 }{
 	ChainCursor: structures.ChainCursor{
-		CoreMajorVersion: -1,
-		Statistics:       &structures.Statistics{LastHeight: -1},
-		EpochStatistics:  &structures.Statistics{LastHeight: -1},
+		CoreMajorVersion:        -1,
+		LastExecutedLocalHeight: -1,
+		Statistics:              &structures.Statistics{LastHeight: -1},
+		EpochStatistics:         &structures.Statistics{LastHeight: -1},
 	},
 	AccountsCache:           make(map[string]*structures.Account),
 	AccountsCacheMax:        constants.DefaultAccountsCacheMax,

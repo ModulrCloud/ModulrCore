@@ -52,12 +52,14 @@ func ApplyRecoveryTransition(cursor *structures.ChainCursor, stateBatch *leveldb
 		return err
 	}
 
+	cursor.HeightOffset = plan.LastAbsoluteHeight + 1
 	cursor.EpochOffset = plan.LastEpochIndex + 1
+	cursor.LastExecutedLocalHeight = -1
 	cursor.NetworkId = plan.Genesis.NetworkId
 	cursor.CoreMajorVersion = plan.Genesis.CoreMajorVersion
 	cursor.NetworkParameters = plan.Genesis.NetworkParameters.CopyNetworkParameters()
 	cursor.EpochDataHandler = *nextEpochHandler
-	cursor.EpochStatistics = &structures.Statistics{LastHeight: cursor.Statistics.LastHeight}
+	cursor.EpochStatistics = &structures.Statistics{LastHeight: -1}
 
 	snapshot := structures.EpochDataSnapshot{
 		EpochDataHandler:  *nextEpochHandler,

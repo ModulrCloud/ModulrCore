@@ -49,11 +49,9 @@ var (
 func BlockExecutionThread() {
 	for {
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		var nextHeight int64
-		if handlers.EXECUTION_THREAD_METADATA.ChainCursor.Statistics != nil {
-			nextHeight = handlers.EXECUTION_THREAD_METADATA.ChainCursor.Statistics.LastHeight + 1
-		}
-		currentEpochId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler.Id
+		cursorSnapshot := handlers.EXECUTION_THREAD_METADATA.ChainCursor
+		nextHeight := cursorSnapshot.LastExecutedLocalHeight + 1
+		currentEpochId := cursorSnapshot.EpochDataHandler.Id
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 		heightProof, block := fetchAggregatedHeightProofAndBlock(int(nextHeight))
@@ -698,6 +696,8 @@ func persistTouchedState(stateBatch *leveldb.Batch) {
 func updateExecutionStatistics(block *block_pack.Block, currentBlockId string, blockFees uint64, stateBatch *leveldb.Batch, cursor *structures.ChainCursor) string {
 	blockHash := block.GetHashForNetwork(cursor.NetworkId)
 
+	localHeight := cursor.LastExecutedLocalHeight + 1
+	cursor.LastExecutedLocalHeight = localHeight
 	cursor.Statistics.LastHeight++
 	cursor.Statistics.LastBlockHash = blockHash
 	cursor.Statistics.TotalFees += blockFees
@@ -706,10 +706,10 @@ func updateExecutionStatistics(block *block_pack.Block, currentBlockId string, b
 	cursor.EpochStatistics.TotalFees += blockFees
 	cursor.EpochStatistics.BlocksGenerated++
 
-	cursor.EpochStatistics.LastHeight = cursor.Statistics.LastHeight
+	cursor.EpochStatistics.LastHeight = localHeight
 	cursor.EpochStatistics.LastBlockHash = blockHash
 
-	stateBatch.Put([]byte(fmt.Sprintf(constants.DBKeyPrefixBlockIndex+"%d", toAbsoluteHeight(cursor.Statistics.LastHeight))), []byte(currentBlockId))
+	stateBatch.Put([]byte(fmt.Sprintf(constants.DBKeyPrefixBlockIndex+"%d", toAbsoluteHeight(localHeight))), []byte(currentBlockId))
 
 	if err := applyRecoveryTransitionIfNeeded(cursor, stateBatch); err != nil {
 		panic("Impossible to apply recovery transition: " + err.Error())

@@ -98,6 +98,8 @@ go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majori
 
 go run ./tests_e2e/harness scenario recovery_script_style
 
+go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -309,22 +311,28 @@ verifies that the majority returns valid signed responses for the same latest
 core quorum. The stale anchor must report `memory_catchup`, proving it caught up
 to its peers at runtime and still participates in the recovery majority.
 
+### `recovery_full_cycle_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
+```
+
+This scenario verifies the recovery lifecycle past the script-style collection
+step. It starts a fast `4 core + 4 anchors` network, waits until anchors know the
+first core quorum transition (`0 -> 1` by default), stops the original network,
+restarts an anchor majority in `RECOVERY_MODE`, and verifies that their signed
+`/recovery/latest_core_quorum` responses agree. The harness then registers a
+signed recovery plan in each core node's persistent `STATE`, switches core
+genesis to a new recovery network id, restarts the recovered `4 core + 4 anchors`
+network, and checks that core applies the recovery transition, avoids
+`network id mismatch`, advances height, and collects a new anchor epoch ACK
+proof.
+
 ## Planned Scenarios
 
 These scenarios are the next E2E roadmap. They focus on longer live runtime,
 process restarts, recovery drills, and failure modes that are difficult to prove
 with unit or integration tests alone.
-
-### `recovery_full_cycle_smoke`
-
-Run the recovery flow end-to-end, beyond just collecting anchor recovery
-responses. The scenario should start a `4 core + 4 anchors` network, advance it
-to a later core epoch, stop the core network, restart an anchor majority in
-`RECOVERY_MODE`, and collect matching signed `/recovery/latest_core_quorum`
-responses. It should then build/apply recovery data for a new core run and verify
-that the recovered core network starts from the recovery transition without
-`network id mismatch`, continues producing blocks, rotates epochs, and can again
-interact with anchors through the normal proof/ACK flow.
 
 ### `long_running_stability`
 

@@ -506,6 +506,8 @@ func setGenesisToState() error {
 	cursor.CoreMajorVersion = globals.GENESIS.CoreMajorVersion
 	cursor.NetworkId = globals.GENESIS.NetworkId
 
+	cursor.LastExecutedLocalHeight = -1
+
 	// EpochStatistics resets on every (re)bootstrap — the new genesis starts a fresh epoch 0.
 	cursor.EpochStatistics = &structures.Statistics{LastHeight: -1}
 
