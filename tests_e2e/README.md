@@ -96,6 +96,8 @@ go run ./tests_e2e/harness scenario multi_node_lagging_anchor_catchup
 
 go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majority
 
+go run ./tests_e2e/harness scenario recovery_script_style
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -292,6 +294,21 @@ only `2/4` anchors in `RECOVERY_MODE`, and verifies that their individual
 signed `/recovery/core_quorum/2` responses are valid but still below the
 required `3/4` anchor majority.
 
+### `recovery_script_style`
+
+```bash
+go run ./tests_e2e/harness scenario recovery_script_style
+```
+
+This scenario models the future recovery client flow. It starts a fast
+`4 core + 4 anchors` network, snapshots one anchor after it has durable epoch
+`1`, advances the full network to at least epoch `2`, restores the stale anchor
+snapshot, and restarts exactly `3/4` anchors in `RECOVERY_MODE`. The harness then
+queries `/recovery/latest_core_quorum` from all three recovery anchors and
+verifies that the majority returns valid signed responses for the same latest
+core quorum. The stale anchor must report `memory_catchup`, proving it caught up
+to its peers at runtime and still participates in the recovery majority.
+
 ## Planned Scenarios
 
 These scenarios are the next E2E roadmap. They focus on longer live runtime,
@@ -332,12 +349,6 @@ Extend the harness proxy beyond hard blocking to simulate slow responses,
 timeouts, HTTP 500 responses, and flaky delivery. The scenario should verify
 that retry and backoff paths keep the network progressing and that no thread
 waits forever on a partial failure.
-
-### `recovery_script_style`
-
-Model the future recovery client flow end to end: query a majority of anchors,
-choose the latest agreed core quorum, request and verify the chain of recovery
-proofs, validate signatures, and then apply a recovery transition in core.
 
 ### `state_divergence_detection`
 
