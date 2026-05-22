@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -2107,11 +2108,12 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 			return fmt.Errorf("%s did not apply core quorum transition %d->%d: %w", anchorNode.Name, *targetEpoch-1, *targetEpoch, err)
 		}
 	}
-	recoveryHeight, err := waitForAllCoreHeightsEqual(coreNodes, 0, 30*time.Second)
+	recoveryHeights, err := waitForCoreHeightSnapshot(coreNodes, 0, 30*time.Second)
 	if err != nil {
 		printScenarioDiagnostics(state, 160)
 		return err
 	}
+	recoveryHeight := recoveryHeights.Max
 
 	manifest, err := loadManifest(manifestPath)
 	if err != nil {
@@ -2197,14 +2199,18 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 		printScenarioDiagnostics(state, 120)
 		return err
 	}
-	recoveryData, err := buildSignedRecoveryData(recoveryPayload.Proof.NextEpochID, recoveryHeight, recoveryGenesis, teamKey)
-	if err != nil {
-		printScenarioDiagnostics(state, 120)
-		return err
-	}
-
-	fmt.Printf("scenario recovery_full_cycle_smoke: registering recovery plan at height %d and network %s\n", recoveryHeight, recoveryGenesis.NetworkId)
+	fmt.Printf("scenario recovery_full_cycle_smoke: registering recovery plans at heights %d..%d and network %s\n", recoveryHeights.Min, recoveryHeights.Max, recoveryGenesis.NetworkId)
 	for _, coreNode := range coreNodes {
+		nodeRecoveryHeight, ok := recoveryHeights.ByNode[coreNode.Name]
+		if !ok {
+			printScenarioDiagnostics(state, 120)
+			return fmt.Errorf("missing recovery height for %s", coreNode.Name)
+		}
+		recoveryData, err := buildSignedRecoveryData(recoveryPayload.Proof.NextEpochID, nodeRecoveryHeight, recoveryGenesis, teamKey)
+		if err != nil {
+			printScenarioDiagnostics(state, 120)
+			return err
+		}
 		if err := writeCoreRecoveryPlan(coreNode, recoveryData); err != nil {
 			printScenarioDiagnostics(state, 120)
 			return err
@@ -2279,7 +2285,7 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 		return fmt.Errorf("unexpected recovered anchor ACK proof: range %d->%d signatures=%d majority=%d", ack.EpochID, ack.NextEpochID, len(ack.Proofs), anchorMajority)
 	}
 
-	fmt.Printf("PASS recovery_full_cycle_smoke: anchor majority %d/%d agreed on %s at original height %d; recovered core network %s advanced %s global height to %d and collected ACK %d->%d (%d signatures)\n", len(recoverySigners), anchorCount, expectedRange, recoveryHeight, recoveryGenesis.NetworkId, recoveredCoreNode.Name, recoveredHeight, ack.EpochID, ack.NextEpochID, len(ack.Proofs))
+	fmt.Printf("PASS recovery_full_cycle_smoke: anchor majority %d/%d agreed on %s at original heights %d..%d; recovered core network %s advanced %s global height to %d and collected ACK %d->%d (%d signatures)\n", len(recoverySigners), anchorCount, expectedRange, recoveryHeights.Min, recoveryHeights.Max, recoveryGenesis.NetworkId, recoveredCoreNode.Name, recoveredHeight, ack.EpochID, ack.NextEpochID, len(ack.Proofs))
 	return nil
 }
 
@@ -2344,6 +2350,57 @@ func fetchLastHeight(client http.Client, lastHeightURL string) (int64, error) {
 		return -1, err
 	}
 	return payload.LastHeight, nil
+}
+
+type coreHeightSnapshot struct {
+	ByNode map[string]int64
+	Min    int64
+	Max    int64
+}
+
+func waitForCoreHeightSnapshot(nodes []NodeState, minHeight int64, timeout time.Duration) (coreHeightSnapshot, error) {
+	deadline := time.Now().Add(timeout)
+	client := http.Client{Timeout: 750 * time.Millisecond}
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		snapshot := coreHeightSnapshot{
+			ByNode: make(map[string]int64, len(nodes)),
+			Min:    math.MaxInt64,
+			Max:    -1,
+		}
+		allReady := true
+		for _, node := range nodes {
+			if err := assertNodeAlive(node); err != nil {
+				return coreHeightSnapshot{}, err
+			}
+			lastHeightURL := strings.TrimSuffix(node.HealthURL, "/live_stats") + "/last_height"
+			height, err := fetchLastHeight(client, lastHeightURL)
+			if err != nil {
+				lastErr = err
+				allReady = false
+				break
+			}
+			if height < minHeight {
+				lastErr = fmt.Errorf("%s height %d is below %d", node.Name, height, minHeight)
+				allReady = false
+				break
+			}
+			snapshot.ByNode[node.Name] = height
+			if height < snapshot.Min {
+				snapshot.Min = height
+			}
+			if height > snapshot.Max {
+				snapshot.Max = height
+			}
+		}
+		if allReady && len(snapshot.ByNode) == len(nodes) {
+			return snapshot, nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return coreHeightSnapshot{}, fmt.Errorf("core heights were not readable within %s: %v", timeout, lastErr)
 }
 
 func waitForAllCoreHeightsEqual(nodes []NodeState, minHeight int64, timeout time.Duration) (int64, error) {
