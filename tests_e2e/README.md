@@ -292,3 +292,64 @@ only `2/4` anchors in `RECOVERY_MODE`, and verifies that their individual
 signed `/recovery/core_quorum/2` responses are valid but still below the
 required `3/4` anchor majority.
 
+## Planned Scenarios
+
+These scenarios are the next E2E roadmap. They focus on longer live runtime,
+process restarts, recovery drills, and failure modes that are difficult to prove
+with unit or integration tests alone.
+
+### `long_running_stability`
+
+Run a `4 core + 4 anchors` network for many epochs, for example `10-20` fast
+epochs. The scenario should verify that execution, approvement, and finalization
+threads do not drift apart, stale ALFPs do not accumulate, and a majority of
+anchors agree on the latest recovery core quorum at the end of the run.
+
+### `restart_persistence`
+
+Start a multi-node network, let it reach a stable later epoch, stop all
+processes, and start the same run again from existing chaindata. The scenario
+should verify that core and anchors continue from persisted state without
+breaking network id checks, epoch cursors, proof storage, or DB layout
+assumptions.
+
+### `rolling_restarts`
+
+Restart core validators and anchors one by one while the network is live. The
+scenario should verify that temporary node restarts do not break quorum progress,
+ALFP delivery or pull fallback, anchor ACK collection, or recovery-facing state.
+
+### `bad_stale_proof_live_injection`
+
+Inject stale or tampered proofs through a proxy or fixture endpoint during a live
+run. The scenario should verify that nodes reject invalid runtime proofs and do
+not persist or apply them, even when the proof arrives through a normal network
+path.
+
+### `network_latency_partial_failures`
+
+Extend the harness proxy beyond hard blocking to simulate slow responses,
+timeouts, HTTP 500 responses, and flaky delivery. The scenario should verify
+that retry and backoff paths keep the network progressing and that no thread
+waits forever on a partial failure.
+
+### `recovery_script_style`
+
+Model the future recovery client flow end to end: query a majority of anchors,
+choose the latest agreed core quorum, request and verify the chain of recovery
+proofs, validate signatures, and then apply a recovery transition in core.
+
+### `state_divergence_detection`
+
+Create or observe incompatible local views across core validators or anchors.
+The scenario should verify that quorum logic does not merge incompatible views
+into a false proof; the system should either converge through valid upgrade
+paths or clearly refuse the conflicting state.
+
+### `real_transaction_flow_across_epochs`
+
+Submit real transactions before an epoch rotation, after an epoch rotation, and
+after a restart. The scenario should verify that user-facing execution state
+survives consensus transitions and restarts, not just that proof and health
+threads keep running.
+
