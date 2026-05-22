@@ -315,6 +315,17 @@ These scenarios are the next E2E roadmap. They focus on longer live runtime,
 process restarts, recovery drills, and failure modes that are difficult to prove
 with unit or integration tests alone.
 
+### `recovery_full_cycle_smoke`
+
+Run the recovery flow end-to-end, beyond just collecting anchor recovery
+responses. The scenario should start a `4 core + 4 anchors` network, advance it
+to a later core epoch, stop the core network, restart an anchor majority in
+`RECOVERY_MODE`, and collect matching signed `/recovery/latest_core_quorum`
+responses. It should then build/apply recovery data for a new core run and verify
+that the recovered core network starts from the recovery transition without
+`network id mismatch`, continues producing blocks, rotates epochs, and can again
+interact with anchors through the normal proof/ACK flow.
+
 ### `long_running_stability`
 
 Run a `4 core + 4 anchors` network for many epochs, for example `10-20` fast
