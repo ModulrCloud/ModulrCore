@@ -325,8 +325,18 @@ func LastMileFinalizerThread() {
 		if trackerIsFinalizer {
 			var previousProof *structures.AggregatedHeightProof
 			if currentHeight > 0 {
-				previousProof = LoadAggregatedHeightProof(int(currentHeight - 1))
-				if previousProof == nil {
+				previousProofRequired := true
+				if currentHeightInEpoch == 0 {
+					if previousBoundary := utils.LoadLastMileEpochBoundary(tracker.EpochId - 1); previousBoundary != nil &&
+						currentHeight == previousBoundary.FinishedOnHeight+1 {
+						previousProofRequired = false
+					}
+				}
+
+				if previousProofRequired {
+					previousProof = LoadAggregatedHeightProof(int(currentHeight - 1))
+				}
+				if previousProofRequired && previousProof == nil {
 					time.Sleep(200 * time.Millisecond)
 					continue
 				}
