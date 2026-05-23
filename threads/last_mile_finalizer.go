@@ -788,9 +788,6 @@ func syncLastMileTrackerToCurrentEpochStart(
 	if tracker == nil || currentEpochHandler == nil || currentEpochHandler.Id <= 0 || tracker.EpochId >= currentEpochHandler.Id {
 		return nil, false
 	}
-	if tracker.NextHeight > 0 && !utils.HasLocallySequencedFullEpoch(tracker.EpochId) {
-		return nil, false
-	}
 
 	proof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id - 1)
 	if proof == nil || proof.NextEpochId != currentEpochHandler.Id {
@@ -821,7 +818,14 @@ func syncLastMileTrackerToCurrentEpochStart(
 		HeightInEpoch: 0,
 	}
 
-	if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileFinalizerTracker, nextTracker, nil); err != nil {
+	provenBoundary := newLastMileEpochBoundary(
+		proof.EpochId,
+		proof.FinishedOnHeight,
+		proof.FinishedOnBlockId,
+		proof.FinishedOnHash,
+	)
+
+	if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileFinalizerTracker, nextTracker, provenBoundary); err != nil {
 		utils.LogWithTime(
 			fmt.Sprintf("Last mile sequencer: failed to persist catch-up tracker sync to epoch %d: %v", currentEpochHandler.Id, err),
 			utils.RED_COLOR,
