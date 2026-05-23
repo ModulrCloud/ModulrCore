@@ -2034,7 +2034,7 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 	runID := fs.String("run-id", "recovery-full-cycle-smoke-"+time.Now().UTC().Format("20060102T150405Z"), "run identifier")
 	coreRepo := fs.String("core-repo", ".", "path to modulr-core repository")
 	anchorsRepo := fs.String("anchors-repo", "../modulr-anchors-core", "path to modulr-anchors-core repository")
-	basePort := fs.Int("base-port", 49000, "base TCP port for generated configs")
+	basePort := fs.Int("base-port", 0, "base TCP port for generated configs; 0 auto-selects a free range")
 	healthTimeout := fs.Duration("health-timeout", 90*time.Second, "timeout for startup health checks")
 	observeTimeout := fs.Duration("observe-timeout", 240*time.Second, "timeout for observing recovery full cycle")
 	targetEpoch := fs.Int("target-epoch", 1, "core epoch to reach before collecting anchor recovery majority")
@@ -2047,6 +2047,19 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 
 	const coreCount = 4
 	const anchorCount = 4
+	selectedBasePort := *basePort
+	if selectedBasePort == 0 {
+		var err error
+		selectedBasePort, err = findAvailableGeneratedBasePort(35000, 4000, coreCount, anchorCount)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("scenario recovery_full_cycle_smoke: auto-selected base-port %d\n", selectedBasePort)
+	}
+	if err := ensureGeneratedPortsAvailable(selectedBasePort, coreCount, anchorCount); err != nil {
+		return err
+	}
+
 	runDir := filepath.Join(*runRoot, *runID)
 	manifestPath := filepath.Join(runDir, "manifest.json")
 	fmt.Printf("scenario recovery_full_cycle_smoke: preparing %d core + %d anchors run %s\n", coreCount, anchorCount, *runID)
@@ -2057,7 +2070,7 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 		"-run-id", *runID,
 		"-core-repo", *coreRepo,
 		"-anchors-repo", *anchorsRepo,
-		"-base-port", fmt.Sprint(*basePort),
+		"-base-port", fmt.Sprint(selectedBasePort),
 		"-core-epoch-duration-ms", "10000",
 		"-core-leadership-duration-ms", "1800",
 		"-core-block-time-ms", "800",
@@ -2286,6 +2299,52 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 	}
 
 	fmt.Printf("PASS recovery_full_cycle_smoke: anchor majority %d/%d agreed on %s at original heights %d..%d; recovered core network %s advanced %s global height to %d and collected ACK %d->%d (%d signatures)\n", len(recoverySigners), anchorCount, expectedRange, recoveryHeights.Min, recoveryHeights.Max, recoveryGenesis.NetworkId, recoveredCoreNode.Name, recoveredHeight, ack.EpochID, ack.NextEpochID, len(ack.Proofs))
+	return nil
+}
+
+func findAvailableGeneratedBasePort(startBasePort, stride int, coreCount, anchorCount int) (int, error) {
+	if stride < 3004 {
+		return 0, errors.New("port stride must be at least 3004")
+	}
+	for basePort := startBasePort; basePort <= 65535; basePort += stride {
+		if err := ensureGeneratedPortsAvailable(basePort, coreCount, anchorCount); err == nil {
+			return basePort, nil
+		}
+	}
+	return 0, fmt.Errorf("could not find a free generated port range from base %d with stride %d", startBasePort, stride)
+}
+
+func ensureGeneratedPortsAvailable(basePort, coreCount, anchorCount int) error {
+	ports := generatedNodePorts(basePort, coreCount, anchorCount)
+	for _, port := range ports {
+		if port < 1 || port > 65535 {
+			return fmt.Errorf("generated port %d from base-port %d is outside valid TCP range", port, basePort)
+		}
+		if err := checkPortAvailable(port); err != nil {
+			return fmt.Errorf("generated port %d from base-port %d is unavailable: %w", port, basePort, err)
+		}
+	}
+	return nil
+}
+
+func generatedNodePorts(basePort, coreCount, anchorCount int) []int {
+	ports := make([]int, 0, coreCount*2+anchorCount*2)
+	for idx := 0; idx < coreCount; idx++ {
+		ports = append(ports, basePort+idx, basePort+1000+idx)
+	}
+	for idx := 0; idx < anchorCount; idx++ {
+		ports = append(ports, basePort+2000+idx, basePort+3000+idx)
+	}
+	return ports
+}
+
+func checkPortAvailable(port int) error {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+	_ = listener.Close()
+
 	return nil
 }
 
