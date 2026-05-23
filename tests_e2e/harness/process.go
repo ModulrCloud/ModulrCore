@@ -87,7 +87,8 @@ func statusCmd(args []string) error {
 		return err
 	}
 
-	state, err := loadState(*runDir)
+	resolvedRunDir := resolveRunDirForState(*runDir)
+	state, err := loadState(resolvedRunDir)
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,8 @@ func logsCmd(args []string) error {
 		return errors.New("missing -node")
 	}
 
-	state, err := loadState(*runDir)
+	resolvedRunDir := resolveRunDirForState(*runDir)
+	state, err := loadState(resolvedRunDir)
 	if err != nil {
 		return err
 	}
@@ -141,7 +143,8 @@ func stopCmd(args []string) error {
 		return err
 	}
 
-	state, err := loadState(*runDir)
+	resolvedRunDir := resolveRunDirForState(*runDir)
+	state, err := loadState(resolvedRunDir)
 	if err != nil {
 		return err
 	}
@@ -313,6 +316,20 @@ func loadState(runDir string) (RunState, error) {
 		return RunState{}, err
 	}
 	return state, nil
+}
+
+func resolveRunDirForState(runDir string) string {
+	if runDir != filepath.Join("tests_e2e", "runs", "latest") {
+		return runDir
+	}
+	if _, err := os.Stat(filepath.Join(runDir, "state.json")); err == nil {
+		return runDir
+	}
+	scenarioLatest := filepath.Join("tests_e2e", "runs", "scenarios", "latest")
+	if _, err := os.Stat(filepath.Join(scenarioLatest, "state.json")); err == nil {
+		return scenarioLatest
+	}
+	return runDir
 }
 
 func writeState(runDir string, state RunState) error {

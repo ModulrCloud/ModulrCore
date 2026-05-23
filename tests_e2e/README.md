@@ -100,6 +100,8 @@ go run ./tests_e2e/harness scenario recovery_script_style
 
 go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
 
+go run ./tests_e2e/harness scenario long_running_stability
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -119,6 +121,8 @@ Use `-core-command` and `-anchor-command` if you want to run prebuilt binaries
 instead of `go run .`.
 If you reuse a `-run-id`, pass `-overwrite` to remove the previous generated
 chaindata first. Scenario commands do this automatically.
+`status`, `logs`, and `stop` default to the latest manual run; if no manual run
+exists, they fall back to the latest scenario run under `tests_e2e/runs/scenarios/latest`.
 
 ## Manifest Format
 
@@ -328,18 +332,35 @@ network, and checks that core applies the recovery transition, avoids
 `network id mismatch`, advances height, and collects a new anchor epoch ACK
 proof.
 
+### `long_running_stability`
+
+```bash
+go run ./tests_e2e/harness scenario long_running_stability
+```
+
+This scenario verifies that a live `4 core + 4 anchors` network remains stable
+across many fast epochs. By default it waits until anchors apply core transition
+`9 -> 10`, verifies every anchor ACK proof from `0 -> 1` through `9 -> 10` has
+anchor-majority signatures, checks that core heights advanced and all nodes are
+still alive, and then requires every core validator to keep increasing its
+executed block height after the long run point. It then restarts an anchor
+majority in `RECOVERY_MODE` and verifies their signed
+`/recovery/latest_core_quorum` responses agree on the latest core quorum.
+While waiting, the scenario prints a progress line for every applied core
+transition, for example `anchors applied core transition 42->43 (43/100)`.
+
+Useful flags:
+
+```bash
+go run ./tests_e2e/harness scenario long_running_stability -target-epoch 15
+go run ./tests_e2e/harness scenario long_running_stability -target-epoch 20 -observe-timeout 8m
+```
+
 ## Planned Scenarios
 
 These scenarios are the next E2E roadmap. They focus on longer live runtime,
 process restarts, recovery drills, and failure modes that are difficult to prove
 with unit or integration tests alone.
-
-### `long_running_stability`
-
-Run a `4 core + 4 anchors` network for many epochs, for example `10-20` fast
-epochs. The scenario should verify that execution, approvement, and finalization
-threads do not drift apart, stale ALFPs do not accumulate, and a majority of
-anchors agree on the latest recovery core quorum at the end of the run.
 
 ### `restart_persistence`
 
