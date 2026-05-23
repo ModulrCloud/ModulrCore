@@ -102,6 +102,8 @@ go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
 
 go run ./tests_e2e/harness scenario long_running_stability
 
+go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down
+
 go run ./tests_e2e/harness start \
   -manifest tests_e2e/runs/latest/manifest.json \
   -health-timeout 25s
@@ -355,6 +357,41 @@ Useful flags:
 go run ./tests_e2e/harness scenario long_running_stability -target-epoch 15
 go run ./tests_e2e/harness scenario long_running_stability -target-epoch 20 -observe-timeout 8m
 ```
+
+### `long_running_stability_with_temporary_validator_down`
+
+```bash
+go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down
+```
+
+This scenario verifies that the core network keeps progressing with one core
+validator temporarily offline, and that the stopped validator can restart from
+the same chaindata and resume its execution thread. It starts a fast
+`4 core + 4 anchors` network, stops one core validator after a configured epoch,
+keeps it down for a configured number of transitions, checks that the remaining
+`3/4` validators keep advancing, then restarts the stopped validator and checks
+that its executed height increases. To prove the recovered validator is actually
+needed for the quorum path, the scenario then stops a different core validator;
+the active `3/4` set must include the recovered validator and continue advancing
+through more core transitions.
+
+Useful flags:
+
+```bash
+go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down \
+  -target-epoch 20 \
+  -down-at-epoch 4 \
+  -down-epochs 4 \
+  -validator core-4 \
+  -second-validator core-3 \
+  -second-down-epochs 4
+```
+
+The scenario prints progress for each core transition plus explicit messages
+when the validator is stopped, while the remaining validators advance, when it
+restarts, its executed height after restart, when the second validator is
+stopped, and whether the recovered validator is part of the active `3/4` set
+that keeps the network moving.
 
 ## Planned Scenarios
 
