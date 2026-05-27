@@ -99,6 +99,14 @@ func (h *Handler) OnMessage(connection *gws.Conn, message *gws.Message) {
 		}
 		GetEpochRotationProof(req, connection)
 
+	case constants.WsRouteSignEpochAnnouncementProof:
+		var req WsEpochAnnouncementProofRequest
+		if err := json.Unmarshal(message.Bytes(), &req); err != nil {
+			connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"invalid_epoch_announcement_proof_request"}`))
+			return
+		}
+		GetEpochAnnouncementProof(req, connection)
+
 	default:
 		connection.WriteMessage(gws.OpcodeText, []byte(`{"error":"unknown_type"}`))
 	}

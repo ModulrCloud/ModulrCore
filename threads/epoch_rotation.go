@@ -225,6 +225,7 @@ func EpochRotationThread() {
 
 						// Finally - assign new handler
 
+						prevEpochHandler := *epochHandlerRef
 						handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = nextEpochHandler
 
 						// Store epoch data snapshot for API/finalization right away,
@@ -262,6 +263,8 @@ func EpochRotationThread() {
 						// New HTTP/WebSocket handlers can now call RLock() as usual
 
 						globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Store(true)
+
+						go utils.AnnounceEpochAfterRotation(prevEpochHandler.Id, nextEpochId, prevEpochHandler)
 
 						//_______________________Check the version required for the next epoch________________________
 

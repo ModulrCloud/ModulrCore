@@ -96,6 +96,10 @@ func PoDOutboxIdForAggregatedEpochRotationProof(epochId int) string {
 	return fmt.Sprintf(constants.DBKeyPrefixAggregatedEpochRotationProof+"%d", epochId)
 }
 
+func PoDOutboxIdForEpochAnnouncementProof(nextEpochId int) string {
+	return fmt.Sprintf(constants.DBKeyPrefixEpochAnnouncementProof+"%d", nextEpochId)
+}
+
 func PoDOutboxIdForAggregatedAnchorEpochAckProof(nextEpochId int) string {
 	return fmt.Sprintf(constants.DBKeyPrefixAggregatedAnchorEpochAckProof+"%d", nextEpochId)
 }

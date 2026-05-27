@@ -257,6 +257,32 @@ func LoadAggregatedHeightProof(absoluteHeight int) *structures.AggregatedHeightP
 	return &proof
 }
 
+func StoreEpochAnnouncementProof(proof *structures.AggregatedEpochAnnouncementProof) {
+	if proof == nil {
+		return
+	}
+	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixEpochAnnouncementProof, proof.NextEpochId))
+	if value, err := json.Marshal(proof); err == nil {
+		_ = databases.FINALIZATION_THREAD_METADATA.Put(key, value, nil)
+	}
+}
+
+func LoadEpochAnnouncementProof(nextEpochId int) *structures.AggregatedEpochAnnouncementProof {
+	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixEpochAnnouncementProof, nextEpochId))
+
+	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+
+	var proof structures.AggregatedEpochAnnouncementProof
+	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+
+	return &proof
+}
+
 // LoadAggregatedHeightProofInfo reads an AggregatedHeightProof from FINALIZATION_THREAD_METADATA
 // and returns a summary suitable for lightweight callers.
 func LoadAggregatedHeightProofInfo(absoluteHeight int) *structures.AggregatedHeightProofInfo {

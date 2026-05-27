@@ -6,6 +6,10 @@ type AcceptLeaderFinalizationProofRequest struct {
 	LeaderFinalizations []AggregatedLeaderFinalizationProof `json:"leaderFinalizations"`
 }
 
+type AcceptEpochAnnouncementProofRequest struct {
+	Proof AggregatedEpochAnnouncementProof `json:"proof"`
+}
+
 type AggregatedLeaderFinalizationProof struct {
 	EpochIndex int               `json:"epochIndex"`
 	Leader     string            `json:"leader"`

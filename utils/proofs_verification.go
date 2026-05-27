@@ -149,6 +149,19 @@ func BuildEpochRotationProofSigningPayload(
 	}, ":")
 }
 
+func BuildEpochAnnouncementProofSigningPayload(
+	epochId int,
+	nextEpochId int,
+	epochDataHash string,
+) string {
+	return strings.Join([]string{
+		constants.SigningPrefixEpochAnnouncement,
+		strconv.Itoa(epochId),
+		strconv.Itoa(nextEpochId),
+		epochDataHash,
+	}, ":")
+}
+
 func VerifyAggregatedEpochRotationProof(proof *structures.AggregatedEpochRotationProof, epochHandler *structures.EpochDataHandler) bool {
 	if proof == nil || epochHandler == nil {
 		return false
@@ -172,6 +185,31 @@ func VerifyAggregatedEpochRotationProof(proof *structures.AggregatedEpochRotatio
 		proof.FinishedOnHeight,
 		proof.FinishedOnBlockId,
 		proof.FinishedOnHash,
+	)
+	okSignatures := countVerifiedUniqueSignatures(proof.Proofs, allowedPubkeysMap(epochHandler.Quorum), dataToVerify)
+
+	return okSignatures >= majority
+}
+
+func VerifyAggregatedEpochAnnouncementProof(proof *structures.AggregatedEpochAnnouncementProof, epochHandler *structures.EpochDataHandler) bool {
+	if proof == nil || epochHandler == nil || len(proof.Proofs) == 0 || proof.EpochDataHash == "" {
+		return false
+	}
+
+	if proof.NextEpochId != proof.EpochId+1 || proof.EpochId != epochHandler.Id {
+		return false
+	}
+
+	recomputedHash := ComputeEpochDataHash(&proof.EpochData)
+	if recomputedHash == "" || recomputedHash != proof.EpochDataHash {
+		return false
+	}
+
+	majority := GetQuorumMajority(epochHandler)
+	dataToVerify := BuildEpochAnnouncementProofSigningPayload(
+		proof.EpochId,
+		proof.NextEpochId,
+		proof.EpochDataHash,
 	)
 	okSignatures := countVerifiedUniqueSignatures(proof.Proofs, allowedPubkeysMap(epochHandler.Quorum), dataToVerify)
 

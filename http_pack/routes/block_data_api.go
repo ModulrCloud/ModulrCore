@@ -202,6 +202,30 @@ func GetFirstBlockInEpoch(ctx *fasthttp.RequestCtx) {
 	helpers.WriteJSON(ctx, fasthttp.StatusOK, proof)
 }
 
+func GetEpochAnnouncementProof(ctx *fasthttp.RequestCtx) {
+	nextEpochRaw := ctx.UserValue("nextEpochId")
+	nextEpochStr, ok := nextEpochRaw.(string)
+
+	if !ok || nextEpochStr == "" {
+		helpers.WriteErr(ctx, fasthttp.StatusBadRequest, "Invalid nextEpochId")
+		return
+	}
+
+	nextEpochId, err := strconv.Atoi(nextEpochStr)
+	if err != nil {
+		helpers.WriteErr(ctx, fasthttp.StatusBadRequest, "Invalid nextEpochId")
+		return
+	}
+
+	proof := utils.LoadEpochAnnouncementProof(nextEpochId)
+	if proof == nil {
+		helpers.WriteErr(ctx, fasthttp.StatusNotFound, "Not found")
+		return
+	}
+
+	helpers.WriteJSON(ctx, fasthttp.StatusOK, proof)
+}
+
 func GetAggregatedFinalizationProof(ctx *fasthttp.RequestCtx) {
 	blockIdRaw := ctx.UserValue("blockId")
 	blockId, ok := blockIdRaw.(string)

@@ -131,6 +131,18 @@ type WsEpochRotationProofResponse struct {
 	Sig   string `json:"sig"`
 }
 
+type WsEpochAnnouncementProofRequest struct {
+	Route         string `json:"route"`
+	EpochId       int    `json:"epochId"`
+	NextEpochId   int    `json:"nextEpochId"`
+	EpochDataHash string `json:"epochDataHash"`
+}
+
+type WsEpochAnnouncementProofResponse struct {
+	Voter string `json:"voter"`
+	Sig   string `json:"sig"`
+}
+
 // PoD storage/retrieval for aggregated epoch rotation proofs
 
 type WsAggregatedEpochRotationProofStoreRequest struct {

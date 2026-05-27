@@ -696,6 +696,54 @@ func GetEpochRotationProof(parsedRequest WsEpochRotationProofRequest, connection
 	logEpochRotationProofReturn("marshal_response_failed", parsedRequest, err.Error())
 }
 
+func GetEpochAnnouncementProof(parsedRequest WsEpochAnnouncementProofRequest, connection *gws.Conn) {
+	if !globals.FLOOD_PREVENTION_FLAG_FOR_ROUTES.Load() {
+		sendNotReady(connection)
+		return
+	}
+
+	if parsedRequest.NextEpochId != parsedRequest.EpochId+1 || parsedRequest.EpochDataHash == "" {
+		sendNotReady(connection)
+		return
+	}
+
+	if getEpochHandlerForLeaderFinalization(parsedRequest.EpochId) == nil {
+		sendNotReady(connection)
+		return
+	}
+
+	localEpochData := utils.LoadNextEpochData(parsedRequest.NextEpochId)
+	if localEpochData == nil {
+		sendNotReady(connection)
+		return
+	}
+
+	localHash := utils.ComputeEpochDataHash(localEpochData)
+	if localHash == "" || localHash != parsedRequest.EpochDataHash {
+		sendNotReady(connection)
+		return
+	}
+
+	dataToSign := utils.BuildEpochAnnouncementProofSigningPayload(
+		parsedRequest.EpochId,
+		parsedRequest.NextEpochId,
+		parsedRequest.EpochDataHash,
+	)
+
+	response := WsEpochAnnouncementProofResponse{
+		Voter: globals.CONFIGURATION.PublicKey,
+		Sig:   cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataToSign),
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err == nil {
+		connection.WriteMessage(gws.OpcodeText, jsonResponse)
+		return
+	}
+
+	sendNotReady(connection)
+}
+
 func getBlockHashForHeightVoter(blockId string) string {
 	blockRaw, err := databases.BLOCKS.Get([]byte(blockId), nil)
 

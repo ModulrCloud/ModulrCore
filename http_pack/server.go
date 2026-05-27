@@ -28,6 +28,7 @@ func createRouter() fasthttp.RequestHandler {
 	r.GET("/epoch_stats", routes.GetCurrentEpochStats)
 	r.GET("/epoch_stats/{epochIndex}", routes.GetEpochStatsByEpochIndex)
 	r.GET("/aggregated_epoch_rotation_proof/{epochId}", routes.GetAggregatedEpochRotationProof)
+	r.GET("/epoch_announcement_proof/{nextEpochId}", routes.GetEpochAnnouncementProof)
 
 	// Information about statistics
 	r.GET("/live_stats", routes.GetLiveStats)

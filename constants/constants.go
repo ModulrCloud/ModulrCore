@@ -30,10 +30,13 @@ const (
 	WsRouteGetAggregatedLeaderFinalizationProof   = "get_aggregated_leader_finalization_proof"
 	WsRouteSignHeightProof                        = "sign_height_proof"
 	WsRouteSignEpochRotationProof                 = "sign_epoch_rotation_proof"
+	WsRouteSignEpochAnnouncementProof             = "sign_epoch_announcement_proof"
 	WsRouteAcceptAggregatedHeightProof            = "accept_aggregated_height_proof"
 	WsRouteGetAggregatedHeightProofFromPoD        = "get_aggregated_height_proof_from_pod"
 	WsRouteAcceptAggregatedEpochRotationProof     = "accept_aggregated_epoch_rotation_proof"
 	WsRouteGetAggregatedEpochRotationProofFromPoD = "get_aggregated_epoch_rotation_proof_from_pod"
+	WsRouteAcceptAggregatedEpochAnnouncementProof = "accept_aggregated_epoch_announcement_proof"
+	WsRouteGetEpochAnnouncementProofFromPoD       = "get_epoch_announcement_proof_from_pod"
 	WsRouteGetBlockByHeight                       = "get_block_by_height"
 	WsRouteAcceptAggregatedAnchorEpochAckProof    = "accept_aggregated_anchor_epoch_ack_proof"
 	WsRouteGetAnchorEpochAckFromPoD               = "get_anchor_epoch_ack_proof"
@@ -66,6 +69,7 @@ const (
 	DBKeyPrefixLastMileEpochBoundary        = "LAST_MILE_EPOCH_BOUNDARY:"
 	DBKeyPrefixAfp                          = "AFP:"
 	DBKeyPrefixAggregatedEpochRotationProof = "EPOCH_ROTATION_PROOF:"
+	DBKeyPrefixEpochAnnouncementProof       = "EPOCH_ANNOUNCEMENT_PROOF:"
 
 	DBKeyPrefixFirstBlockAggregatedHeightProof = "FIRST_BLOCK_AGGREGATED_HEIGHT_PROOF:"
 	DBKeyPrefixAggregatedAnchorEpochAckProof   = "ANCHOR_EPOCH_ACK_PROOF:"
@@ -77,6 +81,7 @@ const (
 // Signing prefixes (used as salts for cryptographic signatures).
 const (
 	SigningPrefixEpochRotationProof  = "EPOCH_ROTATION_PROOF"
+	SigningPrefixEpochAnnouncement   = "EPOCH_ANNOUNCEMENT_PROOF"
 	SigningPrefixDelayedOperations   = "SIG_DELAYED_OPERATIONS"
 	SigningPrefixHeightProof         = "HEIGHT_PROOF"
 	SigningPrefixLeaderFinalization  = "LEADER_FINALIZATION_PROOF"
