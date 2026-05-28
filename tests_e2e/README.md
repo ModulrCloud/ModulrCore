@@ -78,6 +78,8 @@ go run ./tests_e2e/harness scenario bootstrap_smoke
 
 go run ./tests_e2e/harness scenario alfp_pull_smoke
 
+go run ./tests_e2e/harness scenario early_epoch_announcement_alfp_smoke
+
 go run ./tests_e2e/harness scenario epoch_anchor_ack_smoke
 
 go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
