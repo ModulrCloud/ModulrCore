@@ -111,7 +111,76 @@ func getEpochHandlerForLeaderFinalization(epochIndex int) *structures.EpochDataH
 		return &snapshot.EpochDataHandler
 	}
 
+	if derived := deriveEpochHandlerFromNextEpochDataForRoute(epochIndex); derived != nil {
+		return derived
+	}
+
 	return nil
+}
+
+func deriveEpochHandlerFromNextEpochDataForRoute(epochIndex int) *structures.EpochDataHandler {
+	if epochIndex <= 0 {
+		return nil
+	}
+
+	prevEpochHandler := getEpochHandlerForLeaderFinalization(epochIndex - 1)
+	if prevEpochHandler == nil {
+		return nil
+	}
+
+	nextEpochData := utils.LoadNextEpochData(epochIndex)
+	if nextEpochData == nil {
+		proof := loadAggregatedEpochRotationProofForRoute(epochIndex - 1)
+		if proof == nil || proof.NextEpochId != epochIndex || !utils.VerifyAggregatedEpochRotationProof(proof, prevEpochHandler) {
+			return nil
+		}
+		nextEpochData = &proof.EpochData
+	}
+
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	networkParams := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	startTimestamp := nextEpochData.NextEpochStartTimestamp
+	if startTimestamp == 0 {
+		startTimestamp = prevEpochHandler.StartTimestamp + uint64(networkParams.EpochDuration)
+	}
+
+	currentLeaderIndex := 0
+	if networkParams.LeadershipDuration > 0 && len(nextEpochData.NextEpochLeadersSequence) > 0 {
+		now := utils.GetUTCTimestampInMilliSeconds()
+		if now >= int64(startTimestamp) {
+			currentLeaderIndex = int((now - int64(startTimestamp)) / networkParams.LeadershipDuration)
+			if currentLeaderIndex > len(nextEpochData.NextEpochLeadersSequence) {
+				currentLeaderIndex = len(nextEpochData.NextEpochLeadersSequence)
+			}
+		}
+	}
+
+	return &structures.EpochDataHandler{
+		Id:                 epochIndex,
+		Hash:               nextEpochData.NextEpochHash,
+		ValidatorsRegistry: nextEpochData.NextEpochValidatorsRegistry,
+		Quorum:             nextEpochData.NextEpochQuorum,
+		LeadersSequence:    nextEpochData.NextEpochLeadersSequence,
+		StartTimestamp:     startTimestamp,
+		CurrentLeaderIndex: currentLeaderIndex,
+	}
+}
+
+func loadAggregatedEpochRotationProofForRoute(epochIndex int) *structures.AggregatedEpochRotationProof {
+	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedEpochRotationProof, epochIndex))
+	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+
+	var proof structures.AggregatedEpochRotationProof
+	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+
+	return &proof
 }
 
 func getEpochSnapshotFromApprovementDB(epochIndex int) *structures.EpochDataSnapshot {

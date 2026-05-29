@@ -69,6 +69,7 @@ func prepareCmd(args []string) error {
 	coreWSBase := *basePort + 1000
 	anchorHTTPBase := *basePort + 2000
 	anchorWSBase := *basePort + 3000
+	loopbackHost := "127.0.0.1"
 
 	coreValidators := make([]map[string]any, 0, *coreCount)
 	coreState := make(map[string]any, *coreCount)
@@ -80,8 +81,8 @@ func prepareCmd(args []string) error {
 			"percentage":      percentageForIndex(idx, *coreCount),
 			"totalStaked":     uint64(50_000_000_000),
 			"stakers":         map[string]uint64{key.Pub: 50_000_000_000},
-			"validatorURL":    fmt.Sprintf("http://localhost:%d", httpPort),
-			"wssValidatorURL": fmt.Sprintf("ws://localhost:%d", wsPort),
+			"validatorURL":    fmt.Sprintf("http://%s:%d", loopbackHost, httpPort),
+			"wssValidatorURL": fmt.Sprintf("ws://%s:%d", loopbackHost, wsPort),
 		})
 		coreState[key.Pub] = map[string]any{"balance": uint64(20_000_000_000), "nonce": 0}
 	}
@@ -90,8 +91,8 @@ func prepareCmd(args []string) error {
 	for idx, key := range anchorKeys {
 		anchors = append(anchors, map[string]any{
 			"pubkey":       key.Pub,
-			"anchorURL":    fmt.Sprintf("http://localhost:%d", anchorHTTPBase+idx),
-			"wssAnchorURL": fmt.Sprintf("ws://localhost:%d", anchorWSBase+idx),
+			"anchorURL":    fmt.Sprintf("http://%s:%d", loopbackHost, anchorHTTPBase+idx),
+			"wssAnchorURL": fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase+idx),
 		})
 	}
 
@@ -119,7 +120,7 @@ func prepareCmd(args []string) error {
 
 	coreBootstrapNodes := make([]string, 0, *coreCount)
 	for idx := range coreKeys {
-		coreBootstrapNodes = append(coreBootstrapNodes, fmt.Sprintf("http://localhost:%d", coreHTTPBase+idx))
+		coreBootstrapNodes = append(coreBootstrapNodes, fmt.Sprintf("http://%s:%d", loopbackHost, coreHTTPBase+idx))
 	}
 	anchorNodes := make([]ManifestNode, 0, *anchorCount)
 	coreNodes := make([]ManifestNode, 0, *coreCount)
@@ -134,13 +135,13 @@ func prepareCmd(args []string) error {
 			"PUBLIC_KEY":                       key.Pub,
 			"PRIVATE_KEY":                      key.Prv,
 			"RECOVERY_MODE":                    false,
-			"POINT_OF_DISTRIBUTION_WS":         fmt.Sprintf("ws://localhost:%d", coreWSBase+idx),
-			"ANCHORS_POINT_OF_DISTRIBUTION_WS": fmt.Sprintf("ws://localhost:%d", anchorWSBase),
+			"POINT_OF_DISTRIBUTION_WS":         fmt.Sprintf("ws://%s:%d", loopbackHost, coreWSBase+idx),
+			"ANCHORS_POINT_OF_DISTRIBUTION_WS": fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase),
 			"DISABLE_POD_OUTBOX":               true,
 			"EXTRA_DATA_TO_BLOCK":              map[string]string{"e2e": "true", "node": nodeName},
 			"TXS_MEMPOOL_SIZE":                 300000,
 			"BOOTSTRAP_NODES":                  coreBootstrapNodes,
-			"MY_HOSTNAME":                      fmt.Sprintf("http://localhost:%d", coreHTTPBase+idx),
+			"MY_HOSTNAME":                      fmt.Sprintf("http://%s:%d", loopbackHost, coreHTTPBase+idx),
 			"INTERFACE":                        "127.0.0.1",
 			"PORT":                             coreHTTPBase + idx,
 			"WEBSOCKET_INTERFACE":              "127.0.0.1",
@@ -164,7 +165,7 @@ func prepareCmd(args []string) error {
 			RepoPath:      coreRepoAbs,
 			WorkDir:       absOrOriginal(chaindata),
 			ChaindataPath: absOrOriginal(chaindata),
-			HealthURL:     fmt.Sprintf("http://localhost:%d/live_stats", coreHTTPBase+idx),
+			HealthURL:     fmt.Sprintf("http://%s:%d/live_stats", loopbackHost, coreHTTPBase+idx),
 			Command:       coreNodeCommand,
 		})
 	}
@@ -185,7 +186,7 @@ func prepareCmd(args []string) error {
 			"PORT":                  anchorHTTPBase + idx,
 			"WEBSOCKET_INTERFACE":   "127.0.0.1",
 			"WEBSOCKET_PORT":        anchorWSBase + idx,
-			"POINT_OF_DISTRIBUTION": fmt.Sprintf("ws://localhost:%d", anchorWSBase+idx),
+			"POINT_OF_DISTRIBUTION": fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase+idx),
 			"CORE_BOOTSTRAP_NODES":  coreBootstrapNodes,
 		}
 		if err := writeJSON(filepath.Join(chaindata, "configs.json"), config); err != nil {
@@ -203,7 +204,7 @@ func prepareCmd(args []string) error {
 			RepoPath:      anchorsRepoAbs,
 			WorkDir:       anchorsRepoAbs,
 			ChaindataPath: absOrOriginal(chaindata),
-			HealthURL:     fmt.Sprintf("http://localhost:%d/core/quorum_state", anchorHTTPBase+idx),
+			HealthURL:     fmt.Sprintf("http://%s:%d/core/quorum_state", loopbackHost, anchorHTTPBase+idx),
 			Command:       anchorNodeCommand,
 		})
 	}

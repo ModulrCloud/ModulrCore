@@ -4,7 +4,6 @@
 package threads
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -531,71 +530,51 @@ func getAnchorBlockFromAnchorsNetworkById(blockID string) *anchors_pack.AnchorBl
 
 	client := &http.Client{Timeout: 2 * time.Second}
 
-	// Query a randomized list of anchors. The block may be replicated on peers even if its creator is down.
 	anchors := make([]structures.Anchor, 0, len(globals.ANCHORS))
+	creatorAnchors := make([]structures.Anchor, 0, 1)
 	for _, a := range globals.ANCHORS {
 		if a.AnchorUrl == "" {
 			continue
 		}
+		if a.Pubkey == creator {
+			creatorAnchors = append(creatorAnchors, a)
+			continue
+		}
 		anchors = append(anchors, a)
 	}
+
+	// Hit the creator first. Other anchors may legitimately return 404 before
+	// replication catches up, so querying them first only burns sockets.
+	anchors = append(creatorAnchors, anchors...)
 	if len(anchors) == 0 {
 		return nil
 	}
-	ANCHORS_POD_MISSES_MUTEX.Lock()
-	ANCHORS_HTTP_FALLBACK_RNG.Shuffle(len(anchors), func(i, j int) { anchors[i], anchors[j] = anchors[j], anchors[i] })
-	ANCHORS_POD_MISSES_MUTEX.Unlock()
-
-	resultChan := make(chan *anchors_pack.AnchorBlock, len(anchors))
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for _, anchor := range anchors {
-		wg.Add(1)
-		go func(endpoint string) {
-			defer wg.Done()
-
-			endpoint = strings.TrimRight(endpoint, "/")
-			req, err := http.NewRequestWithContext(ctx, "GET", endpoint+"/block/"+blockID, nil)
-			if err != nil {
-				return
-			}
-
-			resp, err := client.Do(req)
-			if err != nil || resp.StatusCode != http.StatusOK {
-				return
-			}
-			defer resp.Body.Close()
-
-			var b anchors_pack.AnchorBlock
-			if json.NewDecoder(resp.Body).Decode(&b) != nil {
-				return
-			}
-
-			// Sanity check: match requested ID and signature.
-			if b.Creator != creator || b.Index != index || !b.VerifySignature() {
-				return
-			}
-
-			select {
-			case resultChan <- &b:
-				cancel()
-			default:
-			}
-		}(anchor.AnchorUrl)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		if res != nil {
-			return res
+		endpoint := strings.TrimRight(anchor.AnchorUrl, "/")
+		resp, err := client.Get(endpoint + "/block/" + blockID)
+		if err != nil {
+			continue
 		}
+
+		if resp.StatusCode != http.StatusOK {
+			_ = resp.Body.Close()
+			continue
+		}
+
+		var b anchors_pack.AnchorBlock
+		decodeErr := json.NewDecoder(resp.Body).Decode(&b)
+		_ = resp.Body.Close()
+		if decodeErr != nil {
+			continue
+		}
+
+		// Sanity check: match requested ID and signature.
+		if b.Creator != creator || b.Index != index || !b.VerifySignature() {
+			continue
+		}
+
+		return &b
 	}
 
 	return nil

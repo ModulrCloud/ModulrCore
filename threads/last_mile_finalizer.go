@@ -629,7 +629,63 @@ func getEpochHandlerForTracker(epochId int) *structures.EpochDataHandler {
 		}
 	}
 
+	if derived := deriveEpochHandlerFromNextEpochData(epochId); derived != nil {
+		return derived
+	}
+
 	return nil
+}
+
+func deriveEpochHandlerFromNextEpochData(epochId int) *structures.EpochDataHandler {
+	if epochId <= 0 {
+		return nil
+	}
+
+	prevEpochHandler := getEpochHandlerForTracker(epochId - 1)
+	if prevEpochHandler == nil {
+		return nil
+	}
+
+	nextEpochData := utils.LoadNextEpochData(epochId)
+	if nextEpochData == nil {
+		proof := LoadAggregatedEpochRotationProof(epochId - 1)
+		if proof == nil || proof.NextEpochId != epochId || !utils.VerifyAggregatedEpochRotationProof(proof, prevEpochHandler) {
+			return nil
+		}
+		nextEpochData = &proof.EpochData
+	}
+
+	startTimestamp := nextEpochData.NextEpochStartTimestamp
+	if startTimestamp == 0 {
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+		epochDuration := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.EpochDuration
+		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+		startTimestamp = prevEpochHandler.StartTimestamp + uint64(epochDuration)
+	}
+
+	currentLeaderIndex := 0
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
+	leadershipDuration := handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.LeadershipDuration
+	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+	if leadershipDuration > 0 && len(nextEpochData.NextEpochLeadersSequence) > 0 {
+		now := utils.GetUTCTimestampInMilliSeconds()
+		if now >= int64(startTimestamp) {
+			currentLeaderIndex = int((now - int64(startTimestamp)) / leadershipDuration)
+			if currentLeaderIndex > len(nextEpochData.NextEpochLeadersSequence) {
+				currentLeaderIndex = len(nextEpochData.NextEpochLeadersSequence)
+			}
+		}
+	}
+
+	return &structures.EpochDataHandler{
+		Id:                 epochId,
+		Hash:               nextEpochData.NextEpochHash,
+		ValidatorsRegistry: nextEpochData.NextEpochValidatorsRegistry,
+		Quorum:             nextEpochData.NextEpochQuorum,
+		LeadersSequence:    nextEpochData.NextEpochLeadersSequence,
+		StartTimestamp:     startTimestamp,
+		CurrentLeaderIndex: currentLeaderIndex,
+	}
 }
 
 func getEpochSnapshotFromApprovementDB(epochId int) *structures.EpochDataSnapshot {
