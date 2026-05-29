@@ -31,6 +31,7 @@ func prepareCmd(args []string) error {
 	coreBlockTimeMs := fs.Int64("core-block-time-ms", 1_000, "core block time in milliseconds")
 	anchorEpochDurationMs := fs.Int64("anchor-epoch-duration-ms", 30_000, "anchor epoch duration in milliseconds")
 	anchorBlockTimeMs := fs.Int64("anchor-block-time-ms", 1_000, "anchor block time in milliseconds")
+	anchorHealthCheckIntervalMs := fs.Int64("anchor-health-check-interval-ms", 5_000, "anchor block creator health check interval in milliseconds")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -105,7 +106,7 @@ func prepareCmd(args []string) error {
 	anchorGenesis := map[string]any{
 		"NETWORK_ID":                  coreGenesis["NETWORK_ID"],
 		"FIRST_EPOCH_START_TIMESTAMP": now,
-		"NETWORK_PARAMETERS":          anchorNetworkParams(*anchorCount, *anchorEpochDurationMs, *anchorBlockTimeMs),
+		"NETWORK_PARAMETERS":          anchorNetworkParams(*anchorCount, *anchorEpochDurationMs, *anchorBlockTimeMs, *anchorHealthCheckIntervalMs),
 		"ANCHORS":                     anchors,
 	}
 	coreGenesisForAnchors := map[string]any{
@@ -301,7 +302,7 @@ func coreNetworkParams(quorumSize int, epochDurationMs, leadershipDurationMs, bl
 	}
 }
 
-func anchorNetworkParams(quorumSize int, epochDurationMs, blockTimeMs int64) map[string]any {
+func anchorNetworkParams(quorumSize int, epochDurationMs, blockTimeMs, healthCheckIntervalMs int64) map[string]any {
 	return map[string]any{
 		"QUORUM_SIZE":                             quorumSize,
 		"EPOCH_DURATION":                          epochDurationMs,
@@ -309,6 +310,6 @@ func anchorNetworkParams(quorumSize int, epochDurationMs, blockTimeMs int64) map
 		"MAX_BLOCK_SIZE_IN_BYTES":                 int64(12_288_000),
 		"TXS_LIMIT_PER_BLOCK":                     30_000,
 		"MAX_EPOCHS_TO_SUPPORT":                   16,
-		"BLOCK_CREATORS_HEALTH_CHECK_INTERVAL_MS": int64(5_000),
+		"BLOCK_CREATORS_HEALTH_CHECK_INTERVAL_MS": healthCheckIntervalMs,
 	}
 }

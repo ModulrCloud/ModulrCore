@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -25,10 +26,18 @@ func BuildAnchorRotationProofPayload(anchor string, blockIndex int, blockHash st
 }
 
 func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) bool {
-	if proof.VotingStat.Afp.BlockId == "" {
+	if !slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
 		return false
 	}
-	if !slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
+
+	if proof.VotingStat.Index == -1 {
+		if proof.VotingStat.Hash != constants.ZeroHash || proof.VotingStat.Afp.BlockId != "" {
+			return false
+		}
+		return verifyAnchorRotationProofSignatures(proof)
+	}
+
+	if proof.VotingStat.Afp.BlockId == "" {
 		return false
 	}
 	expectedBlockId := fmt.Sprintf("%d:%s:%d", proof.EpochIndex, proof.Anchor, proof.VotingStat.Index)
@@ -44,6 +53,14 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) b
 	afpIndex, err := strconv.Atoi(blockParts[2])
 
 	if err != nil || afpIndex != proof.VotingStat.Index {
+		return false
+	}
+
+	return verifyAnchorRotationProofSignatures(proof)
+}
+
+func verifyAnchorRotationProofSignatures(proof *AggregatedAnchorRotationProof) bool {
+	if proof == nil {
 		return false
 	}
 
