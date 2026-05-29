@@ -35,6 +35,8 @@ func scenarioCmd(args []string) error {
 	switch args[0] {
 	case "bootstrap_smoke":
 		return bootstrapSmokeScenario(args[1:])
+	case "debug_api_smoke":
+		return debugAPISmokeScenario(args[1:])
 	case "alfp_pull_smoke":
 		return alfpPullSmokeScenario(args[1:])
 	case "early_epoch_announcement_alfp_smoke":
@@ -159,6 +161,134 @@ func bootstrapSmokeScenario(args []string) error {
 	}
 
 	fmt.Printf("PASS bootstrap_smoke: core height advanced from %d to %d; anchor is healthy\n", initialHeight, nextHeight)
+	return nil
+}
+
+func debugAPISmokeScenario(args []string) error {
+	fs := flag.NewFlagSet("scenario debug_api_smoke", flag.ExitOnError)
+	runRoot := fs.String("run-root", filepath.Join("tests_e2e", "runs", "scenarios"), "directory for scenario run state")
+	runID := fs.String("run-id", "debug-api-smoke-"+time.Now().UTC().Format("20060102T150405Z"), "run identifier")
+	coreRepo := fs.String("core-repo", ".", "path to modulr-core repository")
+	anchorsRepo := fs.String("anchors-repo", "../modulr-anchors-core", "path to modulr-anchors-core repository")
+	basePort := fs.Int("base-port", 19000, "base TCP port for generated configs")
+	healthTimeout := fs.Duration("health-timeout", 30*time.Second, "timeout for startup health checks")
+	observeTimeout := fs.Duration("observe-timeout", 12*time.Second, "timeout for observing core height growth")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	runDir := filepath.Join(*runRoot, *runID)
+	manifestPath := filepath.Join(runDir, "manifest.json")
+	fmt.Printf("scenario debug_api_smoke: preparing run %s\n", *runID)
+	if err := prepareCmd([]string{
+		"-core", "1",
+		"-anchors", "1",
+		"-run-root", *runRoot,
+		"-run-id", *runID,
+		"-core-repo", *coreRepo,
+		"-anchors-repo", *anchorsRepo,
+		"-base-port", fmt.Sprint(*basePort),
+		"-overwrite",
+	}); err != nil {
+		return err
+	}
+
+	fmt.Println("scenario debug_api_smoke: starting nodes")
+	if err := startCmd([]string{
+		"-manifest", manifestPath,
+		"-run-root", *runRoot,
+		"-run-id", *runID,
+		"-health-timeout", healthTimeout.String(),
+	}); err != nil {
+		if state, loadErr := loadState(runDir); loadErr == nil {
+			printScenarioDiagnostics(state, 120)
+		}
+		return err
+	}
+
+	state, err := loadState(runDir)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = stopState(state, 5*time.Second)
+	}()
+
+	coreNode, err := findNodeByRole(state, "core")
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+
+	initialHeight, err := waitForCoreHeight(coreNode, -1, 5*time.Second)
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+	nextHeight, err := waitForCoreHeight(coreNode, initialHeight, *observeTimeout)
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+
+	baseURL := strings.TrimSuffix(coreNode.HealthURL, "/live_stats")
+	client := http.Client{Timeout: 2 * time.Second}
+
+	var pipeline map[string]any
+	if err := fetchJSONStatusOK(client, baseURL+"/debug/pipeline_state", &pipeline); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug pipeline_state failed: %w", err)
+	}
+	if err := assertDebugPipelineShape(pipeline); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+
+	executionNext, err := extractDebugExecutionNext(pipeline)
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+	var heightProbe map[string]any
+	if err := fetchJSONStatusOK(client, fmt.Sprintf("%s/debug/height_probe/%d", baseURL, executionNext), &heightProbe); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug height_probe failed: %w", err)
+	}
+	if err := assertNestedMap(heightProbe, "core"); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug height_probe malformed: %w", err)
+	}
+
+	epochID, leaderIndex, err := extractDebugEpochAndLeader(pipeline)
+	if err != nil {
+		printScenarioDiagnostics(state, 120)
+		return err
+	}
+	var leaderPipeline map[string]any
+	if err := fetchJSONStatusOK(client, fmt.Sprintf("%s/debug/leader_pipeline/%d/%d", baseURL, epochID, leaderIndex), &leaderPipeline); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug leader_pipeline failed: %w", err)
+	}
+	for _, key := range []string{"nodePublicKey", "epochId", "leaderIndex", "leader", "localBlocks", "alfp", "lastMileTracker", "lastMileRelation"} {
+		if _, ok := leaderPipeline[key]; !ok {
+			printScenarioDiagnostics(state, 120)
+			return fmt.Errorf("debug leader_pipeline missing %q", key)
+		}
+	}
+
+	var outbox map[string]any
+	if err := fetchJSONStatusOK(client, baseURL+"/debug/pod_outbox_state", &outbox); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug pod_outbox_state failed: %w", err)
+	}
+	for _, key := range []string{"pendingCount", "countsByType", "sampleIds"} {
+		if _, ok := outbox[key]; !ok {
+			printScenarioDiagnostics(state, 120)
+			return fmt.Errorf("debug pod_outbox_state missing %q", key)
+		}
+	}
+
+	fmt.Printf("PASS debug_api_smoke: height advanced from %d to %d; debug API shapes are valid\n", initialHeight, nextHeight)
 	return nil
 }
 
@@ -3824,6 +3954,74 @@ func fetchJSONStatusOK(client http.Client, url string, target any) error {
 		return fmt.Errorf("GET %s returned %d", url, resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func assertDebugPipelineShape(payload map[string]any) error {
+	for _, key := range []string{"node", "approvement", "generation", "finalizer", "alfp", "lastMile", "execution", "podOutbox"} {
+		if err := assertNestedMap(payload, key); err != nil {
+			return fmt.Errorf("debug pipeline_state malformed: %w", err)
+		}
+	}
+	if err := assertNestedMap(payload["execution"].(map[string]any), "nextHeightProbe"); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
+	if err := assertNestedMap(payload["lastMile"].(map[string]any), "tracker"); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
+	if err := assertNestedMap(payload["podOutbox"].(map[string]any), "countsByType"); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
+	return nil
+}
+
+func assertNestedMap(payload map[string]any, key string) error {
+	value, ok := payload[key]
+	if !ok {
+		return fmt.Errorf("missing %q", key)
+	}
+	if _, ok := value.(map[string]any); !ok {
+		return fmt.Errorf("%q is not an object", key)
+	}
+	return nil
+}
+
+func extractDebugExecutionNext(payload map[string]any) (int64, error) {
+	execution, ok := payload["execution"].(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("debug pipeline_state execution is not an object")
+	}
+	raw, ok := execution["nextHeight"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("debug pipeline_state execution.nextHeight is missing or not numeric")
+	}
+	return int64(raw), nil
+}
+
+func extractDebugEpochAndLeader(payload map[string]any) (int, int, error) {
+	approvement, ok := payload["approvement"].(map[string]any)
+	if !ok {
+		return 0, 0, fmt.Errorf("debug pipeline_state approvement is not an object")
+	}
+	epochRaw, ok := approvement["epochId"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("debug pipeline_state approvement.epochId is missing or not numeric")
+	}
+	leaderRaw, ok := approvement["wallClockLeaderIndex"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("debug pipeline_state approvement.wallClockLeaderIndex is missing or not numeric")
+	}
+	leaders, ok := approvement["leadersSequence"].([]any)
+	if !ok || len(leaders) == 0 {
+		return 0, 0, fmt.Errorf("debug pipeline_state approvement.leadersSequence is missing or empty")
+	}
+	leaderIndex := int(leaderRaw)
+	if leaderIndex >= len(leaders) {
+		leaderIndex = len(leaders) - 1
+	}
+	if leaderIndex < 0 {
+		leaderIndex = 0
+	}
+	return int(epochRaw), leaderIndex, nil
 }
 
 type recoverySignedResponse struct {

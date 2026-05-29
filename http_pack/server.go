@@ -47,6 +47,12 @@ func createRouter() fasthttp.RequestHandler {
 	// Other
 	r.GET("/aggregated_anchor_epoch_ack_proof/{epochId}", routes.GetAggregatedAnchorEpochAckProof)
 
+	// Diagnostics
+	r.GET("/debug/pipeline_state", routes.GetDebugPipelineState)
+	r.GET("/debug/height_probe/{height}", routes.GetDebugHeightProbe)
+	r.GET("/debug/leader_pipeline/{epoch}/{leaderIndex}", routes.GetDebugLeaderPipeline)
+	r.GET("/debug/pod_outbox_state", routes.GetDebugPodOutboxState)
+
 	return r.Handler
 }
 
