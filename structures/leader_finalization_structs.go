@@ -6,6 +6,10 @@ type AcceptLeaderFinalizationProofRequest struct {
 	LeaderFinalizations []AggregatedLeaderFinalizationProof `json:"leaderFinalizations"`
 }
 
+type AcceptEpochAnnouncementProofRequest struct {
+	Proof AggregatedEpochAnnouncementProof `json:"proof"`
+}
+
 type AggregatedLeaderFinalizationProof struct {
 	EpochIndex int               `json:"epochIndex"`
 	Leader     string            `json:"leader"`
@@ -14,7 +18,6 @@ type AggregatedLeaderFinalizationProof struct {
 }
 
 func (alfp *AggregatedLeaderFinalizationProof) UnmarshalJSON(data []byte) error {
-
 	type alias AggregatedLeaderFinalizationProof
 
 	var aux alias
@@ -30,11 +33,9 @@ func (alfp *AggregatedLeaderFinalizationProof) UnmarshalJSON(data []byte) error 
 	*alfp = AggregatedLeaderFinalizationProof(aux)
 
 	return nil
-
 }
 
 func (alfp AggregatedLeaderFinalizationProof) MarshalJSON() ([]byte, error) {
-
 	type alias AggregatedLeaderFinalizationProof
 
 	aux := alias(alfp)

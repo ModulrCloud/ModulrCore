@@ -15,6 +15,8 @@ import (
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
 	"github.com/modulrcloud/modulr-core/utils"
+
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type Block struct {
@@ -42,7 +44,10 @@ func NewBlock(transactions []structures.Transaction, extraData ExtraDataToBlock,
 }
 
 func (block *Block) GetHash() string {
+	return block.GetHashForNetwork(globals.GENESIS.NetworkId)
+}
 
+func (block *Block) GetHashForNetwork(networkId string) string {
 	jsonedTransactions, err := json.Marshal(block.Transactions)
 
 	if err != nil {
@@ -60,7 +65,7 @@ func (block *Block) GetHash() string {
 		strconv.FormatInt(block.Time, 10),
 		string(jsonedTransactions),
 		string(jsonedExtraData),
-		globals.GENESIS.NetworkId,
+		networkId,
 		block.Epoch,
 		strconv.Itoa(block.Index),
 		block.PrevHash,
@@ -70,25 +75,27 @@ func (block *Block) GetHash() string {
 }
 
 func (block *Block) SignBlock() {
-
 	block.Sig = cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, block.GetHash())
-
 }
 
 func (block *Block) VerifySignature() bool {
-
 	return cryptography.VerifySignature(block.GetHash(), block.Creator, block.Sig)
+}
 
+func (block *Block) VerifySignatureForNetwork(networkId string) bool {
+	return cryptography.VerifySignature(block.GetHashForNetwork(networkId), block.Creator, block.Sig)
 }
 
 func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *Block {
 
 	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
 
-	blockAsBytes, err := databases.BLOCKS.Get([]byte(blockID), nil)
+	blockDb, closeBlockDb := getBlockDbForExecution()
+	defer closeBlockDb()
+
+	blockAsBytes, err := blockDb.Get([]byte(blockID), nil)
 
 	if err == nil {
-
 		var blockParsed *Block
 
 		err = json.Unmarshal(blockAsBytes, &blockParsed)
@@ -96,7 +103,6 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 		if err == nil {
 			return blockParsed
 		}
-
 	}
 
 	// Find from other nodes
@@ -106,9 +112,7 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 	var quorumUrls []string
 
 	for _, quorumMember := range quorumUrlsAndPubkeys {
-
 		quorumUrls = append(quorumUrls, quorumMember.Url)
-
 	}
 
 	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
@@ -117,14 +121,12 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 	var wg sync.WaitGroup
 
 	for _, node := range allKnownNodes {
-
 		if node == globals.CONFIGURATION.MyHostname {
 			continue
 		}
 
 		wg.Add(1)
 		go func(endpoint string) {
-
 			defer wg.Done()
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -147,9 +149,7 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 			if err := json.NewDecoder(resp.Body).Decode(&block); err == nil {
 				resultChan <- &block
 			}
-
 		}(node)
-
 	}
 
 	go func() {
@@ -164,4 +164,23 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 	}
 
 	return nil
+}
+
+func getBlockDbForExecution() (*leveldb.DB, func()) {
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	networkId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	if networkId == "" || networkId == globals.GENESIS.NetworkId {
+		return databases.BLOCKS, func() {}
+	}
+
+	db, err := leveldb.OpenFile(utils.ResolveDbPathForNetwork("BLOCKS", networkId), nil)
+	if err != nil {
+		return databases.BLOCKS, func() {}
+	}
+
+	return db, func() {
+		_ = db.Close()
+	}
 }

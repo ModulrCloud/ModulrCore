@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/globals"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -21,16 +22,22 @@ type AggregatedAnchorRotationProof struct {
 }
 
 func BuildAnchorRotationProofPayload(anchor string, blockIndex int, blockHash string, epochIndex int) string {
-
 	return fmt.Sprintf("ANCHOR_ROTATION_PROOF:%s:%d:%s:%d", anchor, blockIndex, blockHash, epochIndex)
 }
 
 func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) bool {
-
-	if proof.VotingStat.Afp.BlockId == "" {
+	if !slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
 		return false
 	}
-	if !slices.Contains(globals.ANCHORS_PUBKEYS, proof.Anchor) {
+
+	if proof.VotingStat.Index == -1 {
+		if proof.VotingStat.Hash != constants.ZeroHash || proof.VotingStat.Afp.BlockId != "" {
+			return false
+		}
+		return verifyAnchorRotationProofSignatures(proof)
+	}
+
+	if proof.VotingStat.Afp.BlockId == "" {
 		return false
 	}
 	expectedBlockId := fmt.Sprintf("%d:%s:%d", proof.EpochIndex, proof.Anchor, proof.VotingStat.Index)
@@ -46,6 +53,14 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) b
 	afpIndex, err := strconv.Atoi(blockParts[2])
 
 	if err != nil || afpIndex != proof.VotingStat.Index {
+		return false
+	}
+
+	return verifyAnchorRotationProofSignatures(proof)
+}
+
+func verifyAnchorRotationProofSignatures(proof *AggregatedAnchorRotationProof) bool {
+	if proof == nil {
 		return false
 	}
 
@@ -72,11 +87,9 @@ func VerifyAggregatedAnchorRotationProof(proof *AggregatedAnchorRotationProof) b
 	}
 
 	return verified >= utils.GetAnchorsQuorumMajority()
-
 }
 
 func (aarp *AggregatedAnchorRotationProof) UnmarshalJSON(data []byte) error {
-
 	type alias AggregatedAnchorRotationProof
 
 	var aux alias
@@ -92,11 +105,9 @@ func (aarp *AggregatedAnchorRotationProof) UnmarshalJSON(data []byte) error {
 	*aarp = AggregatedAnchorRotationProof(aux)
 
 	return nil
-
 }
 
 func (aarp AggregatedAnchorRotationProof) MarshalJSON() ([]byte, error) {
-
 	type alias AggregatedAnchorRotationProof
 
 	aux := alias(aarp)

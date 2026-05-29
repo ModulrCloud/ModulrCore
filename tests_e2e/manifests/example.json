@@ -1,0 +1,23 @@
+{
+  "name": "manual-local-run",
+  "nodes": [
+    {
+      "name": "core-1",
+      "role": "core",
+      "repoPath": "/absolute/path/to/modulr-core",
+      "workDir": "/absolute/path/to/core-1-chaindata",
+      "chaindataPath": "/absolute/path/to/core-1-chaindata",
+      "healthURL": "http://localhost:19000/live_stats",
+      "command": ["go", "run", "."]
+    },
+    {
+      "name": "anchor-1",
+      "role": "anchor",
+      "repoPath": "/absolute/path/to/modulr-anchors-core",
+      "workDir": "/absolute/path/to/modulr-anchors-core",
+      "chaindataPath": "/absolute/path/to/anchor-1-chaindata",
+      "healthURL": "http://localhost:21000/core/quorum_state",
+      "command": ["go", "run", "."]
+    }
+  ]
+}

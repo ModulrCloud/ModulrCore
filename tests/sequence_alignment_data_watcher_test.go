@@ -67,8 +67,8 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		return scenario.blockMap[blockID]
 	}
 
-	metaA := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
-	metaB := structures.ExecutionThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
+	metaA := structures.FinalizerThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
+	metaB := structures.FinalizerThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
 
 	// Node A receives a higher anchor response, Node B receives a nearer response; both should still agree on the last block for anchor 0.
 	for idx, resp := range []*threads.SequenceAlignmentDataResponse{&scenario.responseA} {
@@ -76,7 +76,7 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		if resp.FoundInAnchorIndex <= current {
 			continue
 		}
-		if !processSequenceAlignmentDataResponseForTest(resp, current, &epochHandler, &metaA, fetcher) {
+		if !processSequenceAlignmentDataResponseForTest(resp, current, &epochHandler, &metaA, fetcher, nil) {
 			t.Fatalf("node A failed to process alignment data on iteration %d", idx)
 		}
 	}
@@ -86,7 +86,7 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		if resp.FoundInAnchorIndex <= current {
 			continue
 		}
-		if !processSequenceAlignmentDataResponseForTest(resp, current, &epochHandler, &metaB, fetcher) {
+		if !processSequenceAlignmentDataResponseForTest(resp, current, &epochHandler, &metaB, fetcher, nil) {
 			t.Fatalf("node B failed to process alignment data on step %d", idx)
 		}
 	}
@@ -139,6 +139,68 @@ func TestSequenceAlignmentWatcherConvergesOnRotationHeight(t *testing.T) {
 		formatCatchUpTargets(metaA.SequenceAlignmentData.LastBlocksByAnchors), metaA.SequenceAlignmentData.CurrentAnchorAssumption,
 		formatCatchUpTargets(metaB.SequenceAlignmentData.LastBlocksByAnchors), metaB.SequenceAlignmentData.CurrentAnchorAssumption,
 		formatPerAnchorHeights(metaA.SequenceAlignmentData.LastBlocksByAnchors))
+}
+
+func TestSequenceAlignmentDataResponseFetchesMissingAfp(t *testing.T) {
+
+	rng := rand.New(rand.NewSource(42))
+
+	anchorKeys := make([]cryptography.Ed25519Box, 3)
+	for i := range anchorKeys {
+		anchorKeys[i] = cryptography.GenerateKeyPair("", "", nil)
+	}
+
+	globals.ANCHORS = []structures.Anchor{
+		{Pubkey: anchorKeys[0].Pub},
+		{Pubkey: anchorKeys[1].Pub},
+		{Pubkey: anchorKeys[2].Pub},
+	}
+
+	globals.ANCHORS_PUBKEYS = []string{
+		anchorKeys[0].Pub,
+		anchorKeys[1].Pub,
+		anchorKeys[2].Pub,
+	}
+
+	epochHandler := structures.EpochDataHandler{Id: 1, Hash: "epoch_hash", Quorum: []string{anchorKeys[0].Pub, anchorKeys[1].Pub, anchorKeys[2].Pub}}
+	scenario := buildRotationScenarioForTest(t, rng, anchorKeys, epochHandler)
+
+	expectedAfp := scenario.responseB.Afp
+	if expectedAfp == nil {
+		t.Fatal("test scenario did not build fallback AFP")
+	}
+
+	alignmentData := scenario.responseB
+	alignmentData.Afp = nil
+
+	fetcher := func(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse {
+		return scenario.blockMap[blockID]
+	}
+
+	var requestedBlockID string
+	afpFetcher := func(blockID string) *structures.AggregatedFinalizationProof {
+		requestedBlockID = blockID
+		if blockID == expectedAfp.BlockId {
+			return expectedAfp
+		}
+		return nil
+	}
+
+	meta := structures.FinalizerThreadMetadataHandler{SequenceAlignmentData: structures.AlignmentDataHandler{CurrentAnchorAssumption: 0, LastBlocksByLeaders: make(map[string]structures.ExecutionStats), LastBlocksByAnchors: make(map[int]structures.ExecutionStats)}}
+	if !processSequenceAlignmentDataResponseForTest(&alignmentData, 0, &epochHandler, &meta, fetcher, afpFetcher) {
+		t.Fatalf("expected missing AFP to be fetched and alignment data accepted")
+	}
+
+	if requestedBlockID != expectedAfp.BlockId {
+		t.Fatalf("unexpected AFP fallback blockID: got %q, expected %q", requestedBlockID, expectedAfp.BlockId)
+	}
+
+	expected := map[int]structures.ExecutionStats{
+		0: {Index: scenario.anchor0ProofAtAnchor1, Hash: scenario.anchor0Hashes[scenario.anchor0ProofAtAnchor1]},
+	}
+	if !reflect.DeepEqual(meta.SequenceAlignmentData.LastBlocksByAnchors, expected) {
+		t.Fatalf("unexpected catch-up targets: got %v, expected %v", meta.SequenceAlignmentData.LastBlocksByAnchors, expected)
+	}
 }
 
 func buildRotationScenarioForTest(t *testing.T, rng *rand.Rand, anchorKeys []cryptography.Ed25519Box, epochHandler structures.EpochDataHandler) testRotationScenario {
@@ -448,10 +510,11 @@ func buildAggregatedAnchorRotationProof(anchorKeys []cryptography.Ed25519Box, ep
 }
 
 type testAnchorBlockFetcher func(blockID string) *websocket_pack.WsAnchorBlockWithAfpResponse
+type testAfpFetcher func(blockID string) *structures.AggregatedFinalizationProof
 
-func processSequenceAlignmentDataResponseForTest(alignmentData *threads.SequenceAlignmentDataResponse, anchorIndex int, epochHandler *structures.EpochDataHandler, metadata *structures.ExecutionThreadMetadataHandler, fetcher testAnchorBlockFetcher) bool {
+func processSequenceAlignmentDataResponseForTest(alignmentData *threads.SequenceAlignmentDataResponse, anchorIndex int, epochHandler *structures.EpochDataHandler, metadata *structures.FinalizerThreadMetadataHandler, fetcher testAnchorBlockFetcher, afpFetcher testAfpFetcher) bool {
 
-	if alignmentData == nil || alignmentData.Afp == nil || metadata == nil || epochHandler == nil || fetcher == nil {
+	if alignmentData == nil || metadata == nil || epochHandler == nil || fetcher == nil {
 		return false
 	}
 
@@ -463,7 +526,30 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 		return false
 	}
 
-	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
+	maxFoundInBlock := -1
+
+	anchorIndexMap := make(map[string]int, len(globals.ANCHORS))
+	for idx, anchor := range globals.ANCHORS {
+		anchorIndexMap[anchor.Pubkey] = idx
+	}
+
+	for _, anchorData := range alignmentData.Anchors {
+		if anchorData.FoundInBlock > maxFoundInBlock {
+			maxFoundInBlock = anchorData.FoundInBlock
+		}
+	}
+
+	if maxFoundInBlock < 0 {
+		return false
+	}
+
+	expectedAnchor := globals.ANCHORS[alignmentData.FoundInAnchorIndex]
+	if alignmentData.Afp == nil && afpFetcher != nil {
+		nextBlockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, expectedAnchor.Pubkey, maxFoundInBlock+1)
+		alignmentData.Afp = afpFetcher(nextBlockID)
+	}
+
+	if alignmentData.Afp == nil || !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
 		return false
 	}
 
@@ -486,23 +572,9 @@ func processSequenceAlignmentDataResponseForTest(alignmentData *threads.Sequence
 	}
 
 	anchorFromBlock := blockIdParts[1]
-	expectedAnchor := globals.ANCHORS[alignmentData.FoundInAnchorIndex]
 
 	if anchorFromBlock != expectedAnchor.Pubkey {
 		return false
-	}
-
-	maxFoundInBlock := -1
-
-	anchorIndexMap := make(map[string]int, len(globals.ANCHORS))
-	for idx, anchor := range globals.ANCHORS {
-		anchorIndexMap[anchor.Pubkey] = idx
-	}
-
-	for _, anchorData := range alignmentData.Anchors {
-		if anchorData.FoundInBlock > maxFoundInBlock {
-			maxFoundInBlock = anchorData.FoundInBlock
-		}
 	}
 
 	if blockIndexInAfp != maxFoundInBlock+1 {
@@ -615,7 +687,7 @@ func findEarliestAnchorRotationProofForTest(currentAnchor, foundInAnchorIndex, b
 	return structures.ExecutionStats{}, false
 }
 
-func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.ExecutionThreadMetadataHandler, epochHandler structures.EpochDataHandler, fetcher testAnchorBlockFetcher, maxSteps int) {
+func simulateSequenceAlignmentThreadForTest(t *testing.T, metadata *structures.FinalizerThreadMetadataHandler, epochHandler structures.EpochDataHandler, fetcher testAnchorBlockFetcher, maxSteps int) {
 
 	t.Helper()
 
