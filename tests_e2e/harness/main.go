@@ -52,6 +52,7 @@ func printUsage(out io.Writer) {
   go run ./tests_e2e/harness scenario recovery_latest_quorum_smoke
   go run ./tests_e2e/harness scenario multi_node_quorum_smoke
   go run ./tests_e2e/harness scenario multi_node_one_anchor_down_smoke
+  go run ./tests_e2e/harness scenario anchor_rotation_aarp_smoke
   go run ./tests_e2e/harness scenario multi_node_one_core_down_smoke
   go run ./tests_e2e/harness scenario multi_node_alfp_pull_after_push_failure
   go run ./tests_e2e/harness scenario multi_node_recovery_majority_latest_quorum

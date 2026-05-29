@@ -112,12 +112,27 @@ func checkSequenceAlignmentData(anchorIndex int, epochHandler *structures.EpochD
 
 	if _, exists := currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; !exists {
 		currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex] = earliestRotationStats
+		if currentHandler.SequenceAlignmentData.CurrentAnchorAssumption == anchorIndex &&
+			currentHandler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved < earliestRotationStats.Index {
+			currentHandler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved = earliestRotationStats.Index
+		}
 		persistFinalizerThreadMetadataLocked()
+		utils.LogWithTime(
+			fmt.Sprintf(
+				"Anchor rotation monitor: accepted AARP chain for epoch %d anchorIndex=%d -> foundInAnchorIndex=%d lastBlockIndex=%d hash=%s",
+				epochHandler.Id,
+				anchorIndex,
+				alignmentData.FoundInAnchorIndex,
+				earliestRotationStats.Index,
+				utils.ShortHash(earliestRotationStats.Hash),
+			),
+			utils.CYAN_COLOR,
+		)
 	}
 }
 
 func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataResponse, anchorIndex int, epochHandler *structures.EpochDataHandler) (structures.ExecutionStats, bool) {
-	if alignmentData == nil || alignmentData.Afp == nil || epochHandler == nil {
+	if alignmentData == nil || epochHandler == nil {
 		return structures.ExecutionStats{}, false
 	}
 
@@ -125,7 +140,30 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 		return structures.ExecutionStats{}, false
 	}
 
-	if !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
+	maxFoundInBlock := -1
+
+	anchorIndexMap := make(map[string]int, len(globals.ANCHORS))
+	for idx, anchor := range globals.ANCHORS {
+		anchorIndexMap[anchor.Pubkey] = idx
+	}
+
+	for _, anchorData := range alignmentData.Anchors {
+		if anchorData.FoundInBlock > maxFoundInBlock {
+			maxFoundInBlock = anchorData.FoundInBlock
+		}
+	}
+
+	if maxFoundInBlock < 0 {
+		return structures.ExecutionStats{}, false
+	}
+
+	expectedAnchor := globals.ANCHORS[alignmentData.FoundInAnchorIndex]
+	if alignmentData.Afp == nil {
+		nextBlockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, expectedAnchor.Pubkey, maxFoundInBlock+1)
+		alignmentData.Afp = utils.GetVerifiedAnchorsAggregatedFinalizationProofByBlockId(nextBlockID, epochHandler)
+	}
+
+	if alignmentData.Afp == nil || !utils.VerifyAggregatedFinalizationProofForAnchorBlock(alignmentData.Afp, epochHandler) {
 		return structures.ExecutionStats{}, false
 	}
 
@@ -149,23 +187,8 @@ func processSequenceAlignmentDataResponse(alignmentData *SequenceAlignmentDataRe
 
 	anchorFromBlock := blockIdParts[1]
 
-	expectedAnchor := globals.ANCHORS[alignmentData.FoundInAnchorIndex]
-
 	if anchorFromBlock != expectedAnchor.Pubkey {
 		return structures.ExecutionStats{}, false
-	}
-
-	maxFoundInBlock := -1
-
-	anchorIndexMap := make(map[string]int, len(globals.ANCHORS))
-	for idx, anchor := range globals.ANCHORS {
-		anchorIndexMap[anchor.Pubkey] = idx
-	}
-
-	for _, anchorData := range alignmentData.Anchors {
-		if anchorData.FoundInBlock > maxFoundInBlock {
-			maxFoundInBlock = anchorData.FoundInBlock
-		}
 	}
 
 	if blockIndexInAfp != maxFoundInBlock+1 {
@@ -208,7 +231,7 @@ func findEarliestAnchorRotationProof(currentAnchor, foundInAnchorIndex, blockLim
 
 		for blockIndex := 0; blockIndex < searchLimit; blockIndex++ {
 			blockID := fmt.Sprintf("%d:%s:%d", epochHandler.Id, anchor.Pubkey, blockIndex)
-			response := getAnchorBlockAndAfpFromAnchorsPoD(blockID, epochHandler)
+			response := getAnchorBlockAndAfpFromAnchorsPoDWithFallback(blockID, epochHandler, true)
 
 			if response == nil || response.Block == nil {
 				utils.LogWithTimeThrottled(

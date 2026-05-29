@@ -61,7 +61,7 @@ func SequenceAlignmentThread() {
 		anchorData := globals.ANCHORS[currentAnchorIndex]
 		blockId := strconv.Itoa(epochSnapshot.Id) + ":" + anchorData.Pubkey + ":" + strconv.Itoa(currentAnchorBlockPointerObserved+1)
 
-		response := getAnchorBlockAndAfpFromAnchorsPoD(blockId, &epochSnapshot)
+		response := getAnchorBlockAndAfpFromAnchorsPoDWithFallback(blockId, &epochSnapshot, true)
 		if response == nil || response.Block == nil {
 			utils.LogWithTimeThrottled(
 				"sequence_alignment:no_anchor_block:"+blockId,

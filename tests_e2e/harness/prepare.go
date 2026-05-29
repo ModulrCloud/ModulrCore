@@ -103,7 +103,7 @@ func prepareCmd(args []string) error {
 		"STATE":                       coreState,
 	}
 	anchorGenesis := map[string]any{
-		"NETWORK_ID":                  randomHex(32),
+		"NETWORK_ID":                  coreGenesis["NETWORK_ID"],
 		"FIRST_EPOCH_START_TIMESTAMP": now,
 		"NETWORK_PARAMETERS":          anchorNetworkParams(*anchorCount, *anchorEpochDurationMs, *anchorBlockTimeMs),
 		"ANCHORS":                     anchors,

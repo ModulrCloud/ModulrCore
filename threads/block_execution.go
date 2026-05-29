@@ -336,6 +336,33 @@ func getBlockAndAfpFromPoD(blockID string) *websocket_pack.WsBlockWithAfpRespons
 }
 
 func getAnchorBlockAndAfpFromAnchorsPoD(blockID string, epochHandler *structures.EpochDataHandler) *websocket_pack.WsAnchorBlockWithAfpResponse {
+	return getAnchorBlockAndAfpFromAnchorsPoDWithFallback(blockID, epochHandler, false)
+}
+
+func getAnchorBlockAndAfpFromAnchorsPoDWithFallback(blockID string, epochHandler *structures.EpochDataHandler, immediateAnchorsHTTPFallback bool) *websocket_pack.WsAnchorBlockWithAfpResponse {
+	if immediateAnchorsHTTPFallback {
+		utils.LogWithTimeThrottled(
+			"anchors:http_block_fetch:"+blockID,
+			5*time.Second,
+			fmt.Sprintf("ANCHORS: fetching anchor block %s directly from anchors HTTP", blockID),
+			utils.YELLOW_COLOR,
+		)
+
+		if b := getAnchorBlockFromAnchorsNetworkById(blockID); b != nil {
+			resetAnchorsPodMisses(blockID)
+			return buildAnchorBlockWithAfpResponse(b, blockID, epochHandler)
+		}
+
+		utils.LogWithTimeThrottled(
+			"anchors:http_block_fetch_fail:"+blockID,
+			5*time.Second,
+			fmt.Sprintf("ANCHORS: anchors HTTP fetch failed for anchor block %s", blockID),
+			utils.YELLOW_COLOR,
+		)
+
+		return nil
+	}
+
 	req := websocket_pack.WsAnchorBlockWithAfpRequest{
 		Route:   constants.WsRouteGetAnchorBlockWithAfp,
 		BlockId: blockID,
@@ -366,8 +393,9 @@ func getAnchorBlockAndAfpFromAnchorsPoD(blockID string, epochHandler *structures
 		}
 	}
 
-	// PoD failed / didn't have the block - maybe fall back to anchors directly after a few misses.
-	if shouldFallbackToAnchorsNetwork(blockID) {
+	// PoD failed / didn't have the block. Most callers rate-limit HTTP fallback because
+	// PoD misses can be transient; recovery scans can opt into immediate fallback.
+	if immediateAnchorsHTTPFallback || shouldFallbackToAnchorsNetwork(blockID) {
 		utils.LogWithTimeThrottled(
 			"anchors:pod_block_fallback:"+blockID,
 			5*time.Second,
@@ -377,19 +405,7 @@ func getAnchorBlockAndAfpFromAnchorsPoD(blockID string, epochHandler *structures
 
 		if b := getAnchorBlockFromAnchorsNetworkById(blockID); b != nil {
 			resetAnchorsPodMisses(blockID)
-
-			resp := websocket_pack.WsAnchorBlockWithAfpResponse{Block: b}
-
-			// Keep the existing AFP fallback behavior, even when the block came from anchors directly.
-			if resp.Afp == nil && epochHandler != nil {
-				if nextID := nextBlockId(blockID); nextID != "" {
-					if afp := utils.GetVerifiedAnchorsAggregatedFinalizationProofByBlockId(nextID, epochHandler); afp != nil {
-						resp.Afp = afp
-					}
-				}
-			}
-
-			return &resp
+			return buildAnchorBlockWithAfpResponse(b, blockID, epochHandler)
 		}
 
 		utils.LogWithTimeThrottled(
@@ -401,6 +417,25 @@ func getAnchorBlockAndAfpFromAnchorsPoD(blockID string, epochHandler *structures
 	}
 
 	return nil
+}
+
+func buildAnchorBlockWithAfpResponse(block *anchors_pack.AnchorBlock, blockID string, epochHandler *structures.EpochDataHandler) *websocket_pack.WsAnchorBlockWithAfpResponse {
+	if block == nil {
+		return nil
+	}
+
+	resp := websocket_pack.WsAnchorBlockWithAfpResponse{Block: block}
+
+	// Keep the existing AFP fallback behavior, even when the block came from anchors directly.
+	if epochHandler != nil {
+		if nextID := nextBlockId(blockID); nextID != "" {
+			if afp := utils.GetVerifiedAnchorsAggregatedFinalizationProofByBlockId(nextID, epochHandler); afp != nil {
+				resp.Afp = afp
+			}
+		}
+	}
+
+	return &resp
 }
 
 func parseBlockId(blockId string) (epochIndex int, creator string, index int, ok bool) {
