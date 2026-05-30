@@ -1182,11 +1182,12 @@ func anchorRotationAarpSmokeScenario(args []string) error {
 		"-core-repo", *coreRepo,
 		"-anchors-repo", *anchorsRepo,
 		"-base-port", fmt.Sprint(selectedBasePort),
-		"-core-epoch-duration-ms", "16000",
-		"-core-leadership-duration-ms", "2500",
-		"-core-block-time-ms", "900",
-		"-anchor-epoch-duration-ms", "16000",
-		"-anchor-block-time-ms", "900",
+		"-core-epoch-duration-ms", "60000",
+		"-core-leadership-duration-ms", "15000",
+		"-core-block-time-ms", "500",
+		"-anchor-epoch-duration-ms", "60000",
+		"-anchor-block-time-ms", "500",
+		"-anchor-health-check-interval-ms", "5000",
 		"-overwrite",
 	}); err != nil {
 		return err
