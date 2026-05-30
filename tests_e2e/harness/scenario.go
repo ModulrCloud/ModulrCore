@@ -1719,7 +1719,7 @@ func multiNodeAlfpPullAfterPushFailureScenario(args []string) error {
 	}
 
 	targetAnchorName := "anchor-4"
-	targetAnchorHTTPURL := fmt.Sprintf("http://localhost:%d", *basePort+2000+3)
+	targetAnchorHTTPURL := fmt.Sprintf("http://127.0.0.1:%d", *basePort+2000+3)
 	proxyURL, closeProxy, err := startAlfpBlockingProxy(targetAnchorHTTPURL, true)
 	if err != nil {
 		return err
@@ -2868,6 +2868,10 @@ func recoveryFullCycleSmokeScenario(args []string) error {
 			return err
 		}
 		if err := resetAnchorRuntimeState(anchorManifestNode); err != nil {
+			printScenarioDiagnostics(state, 120)
+			return err
+		}
+		if err := updateAnchorGenesisForRecovery(filepath.Join(runDir, "network", anchorManifestNode.Name, "genesis.json"), recoveryGenesis); err != nil {
 			printScenarioDiagnostics(state, 120)
 			return err
 		}
@@ -4429,6 +4433,21 @@ func writeCoreRecoveryPlan(coreNode NodeState, recoveryData structures.RecoveryD
 
 func resetAnchorRuntimeState(anchor ManifestNode) error {
 	return os.RemoveAll(filepath.Join(anchor.ChaindataPath, "DATABASES"))
+}
+
+func updateAnchorGenesisForRecovery(path string, recoveryGenesis structures.Genesis) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var genesis map[string]any
+	if err := json.Unmarshal(raw, &genesis); err != nil {
+		return err
+	}
+	genesis["NETWORK_ID"] = recoveryGenesis.NetworkId
+	genesis["FIRST_EPOCH_START_TIMESTAMP"] = recoveryGenesis.FirstEpochStartTimestamp
+	return writeJSON(path, genesis)
 }
 
 func copyDir(src string, dst string) error {

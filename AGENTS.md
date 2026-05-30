@@ -26,6 +26,15 @@ go run ./tests_e2e/harness scenario <name>
 
 - Do not run E2E unless explicitly requested. E2E starts real local processes and writes under `tests_e2e/runs/`.
 
+### E2E Pitfalls
+
+- Use exact generated endpoints from config files. Do not assume `localhost` and `127.0.0.1` are interchangeable when rewriting JSON config values.
+- Before using a manual `-base-port`, check for listeners in the whole generated range. Prefer auto-selected ports when a scenario supports `-base-port 0`.
+- Anchor/core timing matters. Rotation/recovery scenarios should leave enough time for epoch transitions, leader windows, anchor block production, and health checks; avoid unrealistically tight epochs unless the scenario is explicitly testing timing pressure.
+- In recovery/full-cycle E2E flows, reset anchor runtime DBs only with a matching generated anchor genesis. Anchor `NETWORK_ID` and `FIRST_EPOCH_START_TIMESTAMP` must match the recovered core genesis when the recovered core validates anchor blocks.
+- Canonical leader finalization order comes from anchor blocks scanned by `threads/sequence_alignment.go`. Do not use locally collected ALFP as a sequencing source.
+- When debugging E2E failures, distinguish protocol failures from harness/config failures first: URL rewrites, stale processes, occupied ports, and generated genesis mismatches are common false leads.
+
 ## Go Modules
 
 - Do not modify `go.mod` or `go.sum` just because a local test command rewrote them.
