@@ -258,6 +258,10 @@ func debugAPISmokeScenario(args []string) error {
 		printScenarioDiagnostics(state, 120)
 		return fmt.Errorf("debug height_probe malformed: %w", err)
 	}
+	if err := assertNumberKey(heightProbe, "ahpNext"); err != nil {
+		printScenarioDiagnostics(state, 120)
+		return fmt.Errorf("debug height_probe malformed: %w", err)
+	}
 
 	epochID, leaderIndex, err := extractDebugEpochAndLeader(pipeline)
 	if err != nil {
@@ -269,7 +273,7 @@ func debugAPISmokeScenario(args []string) error {
 		printScenarioDiagnostics(state, 120)
 		return fmt.Errorf("debug leader_pipeline failed: %w", err)
 	}
-	for _, key := range []string{"nodePublicKey", "epochId", "leaderIndex", "leader", "localBlocks", "alfp", "lastMileTracker", "lastMileRelation"} {
+	for _, key := range []string{"nodePublicKey", "epochId", "leaderIndex", "leader", "localBlocks", "alfp", "lastMileTracker", "lastMileRelation", "ahpTracker", "ahpRelation"} {
 		if _, ok := leaderPipeline[key]; !ok {
 			printScenarioDiagnostics(state, 120)
 			return fmt.Errorf("debug leader_pipeline missing %q", key)
@@ -1322,12 +1326,12 @@ func anchorRotationAarpNoInitialBlockSmokeScenario(args []string) error {
 		"-core-repo", *coreRepo,
 		"-anchors-repo", *anchorsRepo,
 		"-base-port", fmt.Sprint(selectedBasePort),
-		"-core-epoch-duration-ms", "16000",
-		"-core-leadership-duration-ms", "2500",
-		"-core-block-time-ms", "900",
-		"-anchor-epoch-duration-ms", "16000",
-		"-anchor-block-time-ms", "900",
-		"-anchor-health-check-interval-ms", "1000",
+		"-core-epoch-duration-ms", "60000",
+		"-core-leadership-duration-ms", "15000",
+		"-core-block-time-ms", "500",
+		"-anchor-epoch-duration-ms", "60000",
+		"-anchor-block-time-ms", "500",
+		"-anchor-health-check-interval-ms", "5000",
 		"-overwrite",
 	}); err != nil {
 		return err
@@ -3968,6 +3972,16 @@ func assertDebugPipelineShape(payload map[string]any) error {
 	if err := assertNestedMap(payload["lastMile"].(map[string]any), "tracker"); err != nil {
 		return fmt.Errorf("debug pipeline_state malformed: %w", err)
 	}
+	lastMile := payload["lastMile"].(map[string]any)
+	if err := assertNestedMap(lastMile, "ahpCollectorTracker"); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
+	if err := assertNumberKey(lastMile, "ahpCollectorLag"); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
+	if err := assertAHPCollectorNotAhead(lastMile); err != nil {
+		return fmt.Errorf("debug pipeline_state malformed: %w", err)
+	}
 	if err := assertNestedMap(payload["podOutbox"].(map[string]any), "countsByType"); err != nil {
 		return fmt.Errorf("debug pipeline_state malformed: %w", err)
 	}
@@ -3981,6 +3995,36 @@ func assertNestedMap(payload map[string]any, key string) error {
 	}
 	if _, ok := value.(map[string]any); !ok {
 		return fmt.Errorf("%q is not an object", key)
+	}
+	return nil
+}
+
+func assertNumberKey(payload map[string]any, key string) error {
+	if _, ok := payload[key].(float64); !ok {
+		return fmt.Errorf("%q is missing or not numeric", key)
+	}
+	return nil
+}
+
+func assertAHPCollectorNotAhead(lastMile map[string]any) error {
+	tracker, ok := lastMile["tracker"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("lastMile.tracker is not an object")
+	}
+	ahpTracker, ok := lastMile["ahpCollectorTracker"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("lastMile.ahpCollectorTracker is not an object")
+	}
+	sequencerNext, ok := tracker["nextHeight"].(float64)
+	if !ok {
+		return fmt.Errorf("lastMile.tracker.nextHeight is missing or not numeric")
+	}
+	ahpNext, ok := ahpTracker["nextHeight"].(float64)
+	if !ok {
+		return fmt.Errorf("lastMile.ahpCollectorTracker.nextHeight is missing or not numeric")
+	}
+	if ahpNext > sequencerNext {
+		return fmt.Errorf("lastMile.ahpCollectorTracker.nextHeight %.0f is ahead of tracker.nextHeight %.0f", ahpNext, sequencerNext)
 	}
 	return nil
 }

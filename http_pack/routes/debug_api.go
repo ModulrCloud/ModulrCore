@@ -92,6 +92,8 @@ type debugPipelineResponse struct {
 	} `json:"alfp"`
 	LastMile struct {
 		Tracker               *utils.LastMileSequenceState      `json:"tracker"`
+		AHPCollectorTracker   *utils.LastMileSequenceState      `json:"ahpCollectorTracker"`
+		AHPCollectorLag       int64                             `json:"ahpCollectorLag"`
 		CurrentBlockId        string                            `json:"currentBlockId"`
 		CurrentBlock          debugBlockInfo                    `json:"currentBlock"`
 		CurrentBlockConfirmed bool                              `json:"currentBlockConfirmed"`
@@ -129,6 +131,7 @@ type debugHeightProbeResponse struct {
 	Core          debugHeightCore `json:"core"`
 	ExecutionNext int64           `json:"executionNext"`
 	LastMileNext  int64           `json:"lastMileNext"`
+	AHPNext       int64           `json:"ahpNext"`
 }
 
 type debugLeaderPipelineResponse struct {
@@ -148,7 +151,9 @@ type debugLeaderPipelineResponse struct {
 	ALFP             debugAlfpInfo                `json:"alfp"`
 	Alignment        *structures.ExecutionStats   `json:"alignment,omitempty"`
 	LastMileTracker  *utils.LastMileSequenceState `json:"lastMileTracker"`
+	AHPTracker       *utils.LastMileSequenceState `json:"ahpTracker"`
 	LastMileRelation string                       `json:"lastMileRelation"`
+	AHPRelation      string                       `json:"ahpRelation"`
 }
 
 func GetDebugPipelineState(ctx *fasthttp.RequestCtx) {
@@ -167,6 +172,7 @@ func GetDebugPipelineState(ctx *fasthttp.RequestCtx) {
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
 	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
+	ahpTracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileAHPCollectorTracker)
 	response := debugPipelineResponse{}
 	response.Node.PublicKey = globals.CONFIGURATION.PublicKey
 	response.Node.NowMs = now
@@ -203,6 +209,8 @@ func GetDebugPipelineState(ctx *fasthttp.RequestCtx) {
 	}
 
 	response.LastMile.Tracker = tracker
+	response.LastMile.AHPCollectorTracker = ahpTracker
+	response.LastMile.AHPCollectorLag = tracker.NextHeight - ahpTracker.NextHeight
 	response.LastMile.Boundary = utils.LoadLastMileEpochBoundary(tracker.EpochId)
 	response.LastMile.CurrentBlockId = lastMileTrackerBlockId(tracker)
 	response.LastMile.CurrentBlock = debugLoadBlock(response.LastMile.CurrentBlockId, "")
@@ -239,12 +247,14 @@ func GetDebugHeightProbe(ctx *fasthttp.RequestCtx) {
 	cursor := handlers.EXECUTION_THREAD_METADATA.ChainCursor
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
+	ahpTracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileAHPCollectorTracker)
 
 	helpers.WriteJSON(ctx, fasthttp.StatusOK, debugHeightProbeResponse{
 		NodePublicKey: globals.CONFIGURATION.PublicKey,
 		Core:          buildDebugHeightCore(height, &cursor),
 		ExecutionNext: cursor.LastExecutedLocalHeight + 1,
 		LastMileNext:  tracker.NextHeight,
+		AHPNext:       ahpTracker.NextHeight,
 	})
 }
 
@@ -292,6 +302,7 @@ func GetDebugLeaderPipeline(ctx *fasthttp.RequestCtx) {
 	handlers.FINALIZER_THREAD_METADATA.RWMutex.RUnlock()
 
 	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
+	ahpTracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileAHPCollectorTracker)
 	response := debugLeaderPipelineResponse{
 		NodePublicKey:    globals.CONFIGURATION.PublicKey,
 		EpochId:          epochId,
@@ -302,7 +313,9 @@ func GetDebugLeaderPipeline(ctx *fasthttp.RequestCtx) {
 		LeaderFinished:   utils.GetUTCTimestampInMilliSeconds() >= int64(epochHandler.StartTimestamp)+int64(leaderIndex+1)*network.LeadershipDuration,
 		ALFP:             debugLoadALFP(epochId, leader),
 		LastMileTracker:  tracker,
+		AHPTracker:       ahpTracker,
 		LastMileRelation: describeLastMileRelation(tracker, epochId, leaderIndex),
+		AHPRelation:      describeLastMileRelation(ahpTracker, epochId, leaderIndex),
 	}
 	response.LocalBlocks.Count = count
 	response.LocalBlocks.Highest = highest

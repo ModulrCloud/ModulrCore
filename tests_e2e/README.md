@@ -76,6 +76,8 @@ go run ./tests_e2e/harness prepare \
 
 go run ./tests_e2e/harness scenario bootstrap_smoke
 
+go run ./tests_e2e/harness scenario debug_api_smoke
+
 go run ./tests_e2e/harness scenario alfp_pull_smoke
 
 go run ./tests_e2e/harness scenario early_epoch_announcement_alfp_smoke
@@ -89,6 +91,8 @@ go run ./tests_e2e/harness scenario multi_node_quorum_smoke
 go run ./tests_e2e/harness scenario multi_node_one_anchor_down_smoke
 
 go run ./tests_e2e/harness scenario anchor_rotation_aarp_smoke
+
+go run ./tests_e2e/harness scenario anchor_rotation_aarp_no_initial_block_smoke
 
 go run ./tests_e2e/harness scenario multi_node_one_core_down_smoke
 
@@ -177,6 +181,17 @@ for HTTP health checks, confirms that the core height advances, verifies that
 the anchor remains healthy, and then stops the run. On failure it prints recent
 logs for each node to make the runtime issue visible immediately.
 
+### `debug_api_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario debug_api_smoke
+```
+
+This scenario verifies the read-only debug API contract on a live `1 core + 1
+anchor` network. It waits for height growth, then checks that pipeline state,
+height probe, leader pipeline, and PoD outbox debug endpoints return the
+expected shape, including last-mile sequencing and AHP collector state.
+
 ### `alfp_pull_smoke`
 
 ```bash
@@ -189,6 +204,17 @@ fast `1 core + 1 anchor` network, starts a local proxy that blocks only
 all other anchor HTTP traffic pass through, and then waits until the anchor logs
 show that it built an ALFP locally from the core quorum and included it in an
 anchor block.
+
+### `early_epoch_announcement_alfp_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario early_epoch_announcement_alfp_smoke
+```
+
+This scenario verifies that anchors can accept early core epoch announcement
+proofs and still preserve ALFP inclusion/alignment behavior around epoch
+boundaries. It runs a small fast network and waits for evidence that the
+announcement path and ALFP path both complete without stalling finalization.
 
 ### `epoch_anchor_ack_smoke`
 
@@ -240,6 +266,30 @@ rotation, verifies the remaining anchors still let core collect an
 `AggregatedAnchorEpochAckProof` with majority `3/4` signatures, and then
 restarts a majority of anchors in `RECOVERY_MODE` to confirm recovery latest
 quorum responses are still available from enough anchors.
+
+### `anchor_rotation_aarp_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario anchor_rotation_aarp_smoke
+```
+
+This scenario verifies anchor rotation when an anchor disappears after the
+network has already started. It runs a fast `4 core + 4 anchors` network, stops
+one anchor, waits for active anchors to collect and include AARP evidence, and
+checks that core accepts the canonical anchor rotation chain and continues the
+core epoch transition.
+
+### `anchor_rotation_aarp_no_initial_block_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario anchor_rotation_aarp_no_initial_block_smoke
+```
+
+This scenario verifies the zero-initial-block anchor rotation path. It prepares
+a `4 core + 4 anchors` network but starts it with `anchor-1` already offline, so
+active anchors must collect an AARP for the missing anchor in epoch `0`, include
+that proof in an epoch `0` anchor block, and allow core sequence alignment to
+accept the rotation with `lastBlockIndex=-1` before completing `0 -> 1`.
 
 ### `multi_node_one_core_down_smoke`
 

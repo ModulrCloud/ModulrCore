@@ -62,7 +62,7 @@ func SendAggregatedHeightProofToPoD(proof structures.AggregatedHeightProof) {
 			_, _ = utils.SendWebsocketMessageToPoD(reqBytes)
 			return
 		}
-		_ = utils.SendToPoDWithOutbox(utils.PoDOutboxIdForAggregatedHeightProof(proof.AbsoluteHeight), reqBytes)
+		_ = utils.QueuePoDOutbox(utils.PoDOutboxIdForAggregatedHeightProof(proof.AbsoluteHeight), reqBytes)
 	}
 }
 

@@ -44,14 +44,15 @@ const (
 
 // Common DB key fragments/prefixes.
 const (
-	DBKeyApprovementThreadMetadata = "APPROVEMENT_THREAD_METADATA"
-	DBKeyGenerationThreadMetadata  = "GENERATION_THREAD_METADATA"
-	DBKeyFinalizerThreadMetadata   = "FINALIZER_THREAD_METADATA"
-	DBKeyLatestBatchIndex          = "LATEST_BATCH_INDEX"
-	DBKeyAlfpProgress              = "ALFP_PROGRESS"
-	DBKeyLastMileFinalizerTracker  = "LAST_MILE_FINALIZER_TRACKER"
-	DBKeyChainCursor               = "CHAIN_CURSOR"
-	DBKeyRecoveryActive            = "RECOVERY_ACTIVE"
+	DBKeyApprovementThreadMetadata   = "APPROVEMENT_THREAD_METADATA"
+	DBKeyGenerationThreadMetadata    = "GENERATION_THREAD_METADATA"
+	DBKeyFinalizerThreadMetadata     = "FINALIZER_THREAD_METADATA"
+	DBKeyLatestBatchIndex            = "LATEST_BATCH_INDEX"
+	DBKeyAlfpProgress                = "ALFP_PROGRESS"
+	DBKeyLastMileFinalizerTracker    = "LAST_MILE_FINALIZER_TRACKER"
+	DBKeyLastMileAHPCollectorTracker = "LAST_MILE_AHP_COLLECTOR_TRACKER"
+	DBKeyChainCursor                 = "CHAIN_CURSOR"
+	DBKeyRecoveryActive              = "RECOVERY_ACTIVE"
 
 	DBKeyPrefixBlockIndex                   = "BLOCK_INDEX:"
 	DBKeyPrefixEpochData                    = "EPOCH_DATA:"

@@ -27,6 +27,17 @@ func podOutboxKey(id string) []byte {
 	return []byte(constants.DBKeyPrefixPodOutbox + id)
 }
 
+// QueuePoDOutbox persists a PoD message for the background outbox thread without
+// doing a network round-trip on the caller's critical path.
+func QueuePoDOutbox(id string, payload []byte) bool {
+	if id == "" || len(payload) == 0 {
+		return false
+	}
+
+	_ = databases.FINALIZATION_THREAD_METADATA.Put(podOutboxKey(id), payload, nil)
+	return true
+}
+
 // SendToPoDWithOutbox sends a message to PoD and requires an OK ack.
 // On failure, it persists the message into FINALIZATION_THREAD_METADATA for retry.
 func SendToPoDWithOutbox(id string, payload []byte) bool {

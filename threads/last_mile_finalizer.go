@@ -1,4 +1,4 @@
-// Thread for collecting height attestations and epoch data attestations from quorum
+// Threads for local last-mile sequencing, height attestations, and epoch rotation proofs.
 package threads
 
 import (
@@ -33,6 +33,9 @@ var (
 	LAST_MILE_QUORUM_WAITER   *utils.QuorumWaiter
 
 	LAST_MILE_ANCHOR_WS_CONNS = make(map[string]*websocket.Conn)
+
+	LAST_MILE_EPOCH_HANDLERS_MUTEX sync.RWMutex
+	LAST_MILE_EPOCH_HANDLERS       = make(map[int]structures.EpochDataHandler)
 )
 
 // LastMileFinalizerThread runs on ALL quorum member nodes.
@@ -40,32 +43,25 @@ var (
 // verifies each block via AFP / SequenceAlignmentData, and writes
 // LAST_MILE_HEIGHT_MAP:<height> => blockId into the local DB (used by SignHeightProof).
 //
-// On nodes selected as finalizers (5 per epoch), it additionally collects
-// AggregatedHeightProof signatures from the quorum and handles epoch rotation proofs.
+// Selected finalizers also handle epoch rotation proofs. A separate collector
+// follows this local sequence to collect AggregatedHeightProof signatures.
 func LastMileFinalizerThread() {
 	lastProcessedEpoch := -1
 	isFinalizer := false
-	quorumConnectionsReady := false
-	quorumConnectionsEpoch := -1
 	anchorConnectionsSent := false
 	lastRotationEpoch := -1
-	lastFirstBlockEpochId := -1
 
 	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
-
-	if getFirstBlockDataFromDB(tracker.EpochId) != nil {
-		lastFirstBlockEpochId = tracker.EpochId
-	}
 
 	for {
 		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 		epochSnapshot := handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler
 		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+		rememberLastMileEpochHandler(&epochSnapshot)
 
 		if epochSnapshot.Id != lastProcessedEpoch {
 			lastProcessedEpoch = epochSnapshot.Id
 			isFinalizer = iAmLastMileFinalizer(&epochSnapshot)
-			quorumConnectionsReady = false
 			anchorConnectionsSent = false
 
 			if isFinalizer {
@@ -146,13 +142,6 @@ func LastMileFinalizerThread() {
 		// Keep FINALIZER_THREAD_METADATA.EpochDataHandler in sync with the tracker.
 		// Sequence/anchor threads rely on this for canonical sequencing of the current epoch.
 		rotateFinalizerEpochIfNeeded(tracker.EpochId)
-
-		trackerIsFinalizer := iAmLastMileFinalizer(epochHandler)
-		if trackerIsFinalizer && (!quorumConnectionsReady || quorumConnectionsEpoch != tracker.EpochId) {
-			openQuorumConnectionsForLastMileFinalizer(epochHandler)
-			quorumConnectionsReady = true
-			quorumConnectionsEpoch = tracker.EpochId
-		}
 
 		if tracker.LeaderIndex >= len(epochHandler.LeadersSequence) {
 			completedBoundary := buildCompletedEpochBoundaryFromTracker(tracker, tracker.EpochId)
@@ -301,80 +290,8 @@ func LastMileFinalizerThread() {
 		currentHeight := tracker.NextHeight
 		currentHeightInEpoch := tracker.HeightInEpoch
 
-		// Persist mappings atomically with the current tracker checkpoint so the
-		// height-voter never observes a half-written local sequencing state.
-		if trackerIsFinalizer {
-			currentTrackerCheckpoint := *tracker
-			if err := utils.PersistLastMileMappingsAndState(
-				constants.DBKeyLastMileFinalizerTracker,
-				currentHeight,
-				blockId,
-				currentHeightInEpoch,
-				&currentTrackerCheckpoint,
-			); err != nil {
-				utils.LogWithTime(
-					fmt.Sprintf("Last mile sequencer: failed to persist local height mapping for %s at height %d: %v", blockId, currentHeight, err),
-					utils.RED_COLOR,
-				)
-				time.Sleep(200 * time.Millisecond)
-				continue
-			}
-		}
-
-		// --- Finalizer-only: collect AggregatedHeightProof before advancing ---
-		if trackerIsFinalizer {
-			var previousProof *structures.AggregatedHeightProof
-			if currentHeight > 0 {
-				previousProofRequired := true
-				if currentHeightInEpoch == 0 {
-					if previousBoundary := utils.LoadLastMileEpochBoundary(tracker.EpochId - 1); previousBoundary != nil &&
-						currentHeight == previousBoundary.FinishedOnHeight+1 {
-						previousProofRequired = false
-					}
-				}
-
-				if previousProofRequired {
-					previousProof = LoadAggregatedHeightProof(int(currentHeight - 1))
-				}
-				if previousProofRequired && previousProof == nil {
-					time.Sleep(200 * time.Millisecond)
-					continue
-				}
-			}
-
-			proof := tryCollectAggregatedHeightProof(int(currentHeight), blockId, blockHash, tracker.EpochId, currentHeightInEpoch, epochHandler, previousProof)
-			if proof == nil {
-				time.Sleep(200 * time.Millisecond)
-				continue
-			}
-
-			storeAggregatedHeightProof(proof)
-
-			if proof.HeightInEpoch == 0 && proof.EpochId != lastFirstBlockEpochId {
-				storeFirstBlockAggregatedHeightProof(proof)
-				parts := strings.Split(blockId, ":")
-				if len(parts) == 3 {
-					_ = storeDataAboutFirstBlockInEpoch(proof.EpochId, &FirstBlockData{
-						FirstBlockCreator: parts[1],
-						FirstBlockHash:    blockHash,
-					})
-				}
-				lastFirstBlockEpochId = proof.EpochId
-				utils.LogWithTime(
-					fmt.Sprintf("First core block in epoch %d detected (HeightInEpoch=0): creator=%s, hash=%s...", proof.EpochId, parts[1], utils.ShortHash(blockHash)),
-					utils.GREEN_COLOR,
-				)
-			}
-
-			websocket_pack.SendAggregatedHeightProofToPoD(*proof)
-
-			utils.LogWithTime(
-				fmt.Sprintf("Aggregated height proof collected for height %d => %s (hash: %s...)", proof.AbsoluteHeight, blockId, utils.ShortHash(blockHash)),
-				utils.DEEP_GREEN_COLOR,
-			)
-		}
-
-		// Advance tracker (ALL nodes — finalizers reach here only after successful proof collection)
+		// Advance local sequencing independently from AHP collection. The AHP
+		// collector follows this mapping with its own cursor.
 		nextTracker := *tracker
 		if isLastBlock {
 			nextTracker.LeaderIndex++
@@ -388,19 +305,6 @@ func LastMileFinalizerThread() {
 		var completedBoundary *structures.LastMileEpochBoundary
 		if nextTracker.LeaderIndex >= len(epochHandler.LeadersSequence) {
 			completedBoundary = newLastMileEpochBoundary(epochHandler.Id, currentHeight, blockId, blockHash)
-		}
-
-		if trackerIsFinalizer {
-			if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileFinalizerTracker, &nextTracker, completedBoundary); err != nil {
-				utils.LogWithTime(
-					fmt.Sprintf("Last mile sequencer: failed to persist tracker advance after height %d: %v", currentHeight, err),
-					utils.RED_COLOR,
-				)
-				time.Sleep(200 * time.Millisecond)
-				continue
-			}
-			tracker = &nextTracker
-			continue
 		}
 
 		if err := utils.PersistLastMileMappingsAndStateTransition(
@@ -420,6 +324,243 @@ func LastMileFinalizerThread() {
 		}
 		tracker = &nextTracker
 	}
+}
+
+func LastMileAHPCollectorThread() {
+	lastProcessedEpoch := -1
+	quorumConnectionsReady := false
+	quorumConnectionsEpoch := -1
+	lastFirstBlockEpochId := -1
+
+	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileAHPCollectorTracker)
+	if getFirstBlockDataFromDB(tracker.EpochId) != nil {
+		lastFirstBlockEpochId = tracker.EpochId
+	}
+
+	for {
+		sequencerTracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
+		if sequencerTracker.NextHeight <= tracker.NextHeight {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		blockId := utils.LoadHeightBlockIdMapping(tracker.NextHeight)
+		heightInEpoch, ok := utils.LoadHeightInEpochMapping(tracker.NextHeight)
+		if blockId == "" || !ok {
+			if syncedTracker, synced := syncAHPCollectorToSequencerBoundary(tracker, sequencerTracker); synced {
+				tracker = syncedTracker
+				continue
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		blockParts, ok := parseLastMileBlockId(blockId)
+		if !ok {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		epochHandler := getEpochHandlerForTracker(blockParts.EpochId)
+		if epochHandler == nil {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		if !iAmLastMileFinalizer(epochHandler) {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		if blockParts.EpochId != lastProcessedEpoch {
+			lastProcessedEpoch = blockParts.EpochId
+			quorumConnectionsReady = false
+			utils.LogWithTime(
+				fmt.Sprintf("Last mile AHP collector: processing epoch %d from height %d", blockParts.EpochId, tracker.NextHeight),
+				utils.CYAN_COLOR,
+			)
+		}
+
+		if !quorumConnectionsReady || quorumConnectionsEpoch != blockParts.EpochId {
+			openQuorumConnectionsForLastMileFinalizer(epochHandler)
+			quorumConnectionsReady = true
+			quorumConnectionsEpoch = blockParts.EpochId
+		}
+
+		if existingProof := LoadAggregatedHeightProof(int(tracker.NextHeight)); existingProof != nil &&
+			utils.VerifyAggregatedHeightProof(existingProof, epochHandler) {
+			tracker = advanceAHPCollectorTracker(tracker, blockId, epochHandler)
+			_ = utils.PersistLastMileStateTransition(constants.DBKeyLastMileAHPCollectorTracker, tracker, nil)
+			continue
+		}
+
+		blockHash := getBlockHashByBlockId(blockId, epochHandler)
+		if blockHash == "" {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		proof := tryCollectAggregatedHeightProof(int(tracker.NextHeight), blockId, blockHash, blockParts.EpochId, heightInEpoch, epochHandler)
+		if proof == nil {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		storeAggregatedHeightProof(proof)
+
+		if proof.HeightInEpoch == 0 && proof.EpochId != lastFirstBlockEpochId {
+			storeFirstBlockAggregatedHeightProof(proof)
+			if len(blockParts.Creator) > 0 {
+				_ = storeDataAboutFirstBlockInEpoch(proof.EpochId, &FirstBlockData{
+					FirstBlockCreator: blockParts.Creator,
+					FirstBlockHash:    blockHash,
+				})
+			}
+			lastFirstBlockEpochId = proof.EpochId
+			utils.LogWithTime(
+				fmt.Sprintf("First core block in epoch %d detected (HeightInEpoch=0): creator=%s, hash=%s...", proof.EpochId, blockParts.Creator, utils.ShortHash(blockHash)),
+				utils.GREEN_COLOR,
+			)
+		}
+
+		websocket_pack.SendAggregatedHeightProofToPoD(*proof)
+
+		nextTracker := advanceAHPCollectorTracker(tracker, blockId, epochHandler)
+		if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileAHPCollectorTracker, nextTracker, nil); err != nil {
+			utils.LogWithTime(
+				fmt.Sprintf("Last mile AHP collector: failed to persist tracker advance after height %d: %v", tracker.NextHeight, err),
+				utils.RED_COLOR,
+			)
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+		tracker = nextTracker
+
+		utils.LogWithTime(
+			fmt.Sprintf("Aggregated height proof collected for height %d => %s (hash: %s...)", proof.AbsoluteHeight, blockId, utils.ShortHash(blockHash)),
+			utils.DEEP_GREEN_COLOR,
+		)
+	}
+}
+
+type lastMileBlockIdParts struct {
+	EpochId int
+	Creator string
+	Index   int
+}
+
+func parseLastMileBlockId(blockId string) (lastMileBlockIdParts, bool) {
+	parts := strings.Split(blockId, ":")
+	if len(parts) != 3 {
+		return lastMileBlockIdParts{}, false
+	}
+	epochId, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return lastMileBlockIdParts{}, false
+	}
+	index, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return lastMileBlockIdParts{}, false
+	}
+	return lastMileBlockIdParts{
+		EpochId: epochId,
+		Creator: parts[1],
+		Index:   index,
+	}, true
+}
+
+func advanceAHPCollectorTracker(tracker *utils.LastMileSequenceState, blockId string, epochHandler *structures.EpochDataHandler) *utils.LastMileSequenceState {
+	nextHeight := tracker.NextHeight + 1
+	if mappedNextBlockId := utils.LoadHeightBlockIdMapping(nextHeight); mappedNextBlockId != "" {
+		if mapped, ok := buildAHPCollectorTrackerForMappedHeight(nextHeight, mappedNextBlockId); ok {
+			return mapped
+		}
+	}
+
+	blockParts, ok := parseLastMileBlockId(blockId)
+	if !ok {
+		nextTracker := *tracker
+		nextTracker.NextHeight = nextHeight
+		nextTracker.HeightInEpoch++
+		return &nextTracker
+	}
+
+	nextTracker := *tracker
+	nextTracker.EpochId = blockParts.EpochId
+	nextTracker.LeaderIndex = leaderIndexForPubkey(epochHandler, blockParts.Creator)
+	nextTracker.BlockIndex = blockParts.Index + 1
+	nextTracker.NextHeight = nextHeight
+	nextTracker.HeightInEpoch++
+	return &nextTracker
+}
+
+func buildAHPCollectorTrackerForMappedHeight(height int64, blockId string) (*utils.LastMileSequenceState, bool) {
+	blockParts, ok := parseLastMileBlockId(blockId)
+	if !ok {
+		return nil, false
+	}
+	heightInEpoch, ok := utils.LoadHeightInEpochMapping(height)
+	if !ok {
+		return nil, false
+	}
+	epochHandler := getEpochHandlerForTracker(blockParts.EpochId)
+	if epochHandler == nil {
+		return nil, false
+	}
+	return &utils.LastMileSequenceState{
+		EpochId:       blockParts.EpochId,
+		LeaderIndex:   leaderIndexForPubkey(epochHandler, blockParts.Creator),
+		BlockIndex:    blockParts.Index,
+		NextHeight:    height,
+		HeightInEpoch: heightInEpoch,
+	}, true
+}
+
+func leaderIndexForPubkey(epochHandler *structures.EpochDataHandler, leader string) int {
+	if epochHandler == nil {
+		return 0
+	}
+	for idx, candidate := range epochHandler.LeadersSequence {
+		if candidate == leader {
+			return idx
+		}
+	}
+	return 0
+}
+
+func syncAHPCollectorToSequencerBoundary(
+	tracker *utils.LastMileSequenceState,
+	sequencerTracker *utils.LastMileSequenceState,
+) (*utils.LastMileSequenceState, bool) {
+	if tracker == nil || sequencerTracker == nil || tracker.EpochId >= sequencerTracker.EpochId {
+		return nil, false
+	}
+	previousBoundary := utils.LoadLastMileEpochBoundary(sequencerTracker.EpochId - 1)
+	if previousBoundary == nil {
+		return nil, false
+	}
+	nextTracker := &utils.LastMileSequenceState{
+		EpochId:       sequencerTracker.EpochId,
+		LeaderIndex:   0,
+		BlockIndex:    0,
+		NextHeight:    previousBoundary.FinishedOnHeight + 1,
+		HeightInEpoch: 0,
+	}
+	if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileAHPCollectorTracker, nextTracker, nil); err != nil {
+		utils.LogWithTime(
+			fmt.Sprintf("Last mile AHP collector: failed to fast-forward tracker to epoch %d: %v", sequencerTracker.EpochId, err),
+			utils.RED_COLOR,
+		)
+		return nil, false
+	}
+	utils.LogWithTime(
+		fmt.Sprintf("Last mile AHP collector: fast-forwarded tracker to epoch %d height=%d using sequencer boundary",
+			nextTracker.EpochId,
+			nextTracker.NextHeight,
+		),
+		utils.CYAN_COLOR,
+	)
+	return nextTracker, true
 }
 
 func selectLastMileFinalizersForEpoch(epochHandler *structures.EpochDataHandler) []string {
@@ -461,6 +602,25 @@ func iAmLastMileFinalizer(epochHandler *structures.EpochDataHandler) bool {
 	selected := selectLastMileFinalizersForEpoch(epochHandler)
 
 	return slices.Contains(selected, globals.CONFIGURATION.PublicKey)
+}
+
+func rememberLastMileEpochHandler(epochHandler *structures.EpochDataHandler) {
+	if epochHandler == nil {
+		return
+	}
+	LAST_MILE_EPOCH_HANDLERS_MUTEX.Lock()
+	LAST_MILE_EPOCH_HANDLERS[epochHandler.Id] = *epochHandler
+	LAST_MILE_EPOCH_HANDLERS_MUTEX.Unlock()
+}
+
+func getRememberedLastMileEpochHandler(epochId int) *structures.EpochDataHandler {
+	LAST_MILE_EPOCH_HANDLERS_MUTEX.RLock()
+	handler, ok := LAST_MILE_EPOCH_HANDLERS[epochId]
+	LAST_MILE_EPOCH_HANDLERS_MUTEX.RUnlock()
+	if !ok {
+		return nil
+	}
+	return &handler
 }
 
 func openQuorumConnectionsForLastMileFinalizer(epochHandler *structures.EpochDataHandler) {
@@ -619,6 +779,18 @@ func getEpochHandlerForTracker(epochId int) *structures.EpochDataHandler {
 		return &copy
 	}
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
+
+	handlers.FINALIZER_THREAD_METADATA.RWMutex.RLock()
+	if handlers.FINALIZER_THREAD_METADATA.Handler.EpochDataHandler.Id == epochId {
+		copy := handlers.FINALIZER_THREAD_METADATA.Handler.EpochDataHandler
+		handlers.FINALIZER_THREAD_METADATA.RWMutex.RUnlock()
+		return &copy
+	}
+	handlers.FINALIZER_THREAD_METADATA.RWMutex.RUnlock()
+
+	if remembered := getRememberedLastMileEpochHandler(epochId); remembered != nil {
+		return remembered
+	}
 
 	if snapshot := utils.GetEpochSnapshot(toAbsoluteEpochId(epochId)); snapshot != nil {
 		return &snapshot.EpochDataHandler
@@ -855,76 +1027,77 @@ func syncLastMileTrackerToCurrentEpochStart(
 		return nil, false
 	}
 
-	proof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id - 1)
-	if proof == nil || proof.NextEpochId != currentEpochHandler.Id {
-		return nil, false
-	}
+	nextTracker := *tracker
 
-	nextHeight := proof.FinishedOnHeight + 1
-	if nextHeight < tracker.NextHeight {
-		utils.LogWithTimeThrottled(
-			fmt.Sprintf("last_mile:catchup_regression:%d:%d", tracker.EpochId, currentEpochHandler.Id),
-			2*time.Second,
-			fmt.Sprintf(
-				"Last mile sequencer: refusing tracker fast-forward to epoch %d because proof boundary height %d would regress local nextHeight %d",
-				currentEpochHandler.Id,
-				proof.FinishedOnHeight,
-				tracker.NextHeight,
-			),
-			utils.YELLOW_COLOR,
+	for nextTracker.EpochId < currentEpochHandler.Id {
+		proof := fetchVerifiedAggregatedEpochRotationProof(nextTracker.EpochId)
+		if proof == nil || proof.NextEpochId != nextTracker.EpochId+1 {
+			return nil, false
+		}
+
+		nextHeight := proof.FinishedOnHeight + 1
+		if nextHeight < nextTracker.NextHeight {
+			utils.LogWithTimeThrottled(
+				fmt.Sprintf("last_mile:catchup_regression:%d:%d", nextTracker.EpochId, proof.NextEpochId),
+				2*time.Second,
+				fmt.Sprintf(
+					"Last mile sequencer: refusing tracker fast-forward to epoch %d because proof boundary height %d would regress local nextHeight %d",
+					proof.NextEpochId,
+					proof.FinishedOnHeight,
+					nextTracker.NextHeight,
+				),
+				utils.YELLOW_COLOR,
+			)
+			return nil, false
+		}
+
+		provenBoundary := newLastMileEpochBoundary(
+			proof.EpochId,
+			proof.FinishedOnHeight,
+			proof.FinishedOnBlockId,
+			proof.FinishedOnHash,
 		)
-		return nil, false
-	}
 
-	nextTracker := &utils.LastMileSequenceState{
-		EpochId:       currentEpochHandler.Id,
-		LeaderIndex:   0,
-		BlockIndex:    0,
-		NextHeight:    nextHeight,
-		HeightInEpoch: 0,
-	}
+		nextTracker = utils.LastMileSequenceState{
+			EpochId:       proof.NextEpochId,
+			LeaderIndex:   0,
+			BlockIndex:    0,
+			NextHeight:    nextHeight,
+			HeightInEpoch: 0,
+		}
 
-	provenBoundary := newLastMileEpochBoundary(
-		proof.EpochId,
-		proof.FinishedOnHeight,
-		proof.FinishedOnBlockId,
-		proof.FinishedOnHash,
-	)
-
-	if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileFinalizerTracker, nextTracker, provenBoundary); err != nil {
-		utils.LogWithTime(
-			fmt.Sprintf("Last mile sequencer: failed to persist catch-up tracker sync to epoch %d: %v", currentEpochHandler.Id, err),
-			utils.RED_COLOR,
-		)
-		return nil, false
+		if err := utils.PersistLastMileStateTransition(constants.DBKeyLastMileFinalizerTracker, &nextTracker, provenBoundary); err != nil {
+			utils.LogWithTime(
+				fmt.Sprintf("Last mile sequencer: failed to persist catch-up tracker sync to epoch %d: %v", proof.NextEpochId, err),
+				utils.RED_COLOR,
+			)
+			return nil, false
+		}
 	}
 
 	utils.LogWithTime(
 		fmt.Sprintf(
-			"Last mile sequencer: fast-forwarded tracker from epoch %d to epoch %d using rotation proof boundary height=%d blockId=%s hash=%s",
+			"Last mile sequencer: fast-forwarded tracker from epoch %d to epoch %d using verified rotation proof chain (nextHeight=%d)",
 			tracker.EpochId,
-			currentEpochHandler.Id,
-			proof.FinishedOnHeight,
-			proof.FinishedOnBlockId,
-			utils.ShortHash(proof.FinishedOnHash),
+			nextTracker.EpochId,
+			nextTracker.NextHeight,
 		),
 		utils.CYAN_COLOR,
 	)
 
-	return nextTracker, true
+	return &nextTracker, true
 }
 
-func tryCollectAggregatedHeightProof(absoluteHeight int, blockId, blockHash string, epochId int, heightInEpoch int, epochHandler *structures.EpochDataHandler, previousProof *structures.AggregatedHeightProof) *structures.AggregatedHeightProof {
+func tryCollectAggregatedHeightProof(absoluteHeight int, blockId, blockHash string, epochId int, heightInEpoch int, epochHandler *structures.EpochDataHandler) *structures.AggregatedHeightProof {
 	majority := utils.GetQuorumMajority(epochHandler)
 
 	request := websocket_pack.WsHeightProofRequest{
-		Route:                         constants.WsRouteSignHeightProof,
-		AbsoluteHeight:                absoluteHeight,
-		BlockId:                       blockId,
-		BlockHash:                     blockHash,
-		EpochId:                       epochId,
-		HeightInEpoch:                 heightInEpoch,
-		PreviousAggregatedHeightProof: previousProof,
+		Route:          constants.WsRouteSignHeightProof,
+		AbsoluteHeight: absoluteHeight,
+		BlockId:        blockId,
+		BlockHash:      blockHash,
+		EpochId:        epochId,
+		HeightInEpoch:  heightInEpoch,
 	}
 
 	message, err := json.Marshal(request)

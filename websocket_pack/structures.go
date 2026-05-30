@@ -84,13 +84,12 @@ type WsAggregatedLeaderFinalizationProofResponse struct {
 // WsHeightProofRequest is sent by the last-mile finalizer to request a single
 // height-proof signature from a quorum member.
 type WsHeightProofRequest struct {
-	Route                         string                            `json:"route"`
-	AbsoluteHeight                int                               `json:"absoluteHeight"`
-	BlockId                       string                            `json:"blockId"`
-	BlockHash                     string                            `json:"blockHash"`
-	EpochId                       int                               `json:"epochId"`
-	HeightInEpoch                 int                               `json:"heightInEpoch"`
-	PreviousAggregatedHeightProof *structures.AggregatedHeightProof `json:"previousAggregatedHeightProof,omitempty"`
+	Route          string `json:"route"`
+	AbsoluteHeight int    `json:"absoluteHeight"`
+	BlockId        string `json:"blockId"`
+	BlockHash      string `json:"blockHash"`
+	EpochId        int    `json:"epochId"`
+	HeightInEpoch  int    `json:"heightInEpoch"`
 }
 
 type WsHeightProofResponse struct {

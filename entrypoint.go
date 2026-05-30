@@ -76,9 +76,11 @@ func RunBlockchain() {
 	//✅ 11.Thread to asynchronously find and store first block data in each epoch
 	go threads.FirstBlockInEpochMonitorThread()
 
-	//✅ 12.Thread for last mile finalization: sequences blocks locally (writes height->blockId
-	//   mappings for SignHeightProof on ALL nodes) and collects AggregatedHeightProof on finalizer nodes
+	//✅ 12.Thread for last mile finalization: sequences blocks locally and writes height mappings on ALL nodes
 	go threads.LastMileFinalizerThread()
+
+	//✅ 13.Thread for collecting AggregatedHeightProof on selected last-mile finalizer nodes
+	go threads.LastMileAHPCollectorThread()
 
 	//___________________ RUN SERVERS - WEBSOCKET AND HTTP __________________
 
