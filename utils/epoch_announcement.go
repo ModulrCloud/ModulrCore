@@ -70,8 +70,8 @@ func tryCollectEpochAnnouncementProof(epochId, nextEpochId int, prevEpochHandler
 		return nil
 	}
 
-	tmpConns, tmpWaiter := openTemporaryEpochAnnouncementQuorumConnections(prevEpochHandler)
-	defer closeTemporaryEpochAnnouncementQuorumConnections(tmpConns)
+	tmpConns, tmpWaiter, tmpGuards := openTemporaryEpochAnnouncementQuorumConnections(prevEpochHandler)
+	defer closeTemporaryEpochAnnouncementQuorumConnections(tmpConns, tmpGuards)
 
 	return tryCollectEpochAnnouncementProofWithConns(epochId, nextEpochId, localEpochData, epochDataHash, prevEpochHandler, tmpConns, tmpWaiter)
 }
@@ -142,20 +142,27 @@ func tryCollectEpochAnnouncementProofWithConns(
 	}
 }
 
-func openTemporaryEpochAnnouncementQuorumConnections(epochHandler *structures.EpochDataHandler) (map[string]*websocket.Conn, *QuorumWaiter) {
+func openTemporaryEpochAnnouncementQuorumConnections(epochHandler *structures.EpochDataHandler) (map[string]*websocket.Conn, *QuorumWaiter, *WebsocketGuards) {
 	conns := make(map[string]*websocket.Conn)
 	guards := NewWebsocketGuards()
 	OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, conns, guards)
 	waiter := NewQuorumWaiter(len(epochHandler.Quorum), guards)
 
-	return conns, waiter
+	return conns, waiter, guards
 }
 
-func closeTemporaryEpochAnnouncementQuorumConnections(conns map[string]*websocket.Conn) {
-	for _, conn := range conns {
+func closeTemporaryEpochAnnouncementQuorumConnections(conns map[string]*websocket.Conn, guards *WebsocketGuards) {
+	if guards == nil {
+		return
+	}
+	guards.ConnMu.Lock()
+	defer guards.ConnMu.Unlock()
+
+	for id, conn := range conns {
 		if conn != nil {
 			_ = conn.Close()
 		}
+		delete(conns, id)
 	}
 }
 

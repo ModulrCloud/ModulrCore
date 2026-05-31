@@ -47,6 +47,8 @@ func scenarioCmd(args []string) error {
 		return recoveryFullCycleSmokeScenario(args[1:])
 	case "long_running_stability":
 		return longRunningStabilityScenario(args[1:])
+	case "long_running_21_validator_liveness":
+		return longRunning21ValidatorLivenessScenario(args[1:])
 	case "long_running_stability_with_temporary_validator_down":
 		return longRunningStabilityWithTemporaryValidatorDownScenario(args[1:])
 	default:

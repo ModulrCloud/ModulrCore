@@ -102,14 +102,14 @@ func LastMileFinalizerThread() {
 				nextEpochHandler := getEpochHandlerForTracker(prevEpochId + 1)
 
 				if prevEpochHandler != nil && nextEpochHandler != nil && iAmLastMileFinalizer(nextEpochHandler) {
-					tmpConns, tmpWaiter := openTemporaryQuorumConnections(prevEpochHandler)
+					tmpConns, tmpWaiter, tmpGuards := openTemporaryQuorumConnections(prevEpochHandler)
 
 					epochRotationProof := tryCollectAggregatedEpochRotationProofWithConns(
 						prevEpochId, prevEpochId+1,
 						prevEpochHandler, tmpConns, tmpWaiter,
 					)
 
-					closeTemporaryQuorumConnections(tmpConns)
+					closeTemporaryQuorumConnections(tmpConns, tmpGuards)
 
 					if epochRotationProof != nil {
 						if !anchorConnectionsSent {
@@ -527,8 +527,8 @@ func collectAHPForJob(job lastMileAHPCollectionJob) lastMileAHPCollectionResult 
 		return lastMileAHPCollectionResult{Job: job}
 	}
 
-	conns, waiter := openTemporaryQuorumConnections(job.EpochHandler)
-	defer closeTemporaryQuorumConnections(conns)
+	conns, waiter, guards := openTemporaryQuorumConnections(job.EpochHandler)
+	defer closeTemporaryQuorumConnections(conns, guards)
 
 	proof = tryCollectAggregatedHeightProofWithConns(
 		int(job.Height),
@@ -855,20 +855,27 @@ func getRememberedLastMileEpochHandler(epochId int) *structures.EpochDataHandler
 	return &handler
 }
 
-func openTemporaryQuorumConnections(epochHandler *structures.EpochDataHandler) (map[string]*websocket.Conn, *utils.QuorumWaiter) {
+func openTemporaryQuorumConnections(epochHandler *structures.EpochDataHandler) (map[string]*websocket.Conn, *utils.QuorumWaiter, *utils.WebsocketGuards) {
 	conns := make(map[string]*websocket.Conn)
 	guards := utils.NewWebsocketGuards()
 	utils.OpenWebsocketConnectionsWithQuorum(epochHandler.Quorum, conns, guards)
 	waiter := utils.NewQuorumWaiter(len(epochHandler.Quorum), guards)
 
-	return conns, waiter
+	return conns, waiter, guards
 }
 
-func closeTemporaryQuorumConnections(conns map[string]*websocket.Conn) {
-	for _, conn := range conns {
+func closeTemporaryQuorumConnections(conns map[string]*websocket.Conn, guards *utils.WebsocketGuards) {
+	if guards == nil {
+		return
+	}
+	guards.ConnMu.Lock()
+	defer guards.ConnMu.Unlock()
+
+	for id, conn := range conns {
 		if conn != nil {
 			_ = conn.Close()
 		}
+		delete(conns, id)
 	}
 }
 

@@ -62,6 +62,7 @@ func printUsage(out io.Writer) {
   go run ./tests_e2e/harness scenario recovery_script_style
   go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
   go run ./tests_e2e/harness scenario long_running_stability
+  go run ./tests_e2e/harness scenario long_running_21_validator_liveness
   go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down
   go run ./tests_e2e/harness start  -manifest tests_e2e/manifests/example.json
   go run ./tests_e2e/harness status [-run-dir tests_e2e/runs/latest]
