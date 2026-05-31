@@ -105,6 +105,36 @@ type AggregatedEpochRotationProof struct {
 	Proofs            map[string]string    `json:"proofs"`
 }
 
+func (eda *AggregatedEpochRotationProof) UnmarshalJSON(data []byte) error {
+	type alias AggregatedEpochRotationProof
+
+	var aux alias
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.Proofs == nil {
+		aux.Proofs = make(map[string]string)
+	}
+
+	*eda = AggregatedEpochRotationProof(aux)
+
+	return nil
+}
+
+func (eda AggregatedEpochRotationProof) MarshalJSON() ([]byte, error) {
+	type alias AggregatedEpochRotationProof
+
+	aux := alias(eda)
+
+	if aux.Proofs == nil {
+		aux.Proofs = make(map[string]string)
+	}
+
+	return json.Marshal(aux)
+}
+
 type AggregatedEpochAnnouncementProof struct {
 	EpochId       int                  `json:"epochId"`
 	NextEpochId   int                  `json:"nextEpochId"`
@@ -133,36 +163,6 @@ func (eda *AggregatedEpochAnnouncementProof) UnmarshalJSON(data []byte) error {
 
 func (eda AggregatedEpochAnnouncementProof) MarshalJSON() ([]byte, error) {
 	type alias AggregatedEpochAnnouncementProof
-
-	aux := alias(eda)
-
-	if aux.Proofs == nil {
-		aux.Proofs = make(map[string]string)
-	}
-
-	return json.Marshal(aux)
-}
-
-func (eda *AggregatedEpochRotationProof) UnmarshalJSON(data []byte) error {
-	type alias AggregatedEpochRotationProof
-
-	var aux alias
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	if aux.Proofs == nil {
-		aux.Proofs = make(map[string]string)
-	}
-
-	*eda = AggregatedEpochRotationProof(aux)
-
-	return nil
-}
-
-func (eda AggregatedEpochRotationProof) MarshalJSON() ([]byte, error) {
-	type alias AggregatedEpochRotationProof
 
 	aux := alias(eda)
 
