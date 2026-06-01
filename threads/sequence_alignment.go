@@ -45,7 +45,25 @@ func SequenceAlignmentThread() {
 
 		handlers.FINALIZER_THREAD_METADATA.RWMutex.RUnlock()
 
-		if infoAboutAnchorLastBlockExists && infoAboutAnchorLastBlock.Index == currentAnchorBlockPointerObserved {
+		// Invariant guard: the observed pointer must never get ahead of the
+		// AARP-certified boundary. The flip below recovers via >=, but a positive
+		// difference still signals a state-machine bug worth surfacing.
+		if infoAboutAnchorLastBlockExists && currentAnchorBlockPointerObserved > infoAboutAnchorLastBlock.Index {
+			utils.LogWithTimeThrottled(
+				fmt.Sprintf("sequence_alignment:observed_past_boundary:%d:%d", epochSnapshot.Id, currentAnchorIndex),
+				5*time.Second,
+				fmt.Sprintf("Sequence alignment: observed pointer %d is past anchor %d boundary %d in epoch %d (recovering via flip)",
+					currentAnchorBlockPointerObserved, currentAnchorIndex, infoAboutAnchorLastBlock.Index, epochSnapshot.Id),
+				utils.YELLOW_COLOR,
+			)
+		}
+
+		// Flip to the next anchor once we have observed the dead anchor's chain up to
+		// (or, defensively, past) the AARP-certified boundary. Using >= instead of a
+		// strict == makes the flip robust: if the observed pointer ever ends up beyond
+		// the boundary it must still be able to advance instead of spinning forever on
+		// a non-existent next block.
+		if infoAboutAnchorLastBlockExists && infoAboutAnchorLastBlock.Index <= currentAnchorBlockPointerObserved {
 			handlers.FINALIZER_THREAD_METADATA.RWMutex.Lock()
 			if handlers.FINALIZER_THREAD_METADATA.Handler.EpochDataHandler.Id == epochSnapshot.Id &&
 				handlers.FINALIZER_THREAD_METADATA.Handler.SequenceAlignmentData.CurrentAnchorAssumption == currentAnchorIndex &&
@@ -137,7 +155,15 @@ func SequenceAlignmentThread() {
 			}
 		}
 
-		alignmentData.CurrentAnchorBlockIndexObserved++
+		// Advance the observed pointer ONLY if it still matches the snapshot used to
+		// fetch and validate this block. AnchorRotationMonitorThread concurrently sets
+		// this pointer to the AARP boundary index while we are off-lock fetching the
+		// block; a blind ++ here would increment the monitor's value instead of our
+		// snapshot and overshoot the boundary, deadlocking the flip above. This mirrors
+		// the snapshot-consistency guard used by the flip path.
+		if alignmentData.CurrentAnchorBlockIndexObserved == currentAnchorBlockPointerObserved {
+			alignmentData.CurrentAnchorBlockIndexObserved++
+		}
 
 		persistFinalizerThreadMetadataLocked()
 

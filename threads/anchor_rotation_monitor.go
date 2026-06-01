@@ -111,6 +111,7 @@ func checkSequenceAlignmentData(anchorIndex int, epochHandler *structures.EpochD
 	}
 
 	if _, exists := currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex]; !exists {
+		prevObserved := currentHandler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved
 		currentHandler.SequenceAlignmentData.LastBlocksByAnchors[anchorIndex] = earliestRotationStats
 		if currentHandler.SequenceAlignmentData.CurrentAnchorAssumption == anchorIndex &&
 			currentHandler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved < earliestRotationStats.Index {
@@ -119,12 +120,14 @@ func checkSequenceAlignmentData(anchorIndex int, epochHandler *structures.EpochD
 		persistFinalizerThreadMetadataLocked()
 		utils.LogWithTime(
 			fmt.Sprintf(
-				"Anchor rotation monitor: accepted AARP chain for epoch %d anchorIndex=%d -> foundInAnchorIndex=%d lastBlockIndex=%d hash=%s",
+				"Anchor rotation monitor: accepted AARP chain for epoch %d anchorIndex=%d -> foundInAnchorIndex=%d lastBlockIndex=%d hash=%s (observed %d->%d)",
 				epochHandler.Id,
 				anchorIndex,
 				alignmentData.FoundInAnchorIndex,
 				earliestRotationStats.Index,
 				utils.ShortHash(earliestRotationStats.Hash),
+				prevObserved,
+				currentHandler.SequenceAlignmentData.CurrentAnchorBlockIndexObserved,
 			),
 			utils.CYAN_COLOR,
 		)
