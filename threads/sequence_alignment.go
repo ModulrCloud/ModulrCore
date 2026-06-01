@@ -89,8 +89,12 @@ func SequenceAlignmentThread() {
 			}
 		}
 
-		afpValid := response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, &epochSnapshot)
 		responseBlockHash := response.Block.GetHash()
+		// response.Afp is expected to be the AFP of the NEXT anchor block (blockId+1).
+		// Bind it to this block: only a next-block AFP that chains back to responseBlockHash
+		// proves this block is finalized. Without this binding a valid-but-unrelated AFP
+		// (e.g. an earlier block's proof) would let us advance past the canonical tail.
+		afpValid := response.Afp != nil && utils.VerifyAnchorBlockFinalizedByNextAfp(blockId, responseBlockHash, response.Afp, &epochSnapshot)
 
 		handlers.FINALIZER_THREAD_METADATA.RWMutex.Lock()
 

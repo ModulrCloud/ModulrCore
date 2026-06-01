@@ -71,6 +71,49 @@ func VerifyAggregatedFinalizationProofForAnchorBlock(proof *structures.Aggregate
 	return okSignatures >= majority
 }
 
+// VerifyAnchorBlockFinalizedByNextAfp reports whether nextAfp is a valid quorum
+// finalization proof for the anchor block that immediately follows
+// currentBlockId/currentBlockHash, and therefore finalizes that block.
+//
+// Anchor blocks follow the same "next-block AFP" finalization rule as core
+// blocks: block N is final only once a quorum AFP exists for block N+1 that
+// chains back to N via PrevBlockHash. Verifying signatures alone is NOT enough -
+// the proof must be bound to the specific block, otherwise a valid AFP for an
+// unrelated block in the same anchor chain would wrongly mark the current block
+// as finalized and let the reader advance past the canonical, quorum-agreed
+// tail (e.g. past an anchor-rotation boundary).
+func VerifyAnchorBlockFinalizedByNextAfp(currentBlockId, currentBlockHash string, nextAfp *structures.AggregatedFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
+	if nextAfp == nil || epochHandler == nil || currentBlockId == "" || currentBlockHash == "" {
+		return false
+	}
+
+	expectedNextBlockId, ok := incrementAnchorBlockIndex(currentBlockId)
+	if !ok || nextAfp.BlockId != expectedNextBlockId {
+		return false
+	}
+
+	if nextAfp.PrevBlockHash != currentBlockHash {
+		return false
+	}
+
+	return VerifyAggregatedFinalizationProofForAnchorBlock(nextAfp, epochHandler)
+}
+
+// incrementAnchorBlockIndex returns the block id with its index advanced by one
+// (epoch:creator:N -> epoch:creator:N+1). The boolean is false for malformed ids.
+func incrementAnchorBlockIndex(blockId string) (string, bool) {
+	parts := strings.Split(blockId, ":")
+	if len(parts) != 3 {
+		return "", false
+	}
+	idx, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", false
+	}
+	parts[2] = strconv.Itoa(idx + 1)
+	return strings.Join(parts, ":"), true
+}
+
 func VerifyAggregatedLeaderFinalizationProof(proof *structures.AggregatedLeaderFinalizationProof, epochHandler *structures.EpochDataHandler) bool {
 	if proof == nil || epochHandler == nil || proof.EpochIndex != epochHandler.Id {
 		return false
@@ -274,7 +317,7 @@ func GetVerifiedAnchorsAggregatedFinalizationProofByBlockId(blockID string, epoc
 			defer resp.Body.Close()
 
 			var afp structures.AggregatedFinalizationProof
-			if json.NewDecoder(resp.Body).Decode(&afp) == nil && VerifyAggregatedFinalizationProofForAnchorBlock(&afp, epochHandler) {
+			if json.NewDecoder(resp.Body).Decode(&afp) == nil && afp.BlockId == blockID && VerifyAggregatedFinalizationProofForAnchorBlock(&afp, epochHandler) {
 				select {
 				case resultChan <- &afp:
 					cancel()

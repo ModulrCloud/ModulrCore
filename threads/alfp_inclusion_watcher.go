@@ -121,7 +121,10 @@ func AlfpInclusionWatcherThread() {
 		}
 
 		// Determine if this block is accepted in the linear chain.
-		afpOk := response.Afp != nil && utils.VerifyAggregatedFinalizationProofForAnchorBlock(response.Afp, epochHandler)
+		// response.Afp is the AFP of the next anchor block (blockID+1); require it to be
+		// bound to this block (next-block id + PrevBlockHash) so we never accept a block
+		// on the strength of an unrelated, valid AFP.
+		afpOk := response.Afp != nil && utils.VerifyAnchorBlockFinalizedByNextAfp(blockID, block.GetHash(), response.Afp, epochHandler)
 
 		accepted := false
 		switch {
