@@ -163,6 +163,7 @@ func runFinalizationProofsGrabbing(epochHandler *structures.EpochDataHandler) {
 	}
 
 	blockHash := blockToShare.GetHash()
+	websocket_pack.SendBlockAndAfpToPoD(blockToShare, afpPrev)
 
 	// If we already have enough proofs, we can skip network step.
 	if len(proofsCopy) < majority {

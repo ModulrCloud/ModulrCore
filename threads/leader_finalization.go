@@ -46,6 +46,17 @@ type AlfpProcessMetadata struct {
 var (
 	ALFP_GRABBING_MUTEX   = sync.Mutex{}
 	ALFP_PROCESS_METADATA *AlfpProcessMetadata
+
+	ALFP_ANCHOR_HTTP_CLIENT = &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        64,
+			MaxIdleConnsPerHost: 4,
+			MaxConnsPerHost:     4,
+			IdleConnTimeout:     30 * time.Second,
+		},
+	}
+	ALFP_ANCHOR_BROADCAST_SEMAPHORE = make(chan struct{}, 4)
 )
 
 func LeaderFinalizationThread() {
@@ -682,10 +693,13 @@ func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.Aggre
 		return
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-
 	for _, anchor := range globals.ANCHORS {
 		go func(anchor structures.Anchor) {
+			ALFP_ANCHOR_BROADCAST_SEMAPHORE <- struct{}{}
+			defer func() {
+				<-ALFP_ANCHOR_BROADCAST_SEMAPHORE
+			}()
+
 			url := fmt.Sprintf("%s/accept_aggregated_leader_finalization_proof", strings.TrimRight(anchor.AnchorUrl, "/"))
 			req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 			if err != nil {
@@ -700,7 +714,7 @@ func sendAggregatedLeaderFinalizationProofToAnchors(aggregated *structures.Aggre
 
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := client.Do(req)
+			resp, err := ALFP_ANCHOR_HTTP_CLIENT.Do(req)
 			if err != nil {
 				utils.LogWithTimeThrottled(
 					fmt.Sprintf("alfp:anchors:post_err:%d:%s:%s", aggregated.EpochIndex, aggregated.Leader, anchor.AnchorUrl),

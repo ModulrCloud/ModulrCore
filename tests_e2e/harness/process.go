@@ -59,6 +59,12 @@ func startCmd(args []string) error {
 			return fmt.Errorf("start %s: %w", node.Name, err)
 		}
 		state.Nodes = append(state.Nodes, nodeState)
+		if node.Role == "pod" && *waitHealth && nodeState.HealthURL != "" {
+			if err := waitForHealthChecks([]NodeState{nodeState}, *healthTimeout); err != nil {
+				_ = stopState(state, 2*time.Second)
+				return err
+			}
+		}
 	}
 
 	if err := writeState(runDir, state); err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/modulrcloud/modulr-core/block_pack"
 	"github.com/modulrcloud/modulr-core/constants"
@@ -12,22 +13,36 @@ import (
 	"github.com/modulrcloud/modulr-core/utils"
 )
 
+var publishedCoreBlocksToPoD sync.Map
+
 func SendBlockAndAfpToPoD(block block_pack.Block, afp structures.AggregatedFinalizationProof) {
+	if block.Creator != globals.CONFIGURATION.PublicKey {
+		return
+	}
+	epochIndex := -1
+	parts := strings.Split(block.Epoch, "#")
+	if len(parts) > 0 {
+		last := parts[len(parts)-1]
+		if v, convErr := strconv.Atoi(last); convErr == nil {
+			epochIndex = v
+		}
+	}
+	id := utils.PoDOutboxIdForCoreBlock(epochIndex, block.Creator, block.Index)
+	if _, loaded := publishedCoreBlocksToPoD.LoadOrStore(id, struct{}{}); loaded {
+		return
+	}
+
 	req := WsBlockWithAfpStoreRequest{Route: constants.WsRouteAcceptBlockWithAfp, Block: block, Afp: afp}
 	if reqBytes, err := json.Marshal(req); err == nil {
 		if globals.CONFIGURATION.DisablePoDOutbox {
-			_, _ = utils.SendWebsocketMessageToPoD(reqBytes)
+			if _, err := utils.SendWebsocketMessageToPoD(reqBytes); err != nil {
+				publishedCoreBlocksToPoD.Delete(id)
+			}
 			return
 		}
-		epochIndex := -1
-		parts := strings.Split(block.Epoch, "#")
-		if len(parts) > 0 {
-			last := parts[len(parts)-1]
-			if v, convErr := strconv.Atoi(last); convErr == nil {
-				epochIndex = v
-			}
-		}
-		_ = utils.SendToPoDWithOutbox(utils.PoDOutboxIdForCoreBlock(epochIndex, block.Creator, block.Index), reqBytes)
+		_ = utils.SendToPoDWithOutbox(id, reqBytes)
+	} else {
+		publishedCoreBlocksToPoD.Delete(id)
 	}
 }
 

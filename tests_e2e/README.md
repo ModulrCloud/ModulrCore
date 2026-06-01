@@ -110,6 +110,8 @@ go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
 
 go run ./tests_e2e/harness scenario long_running_stability
 
+go run ./tests_e2e/harness scenario long_running_21_validator_liveness
+
 go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down
 
 go run ./tests_e2e/harness start \
@@ -411,6 +413,36 @@ Useful flags:
 go run ./tests_e2e/harness scenario long_running_stability -target-epoch 15
 go run ./tests_e2e/harness scenario long_running_stability -target-epoch 20 -observe-timeout 8m
 ```
+
+### `long_running_21_validator_liveness`
+
+```bash
+go run ./tests_e2e/harness scenario long_running_21_validator_liveness
+```
+
+This scenario verifies that a live `21 core + 7 anchors` network remains stable
+across several fast epochs. It uses dedicated PoD instances for core and anchor
+data (not self-PoD). By default it waits until anchors apply core transition
+`5 -> 6`, verifies every anchor ACK proof from `0 -> 1` through `5 -> 6` has
+anchor-majority signatures, checks that core heights advanced and all nodes are
+still alive, and then requires sustained executed-height growth. It then restarts
+an anchor majority in `RECOVERY_MODE` and verifies their signed
+`/recovery/latest_core_quorum` responses agree on the latest core quorum.
+
+Expect roughly 20–25 minutes for the default `-target-epoch 6` run. While waiting
+for each core transition, the scenario prints a progress line every 15 seconds
+with core height range, anchor ACK/missing counts, and PoD status.
+
+Useful flags:
+
+```bash
+go run ./tests_e2e/harness scenario long_running_21_validator_liveness -target-epoch 4
+go run ./tests_e2e/harness scenario long_running_21_validator_liveness -target-epoch 8 -observe-timeout 10m
+go run ./tests_e2e/harness scenario long_running_21_validator_liveness -base-port 0
+```
+
+Requires sibling checkouts of `modulr-anchors-core` and `point-of-distribution`
+(default paths: `../modulr-anchors-core`, `../point-of-distribution`).
 
 ### `long_running_stability_with_temporary_validator_down`
 

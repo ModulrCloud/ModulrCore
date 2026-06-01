@@ -22,9 +22,12 @@ func prepareCmd(args []string) error {
 	runID := fs.String("run-id", time.Now().UTC().Format("20060102T150405Z"), "run identifier")
 	coreRepo := fs.String("core-repo", ".", "path to modulr-core repository")
 	anchorsRepo := fs.String("anchors-repo", "../modulr-anchors-core", "path to modulr-anchors-core repository")
+	podRepo := fs.String("pod-repo", "../point-of-distribution", "path to point-of-distribution repository")
 	coreCommand := fs.String("core-command", "go run .", "command used to start each core node")
 	anchorCommand := fs.String("anchor-command", "go run .", "command used to start each anchor node")
+	podCommand := fs.String("pod-command", "go run .", "command used to start point-of-distribution")
 	basePort := fs.Int("base-port", 19000, "base TCP port for generated configs")
+	withPod := fs.Bool("pod", false, "generate and start a real point-of-distribution node")
 	overwrite := fs.Bool("overwrite", false, "remove an existing generated run directory before preparing")
 	coreEpochDurationMs := fs.Int64("core-epoch-duration-ms", 30_000, "core epoch duration in milliseconds")
 	coreLeadershipDurationMs := fs.Int64("core-leadership-duration-ms", 5_000, "core leadership duration in milliseconds")
@@ -52,6 +55,7 @@ func prepareCmd(args []string) error {
 	}
 	coreRepoAbs := absOrOriginal(*coreRepo)
 	anchorsRepoAbs := absOrOriginal(*anchorsRepo)
+	podRepoAbs := absOrOriginal(*podRepo)
 	coreNodeCommand := splitCommand(*coreCommand)
 	if strings.TrimSpace(*coreCommand) == "go run ." {
 		coreNodeCommand = []string{"go", "run", coreRepoAbs}
@@ -60,6 +64,7 @@ func prepareCmd(args []string) error {
 	if strings.TrimSpace(*anchorCommand) == "go run ." {
 		anchorNodeCommand = []string{"go", "run", "."}
 	}
+	podNodeCommand := splitCommand(*podCommand)
 
 	coreKeys := generateKeys(*coreCount)
 	anchorKeys := generateKeys(*anchorCount)
@@ -69,7 +74,15 @@ func prepareCmd(args []string) error {
 	coreWSBase := *basePort + 1000
 	anchorHTTPBase := *basePort + 2000
 	anchorWSBase := *basePort + 3000
+	corePodWSBase := *basePort + 4000
+	anchorsPodWSBase := *basePort + 4001
 	loopbackHost := "127.0.0.1"
+	corePodWS := fmt.Sprintf("ws://%s:%d", loopbackHost, corePodWSBase)
+	anchorsPodWS := fmt.Sprintf("ws://%s:%d", loopbackHost, anchorsPodWSBase)
+	if !*withPod {
+		corePodWS = fmt.Sprintf("ws://%s:%d", loopbackHost, coreWSBase)
+		anchorsPodWS = fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase)
+	}
 
 	coreValidators := make([]map[string]any, 0, *coreCount)
 	coreState := make(map[string]any, *coreCount)
@@ -135,8 +148,8 @@ func prepareCmd(args []string) error {
 			"PUBLIC_KEY":                       key.Pub,
 			"PRIVATE_KEY":                      key.Prv,
 			"RECOVERY_MODE":                    false,
-			"POINT_OF_DISTRIBUTION_WS":         fmt.Sprintf("ws://%s:%d", loopbackHost, coreWSBase+idx),
-			"ANCHORS_POINT_OF_DISTRIBUTION_WS": fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase),
+			"POINT_OF_DISTRIBUTION_WS":         podWSForGeneratedCore(*withPod, corePodWS, loopbackHost, coreWSBase+idx),
+			"ANCHORS_POINT_OF_DISTRIBUTION_WS": anchorsPodWS,
 			"DISABLE_POD_OUTBOX":               true,
 			"EXTRA_DATA_TO_BLOCK":              map[string]string{"e2e": "true", "node": nodeName},
 			"TXS_MEMPOOL_SIZE":                 300000,
@@ -186,7 +199,7 @@ func prepareCmd(args []string) error {
 			"PORT":                  anchorHTTPBase + idx,
 			"WEBSOCKET_INTERFACE":   "127.0.0.1",
 			"WEBSOCKET_PORT":        anchorWSBase + idx,
-			"POINT_OF_DISTRIBUTION": fmt.Sprintf("ws://%s:%d", loopbackHost, anchorWSBase+idx),
+			"POINT_OF_DISTRIBUTION": podWSForGeneratedAnchor(*withPod, anchorsPodWS, loopbackHost, anchorWSBase+idx),
 			"CORE_BOOTSTRAP_NODES":  coreBootstrapNodes,
 		}
 		if err := writeJSON(filepath.Join(chaindata, "configs.json"), config); err != nil {
@@ -209,9 +222,47 @@ func prepareCmd(args []string) error {
 		})
 	}
 
+	podNodes := make([]ManifestNode, 0, 2)
+	if *withPod {
+		for _, pod := range []struct {
+			name string
+			port int
+		}{
+			{name: "pod-core-1", port: corePodWSBase},
+			{name: "pod-anchors-1", port: anchorsPodWSBase},
+		} {
+			chaindata := filepath.Join(networkDir, pod.name)
+			if err := os.MkdirAll(chaindata, 0755); err != nil {
+				return err
+			}
+			config := map[string]any{
+				"wsInterface":        "127.0.0.1",
+				"wsPort":             pod.port,
+				"dataPath":           filepath.Join(chaindata, "poddata"),
+				"maxConcurrentLocks": 1000,
+				"logRequests":        false,
+			}
+			if err := writeJSON(filepath.Join(chaindata, "configs.json"), config); err != nil {
+				return err
+			}
+			podNodes = append(podNodes, ManifestNode{
+				Name:          pod.name,
+				Role:          "pod",
+				RepoPath:      podRepoAbs,
+				WorkDir:       podRepoAbs,
+				ChaindataPath: absOrOriginal(chaindata),
+				HealthURL:     fmt.Sprintf("http://%s:%d", loopbackHost, pod.port),
+				Command:       podNodeCommand,
+				Env: map[string]string{
+					"POD_CONFIG_PATH": absOrOriginal(filepath.Join(chaindata, "configs.json")),
+				},
+			})
+		}
+	}
+
 	manifest := Manifest{
 		Name:  "generated-" + *runID,
-		Nodes: append(coreNodes, anchorNodes...),
+		Nodes: append(append(podNodes, coreNodes...), anchorNodes...),
 	}
 	manifestPath := filepath.Join(runDir, "manifest.json")
 	if err := writeJSON(manifestPath, manifest); err != nil {
@@ -236,6 +287,20 @@ func prepareCmd(args []string) error {
 	fmt.Printf("prepared E2E network %s\nmanifest: %s\nnetwork: %s\n", *runID, manifestPath, networkDir)
 	fmt.Printf("start with:\n  go run ./tests_e2e/harness start -manifest %s\n", manifestPath)
 	return nil
+}
+
+func podWSForGeneratedCore(shared bool, sharedCorePodWS, host string, wsPort int) string {
+	if shared {
+		return sharedCorePodWS
+	}
+	return fmt.Sprintf("ws://%s:%d", host, wsPort)
+}
+
+func podWSForGeneratedAnchor(shared bool, sharedAnchorsPodWS, host string, wsPort int) string {
+	if shared {
+		return sharedAnchorsPodWS
+	}
+	return fmt.Sprintf("ws://%s:%d", host, wsPort)
 }
 
 func prepareRunDir(runDir string, overwrite bool) error {

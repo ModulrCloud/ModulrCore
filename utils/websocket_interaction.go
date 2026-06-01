@@ -37,12 +37,16 @@ const (
 	MAX_RETRIES         = 3
 	RETRY_INTERVAL      = 200 * time.Millisecond
 	READ_WRITE_DEADLINE = 2 * time.Second // timeout for read/write operations for POD (point of distribution)
+
+	QUORUM_RECONNECT_MIN_INTERVAL = 5 * time.Second
 )
 
 var (
 	POD_CLIENT         = NewPodClient("PoD", openWebsocketConnectionWithPoD)
 	POD_BULK_CLIENT    = NewPodClient("PoD-Bulk", openWebsocketConnectionWithPoD)
 	ANCHORS_POD_CLIENT = NewPodClient("Anchors-PoD", openWebsocketConnectionWithAnchorsPoD)
+
+	QUORUM_RECONNECT_LAST_ATTEMPT sync.Map
 )
 
 // PodClient manages a single persistent websocket connection to a PoD endpoint
@@ -528,6 +532,13 @@ func (qw *QuorumWaiter) getWriteMuConn(c *websocket.Conn) *sync.Mutex {
 // here so that a transient validator hiccup does not require waiting for a full
 // QuorumWaiter round before we even try to redial again.
 func reconnectOnce(pubkey string, wsConnMap map[string]*websocket.Conn, guards *WebsocketGuards) {
+	if lastRaw, ok := QUORUM_RECONNECT_LAST_ATTEMPT.Load(pubkey); ok {
+		if last, ok := lastRaw.(time.Time); ok && time.Since(last) < QUORUM_RECONNECT_MIN_INTERVAL {
+			return
+		}
+	}
+	QUORUM_RECONNECT_LAST_ATTEMPT.Store(pubkey, time.Now())
+
 	raw, err := databases.APPROVEMENT_THREAD_METADATA.Get([]byte(constants.DBKeyPrefixValidatorStorage+pubkey), nil)
 	if err != nil {
 		return

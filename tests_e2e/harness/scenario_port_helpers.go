@@ -18,6 +18,22 @@ func findAvailableGeneratedBasePort(startBasePort, stride int, coreCount, anchor
 	return 0, fmt.Errorf("could not find a free generated port range from base %d with stride %d", startBasePort, stride)
 }
 
+func findAvailableGeneratedBasePortWithPod(startBasePort, stride int, coreCount, anchorCount int) (int, error) {
+	if stride < 4002 {
+		return 0, errors.New("port stride must be at least 4002 when generating PoD ports")
+	}
+	for basePort := startBasePort; basePort <= 65535; basePort += stride {
+		if err := ensureGeneratedPortsAvailable(basePort, coreCount, anchorCount); err != nil {
+			continue
+		}
+		if err := ensureGeneratedPodPortsAvailable(basePort); err != nil {
+			continue
+		}
+		return basePort, nil
+	}
+	return 0, fmt.Errorf("could not find a free generated port range with PoDs from base %d with stride %d", startBasePort, stride)
+}
+
 func ensureGeneratedPortsAvailable(basePort, coreCount, anchorCount int) error {
 	ports := generatedNodePorts(basePort, coreCount, anchorCount)
 	for _, port := range ports {
@@ -26,6 +42,22 @@ func ensureGeneratedPortsAvailable(basePort, coreCount, anchorCount int) error {
 		}
 		if err := checkPortAvailable(port); err != nil {
 			return fmt.Errorf("generated port %d from base-port %d is unavailable: %w", port, basePort, err)
+		}
+	}
+	return nil
+}
+
+func ensureGeneratedPodPortAvailable(basePort int) error {
+	return ensureGeneratedPodPortsAvailable(basePort)
+}
+
+func ensureGeneratedPodPortsAvailable(basePort int) error {
+	for _, podPort := range []int{basePort + 4000, basePort + 4001} {
+		if podPort < 1 || podPort > 65535 {
+			return fmt.Errorf("generated PoD port %d from base-port %d is outside valid TCP range", podPort, basePort)
+		}
+		if err := checkPortAvailable(podPort); err != nil {
+			return fmt.Errorf("generated PoD port %d from base-port %d is unavailable: %w", podPort, basePort, err)
 		}
 	}
 	return nil

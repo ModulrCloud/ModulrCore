@@ -29,6 +29,8 @@ const (
 
 	LAST_MILE_AHP_COLLECTION_WINDOW  = 8
 	LAST_MILE_AHP_COLLECTION_WORKERS = 3
+	LAST_MILE_AHP_RETRY_BACKOFF_MIN  = 500 * time.Millisecond
+	LAST_MILE_AHP_RETRY_BACKOFF_MAX  = 5 * time.Second
 )
 
 var (
@@ -59,6 +61,62 @@ type lastMileBlockIdParts struct {
 	Index   int
 }
 
+type lastMileAHPQuorumClient struct {
+	EpochId int
+	Conns   map[string]*websocket.Conn
+	Waiter  *utils.QuorumWaiter
+	Guards  *utils.WebsocketGuards
+}
+
+type lastMileAHPRuntime struct {
+	WorkerClients []*lastMileAHPQuorumClient
+	BlockedHeight int64
+	Failures      int
+	RetryAfter    time.Time
+}
+
+// lastMileAfpBackfillInterval rate-limits PoD backfill requests for a missing
+// next-block AFP so a stuck leader boundary doesn't hammer PoD every loop tick.
+const lastMileAfpBackfillInterval = 750 * time.Millisecond
+
+// backfillNextBlockAfpFromPoD fetches the AFP that finalizes nextBlockId from
+// PoD and persists it locally so the finalizer can confirm the current block.
+// PoD's GetBlockWithAfp(currentBlockId) returns the AFP stored under
+// currentBlockId+1 (== nextBlockId), i.e. exactly the proof needed to confirm
+// the current block. Returns true only when a verified AFP was persisted.
+func backfillNextBlockAfpFromPoD(currentBlockId, nextBlockId string, epochHandler *structures.EpochDataHandler) bool {
+	if epochHandler == nil {
+		return false
+	}
+
+	resp := getBlockAndAfpFromPoD(currentBlockId)
+	if resp == nil || resp.Afp == nil || resp.Afp.BlockId != nextBlockId {
+		return false
+	}
+
+	if !utils.VerifyAggregatedFinalizationProof(resp.Afp, epochHandler) {
+		return false
+	}
+
+	afpBytes, err := json.Marshal(resp.Afp)
+	if err != nil {
+		return false
+	}
+
+	if err := databases.EPOCH_DATA.Put([]byte(constants.DBKeyPrefixAfp+nextBlockId), afpBytes, nil); err != nil {
+		return false
+	}
+
+	utils.LogWithTimeThrottled(
+		"last_mile:afp_backfill:"+nextBlockId,
+		2*time.Second,
+		fmt.Sprintf("Last mile sequencer: backfilled missing AFP %s from PoD (self-healed propagation gap)", nextBlockId),
+		utils.GREEN_COLOR,
+	)
+
+	return true
+}
+
 // LastMileFinalizerThread runs on ALL quorum member nodes.
 // It walks through blocks in leader order (exactly like block_execution.go on main),
 // verifies each block via AFP / SequenceAlignmentData, and writes
@@ -71,6 +129,9 @@ func LastMileFinalizerThread() {
 	isFinalizer := false
 	anchorConnectionsSent := false
 	lastRotationEpoch := -1
+
+	// Throttles per-blockId PoD backfill attempts for missing next-block AFPs.
+	afpBackfillAttempts := make(map[string]time.Time)
 
 	tracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
 
@@ -92,6 +153,19 @@ func LastMileFinalizerThread() {
 					utils.CYAN_COLOR,
 				)
 			}
+		}
+
+		// Advance the rotation cursor from AERPs that ALREADY EXIST locally,
+		// regardless of which node produced them. The finalizer subset is
+		// reshuffled every epoch (selectLastMileFinalizersForEpoch), so the node
+		// that produced AERP (e-1)->e is usually NOT a finalizer for e->(e+1).
+		// Tracking rotation progress purely by local production therefore
+		// deadlocks once LAST_MILE_FINALIZERS_COUNT < quorum size: no single node
+		// is eligible to produce the next proof. Every node already persists each
+		// AERP (replicated via PoD/quorum during epoch rotation), so observing the
+		// stored proof is enough to keep the cursor moving.
+		for LoadAggregatedEpochRotationProof(lastRotationEpoch+1) != nil {
+			lastRotationEpoch++
 		}
 
 		// --- Finalizer-only: epoch rotation proof collection ---
@@ -300,6 +374,22 @@ func LastMileFinalizerThread() {
 			nextBlockId := fmt.Sprintf("%d:%s:%d", tracker.EpochId, leader, tracker.BlockIndex+1)
 			if utils.HasLocalVerifiedAfp(nextBlockId, epochHandler) {
 				confirmed = true
+			} else if last, ok := afpBackfillAttempts[nextBlockId]; !ok || time.Since(last) >= lastMileAfpBackfillInterval {
+				// Self-heal AFP propagation gaps. A non-last block is confirmed by
+				// the verified AFP of the NEXT block, which normally lands locally
+				// when this node receives that next block during live consensus.
+				// Occasionally (especially at leader boundaries) that AFP never
+				// reaches a node's local DB even though the quorum produced it, and
+				// the finalizer would then stall here forever — freezing AHP
+				// collection and execution network-wide. Backfill the missing AFP
+				// from PoD (the authoritative store) so the gap self-heals.
+				afpBackfillAttempts[nextBlockId] = time.Now()
+				if backfillNextBlockAfpFromPoD(blockId, nextBlockId, epochHandler) {
+					confirmed = true
+				}
+				if len(afpBackfillAttempts) > 4096 {
+					afpBackfillAttempts = map[string]time.Time{nextBlockId: afpBackfillAttempts[nextBlockId]}
+				}
 			}
 		}
 
@@ -356,27 +446,39 @@ func LastMileAHPCollectorThread() {
 		lastFirstBlockEpochId = tracker.EpochId
 	}
 
+	runtime := newLastMileAHPRuntime()
+	defer runtime.Close()
+
 	for {
 		sequencerTracker := utils.LoadLastMileSequenceState(constants.DBKeyLastMileFinalizerTracker)
 		if sequencerTracker.NextHeight <= tracker.NextHeight {
 			if syncedTracker, synced := catchUpLastMileWithinEpoch(tracker, sequencerTracker); synced {
 				tracker = syncedTracker
+				runtime.ResetBackoff()
 				continue
 			}
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
-		nextTracker, progressed := collectAHPWindow(tracker, sequencerTracker, &lastProcessedEpoch, &lastFirstBlockEpochId)
+		if wait := runtime.BackoffRemaining(tracker.NextHeight); wait > 0 {
+			time.Sleep(wait)
+			continue
+		}
+
+		nextTracker, progressed := collectAHPWindow(tracker, sequencerTracker, &lastProcessedEpoch, &lastFirstBlockEpochId, runtime)
 		if !progressed {
 			if syncedTracker, synced := syncAHPCollectorToSequencerBoundary(tracker, sequencerTracker); synced {
 				tracker = syncedTracker
+				runtime.ResetBackoff()
 				continue
 			}
+			runtime.RecordBlockedHeight(tracker.NextHeight)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		tracker = nextTracker
+		runtime.ResetBackoff()
 	}
 }
 
@@ -385,6 +487,7 @@ func collectAHPWindow(
 	sequencerTracker *utils.LastMileSequenceState,
 	lastProcessedEpoch *int,
 	lastFirstBlockEpochId *int,
+	runtime *lastMileAHPRuntime,
 ) (*utils.LastMileSequenceState, bool) {
 	jobs := buildAHPCollectionJobs(tracker, sequencerTracker)
 	if len(jobs) == 0 {
@@ -413,12 +516,13 @@ func collectAHPWindow(
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
-		go func() {
+		go func(workerIndex int) {
 			defer wg.Done()
+
 			for job := range jobCh {
-				resultCh <- collectAHPForJob(job)
+				resultCh <- collectAHPForJob(job, runtime.WorkerClientRef(workerIndex))
 			}
-		}()
+		}(i)
 	}
 
 	for _, job := range jobs {
@@ -509,7 +613,7 @@ func buildAHPCollectionJobs(tracker *utils.LastMileSequenceState, sequencerTrack
 	return jobs
 }
 
-func collectAHPForJob(job lastMileAHPCollectionJob) lastMileAHPCollectionResult {
+func collectAHPForJob(job lastMileAHPCollectionJob, quorumClient **lastMileAHPQuorumClient) lastMileAHPCollectionResult {
 	blockHash := getVerifiedBlockHashForAHP(job.BlockId)
 	if blockHash == "" {
 		return lastMileAHPCollectionResult{Job: job}
@@ -527,8 +631,10 @@ func collectAHPForJob(job lastMileAHPCollectionJob) lastMileAHPCollectionResult 
 		return lastMileAHPCollectionResult{Job: job}
 	}
 
-	conns, waiter, guards := openTemporaryQuorumConnections(job.EpochHandler)
-	defer closeTemporaryQuorumConnections(conns, guards)
+	client := getLastMileAHPQuorumClient(quorumClient, job.EpochHandler)
+	if client == nil {
+		return lastMileAHPCollectionResult{Job: job}
+	}
 
 	proof = tryCollectAggregatedHeightProofWithConns(
 		int(job.Height),
@@ -537,14 +643,109 @@ func collectAHPForJob(job lastMileAHPCollectionJob) lastMileAHPCollectionResult 
 		job.BlockParts.EpochId,
 		job.HeightInEpoch,
 		job.EpochHandler,
-		conns,
-		waiter,
+		client.Conns,
+		client.Waiter,
 	)
 	if proof == nil {
 		return lastMileAHPCollectionResult{Job: job}
 	}
 
 	return lastMileAHPCollectionResult{Job: job, Proof: proof, BlockHash: blockHash}
+}
+
+func getLastMileAHPQuorumClient(clientRef **lastMileAHPQuorumClient, epochHandler *structures.EpochDataHandler) *lastMileAHPQuorumClient {
+	if clientRef == nil || epochHandler == nil {
+		return nil
+	}
+	if *clientRef != nil && (*clientRef).EpochId == epochHandler.Id {
+		return *clientRef
+	}
+
+	closeLastMileAHPQuorumClient(*clientRef)
+
+	conns, waiter, guards := openTemporaryQuorumConnections(epochHandler)
+	if waiter == nil || guards == nil {
+		*clientRef = nil
+		return nil
+	}
+
+	*clientRef = &lastMileAHPQuorumClient{
+		EpochId: epochHandler.Id,
+		Conns:   conns,
+		Waiter:  waiter,
+		Guards:  guards,
+	}
+	return *clientRef
+}
+
+func closeLastMileAHPQuorumClient(client *lastMileAHPQuorumClient) {
+	if client == nil {
+		return
+	}
+	closeTemporaryQuorumConnections(client.Conns, client.Guards)
+}
+
+func newLastMileAHPRuntime() *lastMileAHPRuntime {
+	workerCount := LAST_MILE_AHP_COLLECTION_WORKERS
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	return &lastMileAHPRuntime{
+		WorkerClients: make([]*lastMileAHPQuorumClient, workerCount),
+		BlockedHeight: -1,
+	}
+}
+
+func (runtime *lastMileAHPRuntime) WorkerClientRef(workerIndex int) **lastMileAHPQuorumClient {
+	if runtime == nil || workerIndex < 0 || workerIndex >= len(runtime.WorkerClients) {
+		return nil
+	}
+	return &runtime.WorkerClients[workerIndex]
+}
+
+func (runtime *lastMileAHPRuntime) RecordBlockedHeight(height int64) {
+	if runtime == nil {
+		return
+	}
+	if runtime.BlockedHeight != height {
+		runtime.BlockedHeight = height
+		runtime.Failures = 0
+	}
+	runtime.Failures++
+	delay := LAST_MILE_AHP_RETRY_BACKOFF_MIN
+	for i := 1; i < runtime.Failures && delay < LAST_MILE_AHP_RETRY_BACKOFF_MAX; i++ {
+		delay *= 2
+	}
+	if delay > LAST_MILE_AHP_RETRY_BACKOFF_MAX {
+		delay = LAST_MILE_AHP_RETRY_BACKOFF_MAX
+	}
+	runtime.RetryAfter = time.Now().Add(delay)
+}
+
+func (runtime *lastMileAHPRuntime) BackoffRemaining(height int64) time.Duration {
+	if runtime == nil || runtime.BlockedHeight != height || runtime.RetryAfter.IsZero() {
+		return 0
+	}
+	return time.Until(runtime.RetryAfter)
+}
+
+func (runtime *lastMileAHPRuntime) ResetBackoff() {
+	if runtime == nil {
+		return
+	}
+	runtime.BlockedHeight = -1
+	runtime.Failures = 0
+	runtime.RetryAfter = time.Time{}
+}
+
+func (runtime *lastMileAHPRuntime) Close() {
+	if runtime == nil {
+		return
+	}
+	for idx, client := range runtime.WorkerClients {
+		closeLastMileAHPQuorumClient(client)
+		runtime.WorkerClients[idx] = nil
+	}
 }
 
 func fetchVerifiedAggregatedHeightProofForEpoch(absoluteHeight int, epochHandler *structures.EpochDataHandler) *structures.AggregatedHeightProof {
