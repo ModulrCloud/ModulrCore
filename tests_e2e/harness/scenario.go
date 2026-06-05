@@ -45,6 +45,8 @@ func scenarioCmd(args []string) error {
 		return recoveryScriptStyleScenario(args[1:])
 	case "recovery_full_cycle_smoke":
 		return recoveryFullCycleSmokeScenario(args[1:])
+	case "recovery_scheduled_transition_smoke":
+		return recoveryScheduledTransitionSmokeScenario(args[1:])
 	case "long_running_stability":
 		return longRunningStabilityScenario(args[1:])
 	case "long_running_21_validator_liveness":

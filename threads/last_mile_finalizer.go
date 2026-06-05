@@ -843,10 +843,33 @@ func catchUpLastMileWithinEpoch(
 }
 
 func getVerifiedBlockHashForAHP(blockId string) string {
-	block := fetchBlockForExecution(blockId)
+	// Resolve the block strictly within the consensus (genesis) network. During a
+	// pending recovery the execution-scoped fetcher (fetchBlockForExecution) reads
+	// the previous network, whose epoch-0 blockIds collide with the recovered
+	// chain, so it would return stale blocks for new-network height proofs.
+	parts := strings.Split(blockId, ":")
+	if len(parts) != 3 {
+		return ""
+	}
+	epochIndex, epochErr := strconv.Atoi(parts[0])
+	blockIndex, indexErr := strconv.Atoi(parts[2])
+	if epochErr != nil || indexErr != nil || blockIndex < 0 {
+		return ""
+	}
+
+	epochHandler := getEpochHandlerForTracker(epochIndex)
+	if epochHandler == nil {
+		return ""
+	}
+
+	block := block_pack.GetBlockForConsensus(epochIndex, parts[1], uint(blockIndex), epochHandler)
 	if block == nil {
 		return ""
 	}
+	if block.Creator != parts[1] || block.Index != blockIndex || !block.VerifySignatureForNetwork(globals.GENESIS.NetworkId) {
+		return ""
+	}
+
 	return block.GetHash()
 }
 
@@ -1376,7 +1399,7 @@ func getBlockHashByBlockId(blockId string, epochHandler *structures.EpochDataHan
 		if epochErr != nil || indexErr != nil || blockIndex < 0 {
 			return ""
 		}
-		block := block_pack.GetBlock(epochIndex, parts[1], uint(blockIndex), epochHandler)
+		block := block_pack.GetBlockForConsensus(epochIndex, parts[1], uint(blockIndex), epochHandler)
 		if block == nil {
 			return ""
 		}

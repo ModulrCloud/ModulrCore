@@ -390,6 +390,24 @@ network, and checks that core applies the recovery transition, avoids
 `network id mismatch`, advances height, and collects a new anchor epoch ACK
 proof.
 
+### `recovery_scheduled_transition_smoke`
+
+```bash
+go run ./tests_e2e/harness scenario recovery_scheduled_transition_smoke
+```
+
+This scenario verifies the recovery lifecycle when the recovered core starts
+with a pending recovery transition instead of applying it immediately on startup.
+It starts a fast `4 core + 4 anchors` network, stops one core validator after it
+has executed old-network blocks, lets the remaining `3/4` core quorum continue
+to a real recovery cut height, and collects a valid anchor recovery majority.
+The harness then registers one shared recovery plan at that real cut height,
+switches core and anchor genesis files to the recovered network, and restarts
+all nodes. The previously stopped validator must log `Recovery transition
+scheduled at height` rather than the immediate startup happy path, while the
+recovered network must still collect the new anchor epoch ACK proof and commit
+new aggregated height proofs without stale height-proof block hash mismatches.
+
 ### `long_running_stability`
 
 ```bash

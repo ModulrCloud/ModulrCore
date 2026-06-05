@@ -105,8 +105,33 @@ func GetBlock(epochIndex int, blockCreator string, index uint, epochHandler *str
 		}
 	}
 
-	// Find from other nodes
+	return fetchBlockFromPeers(blockID, epochHandler)
+}
 
+// GetBlockForConsensus resolves a block strictly within the current consensus
+// (genesis) network. Unlike GetBlock it never falls back to the execution
+// cursor's network DB. During a pending recovery the execution cursor still
+// points at the previous network, and because a recovered genesis restarts
+// epochs from 0 with the same validator set, blockIds (epoch:creator:index)
+// collide with the pre-recovery chain. Reading the old execution DB would
+// therefore return stale blocks for new-network blockIds and poison consensus
+// state (last-mile height proofs, first-block detection, sequencing).
+func GetBlockForConsensus(epochIndex int, blockCreator string, index uint, epochHandler *structures.EpochDataHandler) *Block {
+
+	blockID := strconv.Itoa(epochIndex) + ":" + blockCreator + ":" + strconv.Itoa(int(index))
+
+	if blockAsBytes, err := databases.BLOCKS.Get([]byte(blockID), nil); err == nil {
+		var blockParsed *Block
+
+		if json.Unmarshal(blockAsBytes, &blockParsed) == nil {
+			return blockParsed
+		}
+	}
+
+	return fetchBlockFromPeers(blockID, epochHandler)
+}
+
+func fetchBlockFromPeers(blockID string, epochHandler *structures.EpochDataHandler) *Block {
 	quorumUrlsAndPubkeys := utils.GetQuorumUrlsAndPubkeys(epochHandler)
 
 	var quorumUrls []string

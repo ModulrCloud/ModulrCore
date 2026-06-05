@@ -61,6 +61,7 @@ func printUsage(out io.Writer) {
   go run ./tests_e2e/harness scenario multi_node_network_partition_no_false_majority
   go run ./tests_e2e/harness scenario recovery_script_style
   go run ./tests_e2e/harness scenario recovery_full_cycle_smoke
+  go run ./tests_e2e/harness scenario recovery_scheduled_transition_smoke
   go run ./tests_e2e/harness scenario long_running_stability
   go run ./tests_e2e/harness scenario long_running_21_validator_liveness
   go run ./tests_e2e/harness scenario long_running_stability_with_temporary_validator_down
