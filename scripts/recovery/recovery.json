@@ -1,6 +1,42 @@
 {
-  "lastEpochIndex": 0,
-  "lastAbsoluteHeight": 0,
-  "genesis": {},
-  "teamSig": ""
+  "lastEpochIndex": 4,
+  "lastAbsoluteHeight": 233,
+  "genesis": {
+    "NETWORK_ID": "8e0302a0a57de1f0f8b6fe8569544c9339fb6ab5969f63aee8e7467b9218e058",
+    "CORE_MAJOR_VERSION": 0,
+    "FIRST_EPOCH_START_TIMESTAMP": 1780670065197,
+    "NETWORK_PARAMETERS": {
+      "VALIDATOR_REQUIRED_STAKE": 50000000000,
+      "MINIMAL_STAKE_PER_STAKER": 2000000000,
+      "QUORUM_SIZE": 127,
+      "EPOCH_DURATION": 30000,
+      "LEADERSHIP_DURATION": 15000,
+      "BLOCK_TIME": 500,
+      "MAX_BLOCK_SIZE_IN_BYTES": 12288000,
+      "TXS_LIMIT_PER_BLOCK": 30000
+    },
+    "VALIDATORS": [
+      {
+        "pubkey": "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK",
+        "percentage": 50,
+        "totalStaked": 50000000000,
+        "stakers": {
+          "9GQ46rqY238rk2neSwgidap9ww5zbAN4dyqyC7j5ZnBK": 50000000000
+        },
+        "validatorURL": "http://localhost:7332",
+        "wssValidatorURL": "ws://localhost:9999"
+      },
+      {
+        "pubkey": "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE",
+        "percentage": 50,
+        "totalStaked": 50000000000,
+        "stakers": {
+          "6XvZpuCDjdvSuot3eLr24C1wqzcf2w4QqeDh9BnDKsNE": 50000000000
+        },
+        "validatorURL": "http://localhost:7333",
+        "wssValidatorURL": "ws://localhost:9998"
+      }
+    ]
+  },
+  "teamSig": "leAPMHvrKY4J5XJxXkfu4Suij2zT5JrtuleVNBY3gV4L2C0pgjVfCuJ7DMY0fs1CqR8yGySx8lBz3XU1RblRBA=="
 }
