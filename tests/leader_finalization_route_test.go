@@ -52,6 +52,69 @@ func TestGetLeaderFinalizationProofReturnsNotReadyForActiveLastLeader(t *testing
 	}
 }
 
+// Regression: the last leader of an epoch must not be finalizable just because the
+// epoch stopped being fresh (time-based). It must wait for the EPOCH_FINISH:N lock —
+// the same signal that stops AFP voting. Otherwise a validator could sign the leader
+// finalization proof at a stale index while still voting AFPs for later blocks,
+// splitting the epoch boundary and stalling the network.
+func TestGetLeaderFinalizationProofReturnsNotReadyForLastLeaderWithoutEpochFinishSignal(t *testing.T) {
+	validator := configureLeaderFinalizationRouteState(t)
+	leader := "leader-last"
+	epochHandler := structures.EpochDataHandler{
+		Id:                 2,
+		Hash:               "epoch-hash",
+		Quorum:             []string{validator.Pub},
+		LeadersSequence:    []string{"leader-first", leader},
+		CurrentLeaderIndex: 1,
+		StartTimestamp:     uint64(time.Now().Add(-time.Hour).UnixMilli()),
+	}
+	// Epoch is no longer fresh, but EPOCH_FINISH:N has NOT been raised yet.
+	setActiveApprovementEpochForLeaderFinalizationTest(epochHandler, structures.NetworkParameters{EpochDuration: 1})
+
+	resp := requestLeaderFinalizationProof(t, websocket_pack.WsLeaderFinalizationProofRequest{
+		Route:                   constants.WsRouteGetLeaderFinalizationProof,
+		EpochIndex:              epochHandler.Id,
+		IndexOfLeaderToFinalize: 1,
+		SkipData:                structures.NewLeaderVotingStatTemplate(),
+	})
+
+	if resp["status"] != "NOT_READY" {
+		t.Fatalf("expected NOT_READY for last leader without EPOCH_FINISH signal, got %+v", resp)
+	}
+}
+
+// Once EPOCH_FINISH:N is set (AFP voting is locked), the last leader becomes
+// finalizable and the route signs the proof.
+func TestGetLeaderFinalizationProofReturnsOKForLastLeaderAfterEpochFinishSignal(t *testing.T) {
+	validator := configureLeaderFinalizationRouteState(t)
+	leader := "leader-last"
+	epochHandler := structures.EpochDataHandler{
+		Id:                 2,
+		Hash:               "epoch-hash",
+		Quorum:             []string{validator.Pub},
+		LeadersSequence:    []string{"leader-first", leader},
+		CurrentLeaderIndex: 1,
+		StartTimestamp:     uint64(time.Now().Add(-time.Hour).UnixMilli()),
+	}
+	setActiveApprovementEpochForLeaderFinalizationTest(epochHandler, structures.NetworkParameters{EpochDuration: 1})
+
+	// Raise the EPOCH_FINISH:N lock — the same signal that stops AFP voting.
+	if err := databases.EPOCH_DATA.Put([]byte(constants.DBKeyPrefixEpochFinish+strconv.Itoa(epochHandler.Id)), []byte("TRUE"), nil); err != nil {
+		t.Fatalf("failed to set EPOCH_FINISH signal: %v", err)
+	}
+
+	resp := requestLeaderFinalizationProof(t, websocket_pack.WsLeaderFinalizationProofRequest{
+		Route:                   constants.WsRouteGetLeaderFinalizationProof,
+		EpochIndex:              epochHandler.Id,
+		IndexOfLeaderToFinalize: 1,
+		SkipData:                structures.NewLeaderVotingStatTemplate(),
+	})
+
+	if resp["status"] != "OK" || resp["voter"] != validator.Pub || resp["forLeaderPubkey"] != leader {
+		t.Fatalf("expected OK for last leader after EPOCH_FINISH signal, got %+v", resp)
+	}
+}
+
 func TestGetLeaderFinalizationProofReturnsOKForCompletedLeader(t *testing.T) {
 	validator := configureLeaderFinalizationRouteState(t)
 	leader := "leader-first"

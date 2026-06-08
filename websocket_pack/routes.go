@@ -231,6 +231,17 @@ func GetFinalizationProof(parsedRequest WsFinalizationProofRequest, connection *
 
 			defer BLOCK_CREATOR_REQUEST_MUTEX.Unlock()
 
+			// Re-check the epoch-finish lock under the mutex: EPOCH_FINISH:N may have
+			// been raised between the outer check and acquiring the lock. This makes
+			// AFP voting strictly ordered against last-leader ALFP signing, which
+			// requires the same EPOCH_FINISH signal. Without this re-check an
+			// in-flight AFP vote that passed the outer check could still complete
+			// after the leader finalization proof was signed.
+			if utils.SignalAboutEpochRotationExists(epochIndex) {
+				sendNotReady(connection)
+				return
+			}
+
 			localVotingDataForLeader := structures.NewLeaderVotingStatTemplate()
 
 			localVotingDataRaw, err := databases.FINALIZATION_THREAD_METADATA.Get([]byte(strconv.Itoa(epochIndex)+":"+parsedRequest.Block.Creator), nil)
@@ -379,31 +390,31 @@ func GetLeaderFinalizationProof(parsedRequest WsLeaderFinalizationProofRequest, 
 	lastLeaderIdx := len(epochHandler.LeadersSequence) - 1
 	isLastLeader := parsedRequest.IndexOfLeaderToFinalize == lastLeaderIdx && epochHandler.CurrentLeaderIndex == lastLeaderIdx
 
-	// Defense-in-depth for the last leader of an active epoch.
+	// Correctness gate for the last leader of an active epoch.
 	//
 	// For non-last leaders we already know they're done because CurrentLeaderIndex
-	// has moved past them (the leaderTimeIsOut watchdog rotated within the epoch).
-	// The last leader has no such intra-epoch indicator — CurrentLeaderIndex stays
-	// at lastLeaderIdx until the whole epoch rotates. Without this gate, a misbehaving
-	// or buggy peer (e.g. an anchor scheduling proactive ALFP collection too early)
-	// could ask us to sign a finalization for the last leader while it is still
-	// actively producing blocks, locking in a low VotingStat.Index and stalling
-	// the anchor's last-mile sequencing.
+	// has moved past them (the leaderTimeIsOut watchdog rotated within the epoch),
+	// and that same advance stops AFP voting for them (the itsLeader check in
+	// GetFinalizationProof). So "AFP voting locked" and "ALFP allowed" are the same
+	// event. The last leader has no such intra-epoch indicator — CurrentLeaderIndex
+	// stays at lastLeaderIdx until the whole epoch rotates.
 	//
-	// Refuse unless one of these "last leader is genuinely done" signals holds:
-	//   1. Time-based: epoch is no longer fresh, i.e. now >= StartTimestamp + EpochDuration.
-	//      Past this boundary the last leader has no right to produce more blocks.
-	//   2. Event-based: a local EPOCH_FINISH:N=TRUE signal has been raised, meaning
-	//      this node has already accepted that the epoch is rotating.
-	if !isRequestForPastEpoch && isLastLeader {
-		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
-		stillFresh := utils.EpochStillFresh(&handlers.APPROVEMENT_THREAD_METADATA.Handler)
-		handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
-
-		if stillFresh && !utils.SignalAboutEpochRotationExists(epochHandler.Id) {
-			sendNotReady(connection)
-			return
-		}
+	// The ONLY signal that locks AFP voting for the last leader is EPOCH_FINISH:N
+	// (checked in GetFinalizationProof). Therefore ALFP for the last leader must be
+	// gated on that SAME signal, so the invariant holds: a validator can only sign
+	// the leader finalization proof after it has already locked finalization-proof
+	// voting, freezing VotingStat.Index at its final value.
+	//
+	// A time-based check (EpochStillFresh) is NOT a valid substitute: EPOCH_FINISH
+	// is written by a separate thread (epoch_rotation.go) slightly after the epoch
+	// stops being fresh, leaving a window where ALFP would be signed at a stale
+	// index while AFP voting is still open. Across nodes those windows differ, the
+	// last leader's finalized tail (blocks 477/478 in the observed incident) gets
+	// abandoned below the sealed boundary, and the epoch boundary splits — making
+	// the epoch rotation proof impossible to aggregate and stalling the network.
+	if !isRequestForPastEpoch && isLastLeader && !utils.SignalAboutEpochRotationExists(epochHandler.Id) {
+		sendNotReady(connection)
+		return
 	}
 
 	if !isRequestForPastEpoch && epochHandler.CurrentLeaderIndex <= parsedRequest.IndexOfLeaderToFinalize && !isLastLeader {
