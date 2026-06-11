@@ -765,7 +765,7 @@ func fetchVerifiedAggregatedHeightProofForEpoch(absoluteHeight int, epochHandler
 		return proof
 	}
 
-	return utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, epochHandler)
+	return utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, epochHandler, "")
 }
 
 func catchUpLastMileWithinEpoch(
@@ -1218,6 +1218,55 @@ func LoadAggregatedHeightProof(absoluteHeight int) *structures.AggregatedHeightP
 	return &proof
 }
 
+// storeAggregatedHeightProofToNetwork persists an AHP into the database of the
+// given network. For the active genesis network it uses the shared handle; for
+// a previous-era network (recovery catch-up) it uses the era-scoped handle.
+func storeAggregatedHeightProofToNetwork(proof *structures.AggregatedHeightProof, networkId string) {
+	if proof == nil {
+		return
+	}
+	if utils.IsActiveNetworkId(networkId) {
+		storeAggregatedHeightProof(proof)
+		return
+	}
+
+	db, err := utils.OpenNetworkScopedDb("FINALIZATION_THREAD_METADATA", networkId)
+	if err != nil {
+		return
+	}
+
+	key := []byte(fmt.Sprintf(constants.DBKeyPrefixAggregatedHeightProof+"%d", proof.AbsoluteHeight))
+	if value, err := json.Marshal(proof); err == nil {
+		_ = db.Put(key, value, nil)
+	}
+}
+
+// loadAggregatedHeightProofFromNetwork reads an AHP from the database of the
+// given network (active genesis or a previous recovery era).
+func loadAggregatedHeightProofFromNetwork(absoluteHeight int, networkId string) *structures.AggregatedHeightProof {
+	if utils.IsActiveNetworkId(networkId) {
+		return LoadAggregatedHeightProof(absoluteHeight)
+	}
+
+	db, err := utils.OpenNetworkScopedDb("FINALIZATION_THREAD_METADATA", networkId)
+	if err != nil {
+		return nil
+	}
+
+	key := []byte(fmt.Sprintf(constants.DBKeyPrefixAggregatedHeightProof+"%d", absoluteHeight))
+	raw, err := db.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+
+	var proof structures.AggregatedHeightProof
+	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+
+	return &proof
+}
+
 func getEpochHandlerForTracker(epochId int) *structures.EpochDataHandler {
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RLock()
 	if handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.Id == epochId {
@@ -1477,7 +1526,7 @@ func syncLastMileTrackerToCurrentEpochStart(
 	nextTracker := *tracker
 
 	for nextTracker.EpochId < currentEpochHandler.Id {
-		proof := fetchVerifiedAggregatedEpochRotationProof(nextTracker.EpochId)
+		proof := fetchVerifiedAggregatedEpochRotationProof(nextTracker.EpochId, "")
 		if proof == nil || proof.NextEpochId != nextTracker.EpochId+1 {
 			return nil, false
 		}
@@ -1730,6 +1779,52 @@ func storeAggregatedEpochRotationProof(proof *structures.AggregatedEpochRotation
 func LoadAggregatedEpochRotationProof(epochId int) *structures.AggregatedEpochRotationProof {
 	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedEpochRotationProof, epochId))
 	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
+	if err != nil {
+		return nil
+	}
+	var proof structures.AggregatedEpochRotationProof
+	if json.Unmarshal(raw, &proof) != nil {
+		return nil
+	}
+	return &proof
+}
+
+// storeAggregatedEpochRotationProofToNetwork mirrors storeAggregatedEpochRotationProof
+// but targets the database of the given network (recovery catch-up aware).
+func storeAggregatedEpochRotationProofToNetwork(proof *structures.AggregatedEpochRotationProof, networkId string) {
+	if proof == nil {
+		return
+	}
+	if utils.IsActiveNetworkId(networkId) {
+		storeAggregatedEpochRotationProof(proof)
+		return
+	}
+
+	db, err := utils.OpenNetworkScopedDb("FINALIZATION_THREAD_METADATA", networkId)
+	if err != nil {
+		return
+	}
+
+	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedEpochRotationProof, proof.EpochId))
+	if value, err := json.Marshal(proof); err == nil {
+		_ = db.Put(key, value, nil)
+	}
+}
+
+// loadAggregatedEpochRotationProofFromNetwork reads an AERP from the database of
+// the given network (active genesis or a previous recovery era).
+func loadAggregatedEpochRotationProofFromNetwork(epochId int, networkId string) *structures.AggregatedEpochRotationProof {
+	if utils.IsActiveNetworkId(networkId) {
+		return LoadAggregatedEpochRotationProof(epochId)
+	}
+
+	db, err := utils.OpenNetworkScopedDb("FINALIZATION_THREAD_METADATA", networkId)
+	if err != nil {
+		return nil
+	}
+
+	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedEpochRotationProof, epochId))
+	raw, err := db.Get(key, nil)
 	if err != nil {
 		return nil
 	}

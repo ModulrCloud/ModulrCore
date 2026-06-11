@@ -78,7 +78,8 @@ func GetBlockById(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	block, err := databases.BLOCKS.Get([]byte(blockId), nil)
+	networkId := string(ctx.QueryArgs().Peek("networkId"))
+	block, err := readNetworkScopedValue(databases.BLOCKS, "BLOCKS", networkId, []byte(blockId))
 
 	if err == nil && block != nil {
 		helpers.WriteJSONBytes(ctx, fasthttp.StatusOK, block)
@@ -86,6 +87,23 @@ func GetBlockById(ctx *fasthttp.RequestCtx) {
 	}
 
 	helpers.WriteErr(ctx, fasthttp.StatusNotFound, "Not found")
+}
+
+// readNetworkScopedValue reads a key from a network-scoped database. When the
+// optional networkId refers to a previous recovery era, it reads from that
+// era's on-disk database so peers can serve catch-up data to lagging nodes.
+// For the active genesis network (or empty networkId) it uses the shared handle.
+func readNetworkScopedValue(activeDb *leveldb.DB, dbName, networkId string, key []byte) ([]byte, error) {
+	if utils.IsActiveNetworkId(networkId) {
+		return activeDb.Get(key, nil)
+	}
+
+	db, err := utils.OpenNetworkScopedDb(dbName, networkId)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.Get(key, nil)
 }
 
 func GetBlockByHeight(ctx *fasthttp.RequestCtx) {
@@ -155,8 +173,9 @@ func GetAggregatedHeightProof(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	networkId := string(ctx.QueryArgs().Peek("networkId"))
 	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedHeightProof, height))
-	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
+	raw, err := readNetworkScopedValue(databases.FINALIZATION_THREAD_METADATA, "FINALIZATION_THREAD_METADATA", networkId, key)
 	if err != nil {
 		helpers.WriteErr(ctx, fasthttp.StatusNotFound, "Not found")
 		return

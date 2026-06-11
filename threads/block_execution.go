@@ -51,22 +51,40 @@ func BlockExecutionThread() {
 		cursorSnapshot := handlers.EXECUTION_THREAD_METADATA.ChainCursor
 		nextHeight := cursorSnapshot.LastExecutedLocalHeight + 1
 		currentEpochId := cursorSnapshot.EpochDataHandler.Id
+		recoveryPlan := handlers.EXECUTION_THREAD_METADATA.RecoveryPlan
 		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-		heightProof, block := fetchAggregatedHeightProofAndBlock(int(nextHeight))
+		// Execution era: during a scheduled recovery transition the cursor still
+		// points at the previous network, so blocks and proofs for the catch-up
+		// must be read from that era (locally and from peers) until the recovery
+		// height is reached and the transition is applied.
+		executionEra := cursorSnapshot.NetworkId
+
+		// Recovery boundary: the last finalized block of the previous network has
+		// no following height proof (the chain stopped there). Its finality is
+		// instead attested by the team-signed recovery plan, so for exactly that
+		// block we relax the "confirm with the next height proof" requirement.
+		atRecoveryBoundary := recoveryPlan != nil &&
+			!utils.IsActiveNetworkId(executionEra) &&
+			cursorSnapshot.Statistics != nil &&
+			cursorSnapshot.Statistics.LastHeight+1 == recoveryPlan.LastAbsoluteHeight
+
+		heightProof, block := fetchAggregatedHeightProofAndBlock(int(nextHeight), executionEra)
 		if heightProof == nil {
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
 
-		nextHeightProof := fetchVerifiedAggregatedHeightProof(int(nextHeight) + 1)
-		if nextHeightProof == nil {
-			time.Sleep(200 * time.Millisecond)
-			continue
+		if !atRecoveryBoundary {
+			nextHeightProof := fetchVerifiedAggregatedHeightProof(int(nextHeight)+1, executionEra)
+			if nextHeightProof == nil {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
 		}
 
 		if heightProof.EpochId > currentEpochId {
-			epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochId)
+			epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochId, executionEra)
 			if epochRotationProof == nil {
 				utils.LogWithTimeThrottled(
 					"exec:epoch_rotation_proof_wait",
@@ -99,7 +117,7 @@ func BlockExecutionThread() {
 		}
 
 		if block == nil {
-			block = fetchBlockForExecution(heightProof.BlockId)
+			block = fetchBlockForExecution(heightProof.BlockId, executionEra)
 		}
 		if block == nil {
 			utils.LogWithTimeThrottled(
@@ -130,26 +148,30 @@ func BlockExecutionThread() {
 
 // fetchAggregatedHeightProofAndBlock tries to get both the AggregatedHeightProof and the block for a given height
 // in a single PoD round-trip. Falls back to separate fetches if the combined route doesn't return both.
-func fetchAggregatedHeightProofAndBlock(absoluteHeight int) (*structures.AggregatedHeightProof, *block_pack.Block) {
-	localProof := LoadAggregatedHeightProof(absoluteHeight)
+func fetchAggregatedHeightProofAndBlock(absoluteHeight int, executionEra string) (*structures.AggregatedHeightProof, *block_pack.Block) {
+	localProof := loadAggregatedHeightProofFromNetwork(absoluteHeight, executionEra)
 	if localProof != nil {
-		epochHandler := getEpochHandlerForTracker(localProof.EpochId)
+		epochHandler := getEpochHandlerForExecutionEra(localProof.EpochId, executionEra)
 		if epochHandler != nil && utils.VerifyAggregatedHeightProof(localProof, epochHandler) {
-			block := fetchBlockForExecution(localProof.BlockId)
+			block := fetchBlockForExecution(localProof.BlockId, executionEra)
 			return localProof, block
 		}
 	}
 
-	combined := websocket_pack.GetBlockByHeightFromPoD(absoluteHeight)
-	if combined != nil && combined.AggregatedHeightProof != nil {
-		epochHandler := getEpochHandlerForTracker(combined.AggregatedHeightProof.EpochId)
-		if epochHandler != nil && utils.VerifyAggregatedHeightProof(combined.AggregatedHeightProof, epochHandler) {
-			storeAggregatedHeightProof(combined.AggregatedHeightProof)
-			var block *block_pack.Block
-			if combined.Block != nil && combined.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
-				block = combined.Block
+	// PoD only serves the active genesis network; skip it during previous-era
+	// recovery catch-up and rely on era-aware local + quorum HTTP reads instead.
+	if utils.IsActiveNetworkId(executionEra) {
+		combined := websocket_pack.GetBlockByHeightFromPoD(absoluteHeight)
+		if combined != nil && combined.AggregatedHeightProof != nil {
+			epochHandler := getEpochHandlerForExecutionEra(combined.AggregatedHeightProof.EpochId, executionEra)
+			if epochHandler != nil && utils.VerifyAggregatedHeightProof(combined.AggregatedHeightProof, epochHandler) {
+				storeAggregatedHeightProofToNetwork(combined.AggregatedHeightProof, executionEra)
+				var block *block_pack.Block
+				if combined.Block != nil && combined.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
+					block = combined.Block
+				}
+				return combined.AggregatedHeightProof, block
 			}
-			return combined.AggregatedHeightProof, block
 		}
 	}
 
@@ -157,30 +179,32 @@ func fetchAggregatedHeightProofAndBlock(absoluteHeight int) (*structures.Aggrega
 	currentEpochHandler := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-	httpProof := fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight, &currentEpochHandler)
+	httpProof := fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight, &currentEpochHandler, executionEra)
 	if httpProof != nil {
-		storeAggregatedHeightProof(httpProof)
+		storeAggregatedHeightProofToNetwork(httpProof, executionEra)
 		return httpProof, nil
 	}
 
 	return nil, nil
 }
 
-func fetchVerifiedAggregatedHeightProof(absoluteHeight int) *structures.AggregatedHeightProof {
-	proof := LoadAggregatedHeightProof(absoluteHeight)
+func fetchVerifiedAggregatedHeightProof(absoluteHeight int, executionEra string) *structures.AggregatedHeightProof {
+	proof := loadAggregatedHeightProofFromNetwork(absoluteHeight, executionEra)
 	if proof != nil {
-		epochHandler := getEpochHandlerForTracker(proof.EpochId)
+		epochHandler := getEpochHandlerForExecutionEra(proof.EpochId, executionEra)
 		if epochHandler != nil && utils.VerifyAggregatedHeightProof(proof, epochHandler) {
 			return proof
 		}
 	}
 
-	podProof := websocket_pack.GetAggregatedHeightProofFromPoD(absoluteHeight)
-	if podProof != nil {
-		epochHandler := getEpochHandlerForTracker(podProof.EpochId)
-		if epochHandler != nil && utils.VerifyAggregatedHeightProof(podProof, epochHandler) {
-			storeAggregatedHeightProof(podProof)
-			return podProof
+	if utils.IsActiveNetworkId(executionEra) {
+		podProof := websocket_pack.GetAggregatedHeightProofFromPoD(absoluteHeight)
+		if podProof != nil {
+			epochHandler := getEpochHandlerForExecutionEra(podProof.EpochId, executionEra)
+			if epochHandler != nil && utils.VerifyAggregatedHeightProof(podProof, epochHandler) {
+				storeAggregatedHeightProofToNetwork(podProof, executionEra)
+				return podProof
+			}
 		}
 	}
 
@@ -188,28 +212,48 @@ func fetchVerifiedAggregatedHeightProof(absoluteHeight int) *structures.Aggregat
 	currentEpochHandler := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-	httpProof := fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight, &currentEpochHandler)
+	httpProof := fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight, &currentEpochHandler, executionEra)
 	if httpProof != nil {
-		storeAggregatedHeightProof(httpProof)
+		storeAggregatedHeightProofToNetwork(httpProof, executionEra)
 		return httpProof
 	}
 
 	return nil
 }
 
-func fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight int, currentEpochHandler *structures.EpochDataHandler) *structures.AggregatedHeightProof {
+// getEpochHandlerForExecutionEra resolves the epoch handler used to verify
+// height/rotation proofs for the current execution era. For the active genesis
+// network it uses the live in-memory trackers. For a previous recovery era it
+// resolves strictly from the durable STATE snapshot (preserved across recovery
+// and keyed by absolute epoch id); the live in-memory handlers belong to the
+// new network and have a different quorum, so they must not be used to verify
+// previous-era proofs.
+func getEpochHandlerForExecutionEra(epochId int, executionEra string) *structures.EpochDataHandler {
+	if utils.IsActiveNetworkId(executionEra) {
+		return getEpochHandlerForTracker(epochId)
+	}
+
+	if snapshot := utils.GetEpochSnapshot(toAbsoluteEpochId(epochId)); snapshot != nil {
+		handler := snapshot.EpochDataHandler
+		return &handler
+	}
+
+	return nil
+}
+
+func fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight int, currentEpochHandler *structures.EpochDataHandler, executionEra string) *structures.AggregatedHeightProof {
 	if currentEpochHandler == nil {
 		return nil
 	}
 
-	if proof := utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, currentEpochHandler); proof != nil {
+	if proof := utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, currentEpochHandler, executionEra); proof != nil {
 		return proof
 	}
 
 	// Boundary fallback: if the next height already belongs to epoch N+1, the current
 	// epoch quorum cannot serve it. Use the signed epoch rotation proof from epoch N
 	// to discover and verify the next epoch quorum, then retry via that quorum.
-	epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id)
+	epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id, executionEra)
 	if epochRotationProof == nil || epochRotationProof.NextEpochId != currentEpochHandler.Id+1 {
 		return nil
 	}
@@ -219,7 +263,7 @@ func fetchAggregatedHeightProofFromCurrentOrNextEpochQuorum(absoluteHeight int, 
 		return nil
 	}
 
-	return utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, nextEpochHandler)
+	return utils.GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight, nextEpochHandler, executionEra)
 }
 
 func buildNextEpochHandlerForBoundaryFetch(currentEpochHandler *structures.EpochDataHandler, nextEpochData *structures.NextEpochDataHandler) *structures.EpochDataHandler {
@@ -245,44 +289,52 @@ func buildNextEpochHandlerForBoundaryFetch(currentEpochHandler *structures.Epoch
 // fetchVerifiedAggregatedEpochRotationProof fetches and verifies an AggregatedEpochRotationProof for the
 // current epoch (signed by epoch N's quorum, containing data for epoch N+1).
 // Checks local DB first, then PoD.
-func fetchVerifiedAggregatedEpochRotationProof(currentEpochId int) *structures.AggregatedEpochRotationProof {
-	epochHandler := getEpochHandlerForTracker(currentEpochId)
+func fetchVerifiedAggregatedEpochRotationProof(currentEpochId int, executionEra string) *structures.AggregatedEpochRotationProof {
+	epochHandler := getEpochHandlerForExecutionEra(currentEpochId, executionEra)
 	if epochHandler == nil {
 		return nil
 	}
 
-	local := LoadAggregatedEpochRotationProof(currentEpochId)
+	local := loadAggregatedEpochRotationProofFromNetwork(currentEpochId, executionEra)
 	if local != nil && utils.VerifyAggregatedEpochRotationProof(local, epochHandler) {
 		return local
 	}
 
-	fromPoD := websocket_pack.GetAggregatedEpochRotationProofFromPoD(currentEpochId)
-	if fromPoD != nil && utils.VerifyAggregatedEpochRotationProof(fromPoD, epochHandler) {
-		storeAggregatedEpochRotationProof(fromPoD)
-		return fromPoD
+	if utils.IsActiveNetworkId(executionEra) {
+		fromPoD := websocket_pack.GetAggregatedEpochRotationProofFromPoD(currentEpochId)
+		if fromPoD != nil && utils.VerifyAggregatedEpochRotationProof(fromPoD, epochHandler) {
+			storeAggregatedEpochRotationProofToNetwork(fromPoD, executionEra)
+			return fromPoD
+		}
 	}
 
-	fromHTTP := utils.GetAggregatedEpochRotationProofFromQuorumByHTTP(currentEpochId, epochHandler)
+	fromHTTP := utils.GetAggregatedEpochRotationProofFromQuorumByHTTP(currentEpochId, epochHandler, executionEra)
 	if fromHTTP != nil {
-		storeAggregatedEpochRotationProof(fromHTTP)
+		storeAggregatedEpochRotationProofToNetwork(fromHTTP, executionEra)
 		return fromHTTP
 	}
 
 	return nil
 }
 
-func fetchBlockForExecution(blockId string) *block_pack.Block {
-	blockRaw, err := databases.BLOCKS.Get([]byte(blockId), nil)
-	if err == nil {
-		var block block_pack.Block
-		if json.Unmarshal(blockRaw, &block) == nil && block.VerifySignatureForNetwork(getExecutionNetworkId()) {
-			return &block
+func fetchBlockForExecution(blockId string, executionEra string) *block_pack.Block {
+	// PoD and the shared active BLOCKS handle only hold the active genesis
+	// network; during previous-era recovery catch-up the block must come from
+	// the era-scoped local DB or era-tagged peer requests (handled inside
+	// block_pack via the execution cursor's network), so skip them here.
+	if utils.IsActiveNetworkId(executionEra) {
+		blockRaw, err := databases.BLOCKS.Get([]byte(blockId), nil)
+		if err == nil {
+			var block block_pack.Block
+			if json.Unmarshal(blockRaw, &block) == nil && block.VerifySignatureForNetwork(getExecutionNetworkId()) {
+				return &block
+			}
 		}
-	}
 
-	response := getBlockAndAfpFromPoD(blockId)
-	if response != nil && response.Block != nil && response.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
-		return response.Block
+		response := getBlockAndAfpFromPoD(blockId)
+		if response != nil && response.Block != nil && response.Block.VerifySignatureForNetwork(getExecutionNetworkId()) {
+			return response.Block
+		}
 	}
 
 	epochIndex, _, _, ok := parseBlockId(blockId)
@@ -290,18 +342,23 @@ func fetchBlockForExecution(blockId string) *block_pack.Block {
 		return nil
 	}
 
-	epochHandler := getEpochHandlerForTracker(epochIndex)
-	if epochHandler == nil {
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-		currentEpochHandler := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler
-		handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+	var epochHandler *structures.EpochDataHandler
+	if utils.IsActiveNetworkId(executionEra) {
+		epochHandler = getEpochHandlerForTracker(epochIndex)
+		if epochHandler == nil {
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+			currentEpochHandler := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler
+			handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
-		if epochIndex == currentEpochHandler.Id+1 {
-			epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id)
-			if epochRotationProof != nil && epochRotationProof.NextEpochId == epochIndex {
-				epochHandler = buildNextEpochHandlerForBoundaryFetch(&currentEpochHandler, &epochRotationProof.EpochData)
+			if epochIndex == currentEpochHandler.Id+1 {
+				epochRotationProof := fetchVerifiedAggregatedEpochRotationProof(currentEpochHandler.Id, executionEra)
+				if epochRotationProof != nil && epochRotationProof.NextEpochId == epochIndex {
+					epochHandler = buildNextEpochHandlerForBoundaryFetch(&currentEpochHandler, &epochRotationProof.EpochData)
+				}
 			}
 		}
+	} else {
+		epochHandler = getEpochHandlerForExecutionEra(epochIndex, executionEra)
 	}
 
 	if networkBlock := getBlockFromNetworkById(blockId, epochHandler); networkBlock != nil {

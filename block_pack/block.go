@@ -142,6 +142,15 @@ func fetchBlockFromPeers(blockID string, epochHandler *structures.EpochDataHandl
 
 	allKnownNodes := append(quorumUrls, globals.CONFIGURATION.BootstrapNodes...)
 
+	// During a scheduled recovery transition the execution cursor still points
+	// at the previous network era, whose blockIds (epoch:creator:index) collide
+	// with the recovered genesis chain. Tag peer requests with that era so peers
+	// serve the matching previous-era block instead of a same-id new-era block.
+	networkQuery := ""
+	if eraNetworkId := executionEraNetworkId(); !utils.IsActiveNetworkId(eraNetworkId) {
+		networkQuery = "?networkId=" + eraNetworkId
+	}
+
 	resultChan := make(chan *Block, len(allKnownNodes))
 	var wg sync.WaitGroup
 
@@ -157,7 +166,7 @@ func fetchBlockFromPeers(blockID string, epochHandler *structures.EpochDataHandl
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			url := endpoint + "/block/" + blockID
+			url := endpoint + "/block/" + blockID + networkQuery
 			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 			if err != nil {
 				return
@@ -192,20 +201,28 @@ func fetchBlockFromPeers(blockID string, epochHandler *structures.EpochDataHandl
 }
 
 func getBlockDbForExecution() (*leveldb.DB, func()) {
-	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-	networkId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId
-	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+	networkId := executionEraNetworkId()
 
-	if networkId == "" || networkId == globals.GENESIS.NetworkId {
+	if utils.IsActiveNetworkId(networkId) {
 		return databases.BLOCKS, func() {}
 	}
 
-	db, err := leveldb.OpenFile(utils.ResolveDbPathForNetwork("BLOCKS", networkId), nil)
+	db, err := utils.OpenNetworkScopedDb("BLOCKS", networkId)
 	if err != nil {
 		return databases.BLOCKS, func() {}
 	}
 
-	return db, func() {
-		_ = db.Close()
-	}
+	// Cached era handle is owned by utils; callers must not close it.
+	return db, func() {}
+}
+
+// executionEraNetworkId returns the network the execution cursor currently
+// points at (the previous era during a scheduled recovery transition, otherwise
+// the active genesis network).
+func executionEraNetworkId() string {
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
+	networkId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkId
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
+
+	return networkId
 }

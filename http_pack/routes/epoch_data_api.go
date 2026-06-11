@@ -56,8 +56,9 @@ func GetAggregatedEpochRotationProof(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	networkId := string(ctx.QueryArgs().Peek("networkId"))
 	key := []byte(fmt.Sprintf("%s%d", constants.DBKeyPrefixAggregatedEpochRotationProof, epochId))
-	raw, err := databases.FINALIZATION_THREAD_METADATA.Get(key, nil)
+	raw, err := readNetworkScopedValue(databases.FINALIZATION_THREAD_METADATA, "FINALIZATION_THREAD_METADATA", networkId, key)
 	if err != nil {
 		helpers.WriteErr(ctx, fasthttp.StatusNotFound, "Not found")
 		return

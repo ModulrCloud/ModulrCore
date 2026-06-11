@@ -343,9 +343,16 @@ func GetVerifiedAnchorsAggregatedFinalizationProofByBlockId(blockID string, epoc
 
 // GetAggregatedHeightProofFromQuorumByHeight fetches an AggregatedHeightProof by absolute height from quorum HTTP endpoints.
 // The proof itself is the source of truth for which block is at this height.
-func GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight int, epochHandler *structures.EpochDataHandler) *structures.AggregatedHeightProof {
+func GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight int, epochHandler *structures.EpochDataHandler, networkId string) *structures.AggregatedHeightProof {
 	if epochHandler == nil {
 		return nil
+	}
+
+	// During a scheduled recovery transition the requested height belongs to a
+	// previous network era; pass the era so peers serve from that era's DB.
+	networkQuery := ""
+	if !IsActiveNetworkId(networkId) {
+		networkQuery = "?networkId=" + networkId
 	}
 
 	quorum := GetQuorumUrlsAndPubkeys(epochHandler)
@@ -360,7 +367,7 @@ func GetAggregatedHeightProofFromQuorumByHeight(absoluteHeight int, epochHandler
 		go func(endpoint string) {
 			defer wg.Done()
 
-			req, err := http.NewRequestWithContext(ctx, "GET", endpoint+"/aggregated_height_proof/"+strconv.Itoa(absoluteHeight), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", endpoint+"/aggregated_height_proof/"+strconv.Itoa(absoluteHeight)+networkQuery, nil)
 			if err != nil {
 				return
 			}
@@ -468,9 +475,16 @@ func GetFirstBlockAggregatedHeightProofFromQuorum(epochId int) *structures.Aggre
 
 // GetAggregatedEpochRotationProofFromQuorumByHTTP fetches an AggregatedEpochRotationProof from quorum/bootstrap
 // nodes via GET /aggregated_epoch_rotation_proof/{epochId}. Used as a fallback when PoD is unavailable.
-func GetAggregatedEpochRotationProofFromQuorumByHTTP(epochId int, epochHandler *structures.EpochDataHandler) *structures.AggregatedEpochRotationProof {
+func GetAggregatedEpochRotationProofFromQuorumByHTTP(epochId int, epochHandler *structures.EpochDataHandler, networkId string) *structures.AggregatedEpochRotationProof {
 	if epochHandler == nil {
 		return nil
+	}
+
+	// Tag the request with the era during recovery catch-up so peers serve the
+	// matching previous-era rotation proof rather than the active network's.
+	networkQuery := ""
+	if !IsActiveNetworkId(networkId) {
+		networkQuery = "?networkId=" + networkId
 	}
 
 	quorum := GetQuorumUrlsAndPubkeys(epochHandler)
@@ -494,7 +508,7 @@ func GetAggregatedEpochRotationProofFromQuorumByHTTP(epochId int, epochHandler *
 		go func(url string) {
 			defer wg.Done()
 
-			req, err := http.NewRequestWithContext(ctx, "GET", url+"/aggregated_epoch_rotation_proof/"+strconv.Itoa(epochId), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", url+"/aggregated_epoch_rotation_proof/"+strconv.Itoa(epochId)+networkQuery, nil)
 			if err != nil {
 				return
 			}
