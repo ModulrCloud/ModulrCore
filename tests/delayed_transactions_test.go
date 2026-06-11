@@ -2,6 +2,7 @@ package tests
 
 import (
 	"container/list"
+	"encoding/json"
 
 	_ "github.com/modulrcloud/modulr-core/tests/testenv"
 
@@ -250,6 +251,70 @@ func TestVotingAcceptRejectsVersionUpdateWithoutQuorumMajority(t *testing.T) {
 	}
 }
 
+func TestVotingAcceptUpdatesApprovementNetworkParameterWithQuorumMajority(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	setupApprovementHandler(t, structures.NetworkParameters{QuorumSize: 4})
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = structures.EpochDataHandler{
+		Id:     7,
+		Hash:   "epoch-hash",
+		Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+	}
+
+	delayedTx := testParametersVoteTx(t, handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler, "QUORUM_SIZE", "8", quorum[:3])
+
+	if !system_contracts.VotingAccept(delayedTx, constants.ContextApprovementThread) {
+		t.Fatalf("expected VotingAccept parameter update to succeed")
+	}
+
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize != 8 {
+		t.Fatalf("expected approvement quorum size 8, got %d", handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize)
+	}
+}
+
+func TestVotingAcceptUpdatesExecutionNetworkParameterWithQuorumMajority(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	handlers.EXECUTION_THREAD_METADATA.ChainCursor = structures.ChainCursor{
+		NetworkParameters: structures.NetworkParameters{EpochDuration: 1000},
+		EpochDataHandler: structures.EpochDataHandler{
+			Id:     7,
+			Hash:   "epoch-hash",
+			Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+		},
+		Statistics:      &structures.Statistics{LastHeight: -1},
+		EpochStatistics: &structures.Statistics{LastHeight: -1},
+	}
+
+	delayedTx := testParametersVoteTx(t, handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler, "EPOCH_DURATION", "2500", quorum[:3])
+
+	if !system_contracts.VotingAccept(delayedTx, constants.ContextExecutionThread) {
+		t.Fatalf("expected VotingAccept parameter update to succeed")
+	}
+
+	if handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkParameters.EpochDuration != 2500 {
+		t.Fatalf("expected execution epoch duration 2500, got %d", handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkParameters.EpochDuration)
+	}
+}
+
+func TestVotingAcceptRejectsUnsupportedNetworkParameterUpdate(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	setupApprovementHandler(t, structures.NetworkParameters{QuorumSize: 4})
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = structures.EpochDataHandler{
+		Id:     7,
+		Hash:   "epoch-hash",
+		Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+	}
+
+	delayedTx := testParametersVoteTx(t, handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler, "UNKNOWN_FIELD", "8", quorum[:3])
+
+	if system_contracts.VotingAccept(delayedTx, constants.ContextApprovementThread) {
+		t.Fatalf("expected VotingAccept parameter update to fail for unsupported field")
+	}
+
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize != 4 {
+		t.Fatalf("expected approvement quorum size to remain 4, got %d", handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters.QuorumSize)
+	}
+}
+
 func testQuorum(t *testing.T, size int) []cryptography.Ed25519Box {
 	t.Helper()
 
@@ -275,9 +340,45 @@ func testVersionVoteTx(t *testing.T, epoch structures.EpochDataHandler, newMajor
 		"newMajorVersion": strconv.Itoa(newMajorVersion),
 	}
 
+	agreements := make(map[string]string, len(signers))
 	for _, signer := range signers {
-		payload["agreement:"+signer.Pub] = cryptography.GenerateSignature(signer.Prv, dataToSign)
+		agreements[signer.Pub] = cryptography.GenerateSignature(signer.Prv, dataToSign)
 	}
+
+	rawAgreements, err := json.Marshal(agreements)
+	if err != nil {
+		t.Fatalf("failed to marshal voting agreements: %v", err)
+	}
+	payload["agreements"] = string(rawAgreements)
+
+	return payload
+}
+
+func testParametersVoteTx(t *testing.T, epoch structures.EpochDataHandler, updateField string, newValue string, signers []cryptography.Ed25519Box) map[string]string {
+	t.Helper()
+
+	dataToSign, ok := system_contracts.BuildVotingAcceptParametersSigningPayload(&epoch, updateField, newValue)
+	if !ok {
+		t.Fatalf("failed to build voting accept parameter signing payload")
+	}
+
+	payload := map[string]string{
+		"type":        "votingAccept",
+		"votingType":  "parameters",
+		"updateField": updateField,
+		"newValue":    newValue,
+	}
+
+	agreements := make(map[string]string, len(signers))
+	for _, signer := range signers {
+		agreements[signer.Pub] = cryptography.GenerateSignature(signer.Prv, dataToSign)
+	}
+
+	rawAgreements, err := json.Marshal(agreements)
+	if err != nil {
+		t.Fatalf("failed to marshal voting agreements: %v", err)
+	}
+	payload["agreements"] = string(rawAgreements)
 
 	return payload
 }

@@ -18,10 +18,13 @@ import (
 
 type DelayedTxExecutorFunction = func(map[string]string, string) bool
 
-const votingAgreementPrefix = "agreement:"
-
 type versionVotingPayload struct {
 	NewMajorVersion int `json:"newMajorVersion"`
+}
+
+type parametersVotingPayload struct {
+	UpdateField string `json:"updateField"`
+	NewValue    string `json:"newValue"`
 }
 
 var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
@@ -258,14 +261,6 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 
 func VotingAccept(delayedTransaction map[string]string, context string) bool {
 	votingType := delayedTransaction["votingType"]
-	if votingType != "version" {
-		return false
-	}
-
-	newMajorVersion, err := strconv.Atoi(delayedTransaction["newMajorVersion"])
-	if err != nil || newMajorVersion < 0 {
-		return false
-	}
 
 	quorumAgreements := collectVotingAgreements(delayedTransaction)
 	if len(quorumAgreements) == 0 {
@@ -277,15 +272,50 @@ func VotingAccept(delayedTransaction map[string]string, context string) bool {
 		return false
 	}
 
-	if !verifyVotingAcceptMajority(epochHandler, votingType, newMajorVersion, quorumAgreements) {
-		return false
-	}
+	switch votingType {
+	case "version":
+		newMajorVersion, err := strconv.Atoi(delayedTransaction["newMajorVersion"])
+		if err != nil || newMajorVersion < 0 {
+			return false
+		}
 
-	switch context {
-	case constants.ContextApprovementThread:
-		handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = newMajorVersion
-	case constants.ContextExecutionThread:
-		handlers.EXECUTION_THREAD_METADATA.ChainCursor.CoreMajorVersion = newMajorVersion
+		payload := versionVotingPayload{NewMajorVersion: newMajorVersion}
+		if !verifyVotingAcceptMajority(epochHandler, votingType, payload, quorumAgreements) {
+			return false
+		}
+
+		switch context {
+		case constants.ContextApprovementThread:
+			handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = newMajorVersion
+		case constants.ContextExecutionThread:
+			handlers.EXECUTION_THREAD_METADATA.ChainCursor.CoreMajorVersion = newMajorVersion
+		default:
+			return false
+		}
+
+	case "parameters":
+		payload := parametersVotingPayload{
+			UpdateField: delayedTransaction["updateField"],
+			NewValue:    delayedTransaction["newValue"],
+		}
+
+		if !networkParameterUpdateIsValid(payload.UpdateField, payload.NewValue) {
+			return false
+		}
+
+		if !verifyVotingAcceptMajority(epochHandler, votingType, payload, quorumAgreements) {
+			return false
+		}
+
+		switch context {
+		case constants.ContextApprovementThread:
+			return applyNetworkParameterUpdate(&handlers.APPROVEMENT_THREAD_METADATA.Handler.NetworkParameters, payload.UpdateField, payload.NewValue)
+		case constants.ContextExecutionThread:
+			return applyNetworkParameterUpdate(&handlers.EXECUTION_THREAD_METADATA.ChainCursor.NetworkParameters, payload.UpdateField, payload.NewValue)
+		default:
+			return false
+		}
+
 	default:
 		return false
 	}
@@ -294,19 +324,9 @@ func VotingAccept(delayedTransaction map[string]string, context string) bool {
 }
 
 func collectVotingAgreements(delayedTransaction map[string]string) map[string]string {
-	quorumAgreements := make(map[string]string)
-
-	for key, signature := range delayedTransaction {
-		if !strings.HasPrefix(key, votingAgreementPrefix) || signature == "" {
-			continue
-		}
-
-		pubkey := strings.TrimPrefix(key, votingAgreementPrefix)
-		if pubkey == "" {
-			continue
-		}
-
-		quorumAgreements[pubkey] = signature
+	quorumAgreements := map[string]string{}
+	if err := json.Unmarshal([]byte(delayedTransaction["agreements"]), &quorumAgreements); err != nil {
+		return map[string]string{}
 	}
 
 	return quorumAgreements
@@ -323,12 +343,12 @@ func currentEpochHandlerForContext(context string) (*structures.EpochDataHandler
 	}
 }
 
-func verifyVotingAcceptMajority(epochHandler *structures.EpochDataHandler, votingType string, newMajorVersion int, quorumAgreements map[string]string) bool {
+func verifyVotingAcceptMajority(epochHandler *structures.EpochDataHandler, votingType string, votingPayload any, quorumAgreements map[string]string) bool {
 	if epochHandler == nil || len(quorumAgreements) == 0 {
 		return false
 	}
 
-	dataThatShouldBeSigned, ok := BuildVotingAcceptSigningPayload(epochHandler, votingType, newMajorVersion)
+	dataThatShouldBeSigned, ok := buildVotingAcceptSigningPayload(epochHandler, votingType, votingPayload)
 	if !ok {
 		return false
 	}
@@ -356,11 +376,23 @@ func verifyVotingAcceptMajority(epochHandler *structures.EpochDataHandler, votin
 }
 
 func BuildVotingAcceptSigningPayload(epochHandler *structures.EpochDataHandler, votingType string, newMajorVersion int) (string, bool) {
-	if epochHandler == nil || votingType != "version" {
+	if votingType != "version" {
 		return "", false
 	}
 
-	payloadBytes, err := json.Marshal(versionVotingPayload{NewMajorVersion: newMajorVersion})
+	return buildVotingAcceptSigningPayload(epochHandler, votingType, versionVotingPayload{NewMajorVersion: newMajorVersion})
+}
+
+func BuildVotingAcceptParametersSigningPayload(epochHandler *structures.EpochDataHandler, updateField string, newValue string) (string, bool) {
+	return buildVotingAcceptSigningPayload(epochHandler, "parameters", parametersVotingPayload{UpdateField: updateField, NewValue: newValue})
+}
+
+func buildVotingAcceptSigningPayload(epochHandler *structures.EpochDataHandler, votingType string, votingPayload any) (string, bool) {
+	if epochHandler == nil {
+		return "", false
+	}
+
+	payloadBytes, err := json.Marshal(votingPayload)
 	if err != nil {
 		return "", false
 	}
@@ -373,6 +405,103 @@ func BuildVotingAcceptSigningPayload(epochHandler *structures.EpochDataHandler, 
 		votingType,
 		string(payloadBytes),
 	}, ":"), true
+}
+
+func networkParameterUpdateIsValid(updateField string, newValue string) bool {
+	params := structures.NetworkParameters{}
+	return applyNetworkParameterUpdate(&params, updateField, newValue)
+}
+
+func applyNetworkParameterUpdate(params *structures.NetworkParameters, updateField string, newValue string) bool {
+	if params == nil {
+		return false
+	}
+
+	switch updateField {
+	case "VALIDATOR_REQUIRED_STAKE":
+		value, ok := parseUint64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.ValidatorRequiredStake = value
+
+	case "MINIMAL_STAKE_PER_STAKER":
+		value, ok := parseUint64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.MinimalStakePerStaker = value
+
+	case "QUORUM_SIZE":
+		value, ok := parseIntNetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.QuorumSize = value
+
+	case "EPOCH_DURATION":
+		value, ok := parseInt64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.EpochDuration = value
+
+	case "LEADERSHIP_DURATION":
+		value, ok := parseInt64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.LeadershipDuration = value
+
+	case "BLOCK_TIME":
+		value, ok := parseInt64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.BlockTime = value
+
+	case "MAX_BLOCK_SIZE_IN_BYTES":
+		value, ok := parseInt64NetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.MaxBlockSizeInBytes = value
+
+	case "TXS_LIMIT_PER_BLOCK":
+		value, ok := parseIntNetworkParameter(newValue)
+		if !ok {
+			return false
+		}
+		params.TxLimitPerBlock = value
+
+	default:
+		return false
+	}
+
+	return true
+}
+
+func parseUint64NetworkParameter(raw string) (uint64, bool) {
+	value, err := strconv.ParseUint(raw, 10, 64)
+	return value, err == nil
+}
+
+func parseIntNetworkParameter(raw string) (int, bool) {
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, false
+	}
+
+	return value, true
+}
+
+func parseInt64NetworkParameter(raw string) (int64, bool) {
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value < 0 {
+		return 0, false
+	}
+
+	return value, true
 }
 
 func removeFromSlice[T comparable](s []T, v T) []T {
