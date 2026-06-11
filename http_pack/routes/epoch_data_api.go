@@ -101,8 +101,13 @@ func GetEpochStatsByEpochIndex(ctx *fasthttp.RequestCtx) {
 	}
 
 	// If requested epoch is the current one, serve from memory (live, not yet snapshotted).
+	// EPOCH_STATS keys in STATE are ABSOLUTE, but the cursor handler carries the
+	// network-local epoch id; convert to absolute before comparing. Otherwise, after
+	// a recovery transition the live epoch (local 0, absolute = EpochOffset) would be
+	// missed while a request for the previous era's epoch 0 would wrongly hit the
+	// in-memory shortcut and return the new network's live stats.
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
-	currentEpochId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler.Id
+	currentEpochId := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler.Id + handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset
 	currentStats := handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochStatistics
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
 
