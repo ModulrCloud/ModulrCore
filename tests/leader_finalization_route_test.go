@@ -115,6 +115,83 @@ func TestGetLeaderFinalizationProofReturnsOKForLastLeaderAfterEpochFinishSignal(
 	}
 }
 
+// Regression: during a scheduled recovery catch-up window the execution cursor still
+// points at the previous era (ChainCursor.EpochOffset == 0), while durable STATE retains
+// the previous network's epoch-0 snapshot under EPOCH_DATA:0. When the recovered network
+// has already rotated to epoch 1, collecting the ALFP for the last leader of epoch 0 takes
+// the past-epoch resolution path. It must resolve the ACTIVE network's epoch-0 handler from
+// the network-scoped APPROVEMENT DB (EPOCH_HANDLER:0), NOT the previous era's STATE
+// EPOCH_DATA:0 (absolute-id collision). Otherwise the proof is signed against the wrong
+// epoch hash/quorum and the last-leader ALFP can never reach majority.
+func TestGetLeaderFinalizationProofResolvesActiveNetworkEpochDuringRecoveryWindow(t *testing.T) {
+	validator := configureLeaderFinalizationRouteState(t)
+	databases.STATE = openTempDB(t)
+	leader := "leader-last"
+
+	newParams := structures.NetworkParameters{EpochDuration: 1}
+
+	// The recovered network's epoch 0 (the one we must resolve), stored network-scoped.
+	newEpoch0 := structures.EpochDataHandler{
+		Id:                 0,
+		Hash:               "new-network-epoch0-hash",
+		Quorum:             []string{validator.Pub},
+		LeadersSequence:    []string{"leader-first", leader},
+		CurrentLeaderIndex: 1,
+		StartTimestamp:     uint64(time.Now().Add(-time.Hour).UnixMilli()),
+	}
+	writeEpochHandlerSnapshotToApprovementDB(t, newEpoch0, newParams)
+
+	// Previous era's epoch 0 preserved in durable STATE under the same absolute id.
+	oldEpoch0 := newEpoch0
+	oldEpoch0.Hash = "old-network-epoch0-hash"
+	writeEpochDataSnapshotToStateDB(t, 0, oldEpoch0, newParams)
+
+	// Live approvement handler has already rotated to epoch 1 -> epoch-0 request takes the
+	// past-epoch resolution path.
+	liveEpoch1 := structures.EpochDataHandler{
+		Id:                 1,
+		Hash:               "new-network-epoch1-hash",
+		Quorum:             []string{validator.Pub},
+		LeadersSequence:    []string{validator.Pub},
+		CurrentLeaderIndex: 0,
+		StartTimestamp:     uint64(time.Now().Add(-time.Hour).UnixMilli()),
+	}
+	setActiveApprovementEpochForLeaderFinalizationTest(liveEpoch1, newParams)
+
+	// Recovery transition not yet applied: cursor still on the previous era.
+	setExecutionEpochOffsetForTest(t, 0)
+
+	// EPOCH_FINISH:0 raised so the last leader of epoch 0 is finalizable.
+	if err := databases.EPOCH_DATA.Put([]byte(constants.DBKeyPrefixEpochFinish+"0"), []byte("TRUE"), nil); err != nil {
+		t.Fatalf("failed to set EPOCH_FINISH signal: %v", err)
+	}
+
+	resp := requestLeaderFinalizationProof(t, websocket_pack.WsLeaderFinalizationProofRequest{
+		Route:                   constants.WsRouteGetLeaderFinalizationProof,
+		EpochIndex:              0,
+		IndexOfLeaderToFinalize: 1,
+		SkipData:                structures.NewLeaderVotingStatTemplate(),
+	})
+
+	if resp["status"] != "OK" || resp["voter"] != validator.Pub || resp["forLeaderPubkey"] != leader {
+		t.Fatalf("expected OK signed against the active-network epoch-0 handler, got %+v", resp)
+	}
+
+	sig, _ := resp["sig"].(string)
+	// The proof must be signed against the recovered network's epoch-0 hash, not the
+	// previous era's STATE EPOCH_DATA:0 snapshot.
+	payload := strings.Join([]string{
+		constants.SigningPrefixLeaderFinalization,
+		leader,
+		"-1",
+		constants.ZeroHash,
+		newEpoch0.Hash + "#0",
+	}, ":")
+	if !cryptography.VerifySignature(payload, validator.Pub, sig) {
+		t.Fatalf("leader finalization proof was not signed against the active-network epoch-0 handler (cross-era STATE EPOCH_DATA:0 collision regression)")
+	}
+}
+
 func TestGetLeaderFinalizationProofReturnsOKForCompletedLeader(t *testing.T) {
 	validator := configureLeaderFinalizationRouteState(t)
 	leader := "leader-first"
@@ -295,6 +372,46 @@ func setActiveApprovementEpochForLeaderFinalizationTest(epochHandler structures.
 		NetworkParameters: params,
 		EpochDataHandler:  epochHandler,
 	}
+}
+
+func writeEpochHandlerSnapshotToApprovementDB(t *testing.T, handler structures.EpochDataHandler, params structures.NetworkParameters) {
+	t.Helper()
+
+	snapshot := structures.EpochDataSnapshot{EpochDataHandler: handler, NetworkParameters: params}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("failed to marshal EPOCH_HANDLER snapshot: %v", err)
+	}
+	if err := databases.APPROVEMENT_THREAD_METADATA.Put([]byte(constants.DBKeyPrefixEpochHandler+strconv.Itoa(handler.Id)), raw, nil); err != nil {
+		t.Fatalf("failed to write EPOCH_HANDLER snapshot: %v", err)
+	}
+}
+
+func writeEpochDataSnapshotToStateDB(t *testing.T, absoluteEpochId int, handler structures.EpochDataHandler, params structures.NetworkParameters) {
+	t.Helper()
+
+	snapshot := structures.EpochDataSnapshot{EpochDataHandler: handler, NetworkParameters: params}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("failed to marshal EPOCH_DATA snapshot: %v", err)
+	}
+	if err := databases.STATE.Put([]byte(constants.DBKeyPrefixEpochData+strconv.Itoa(absoluteEpochId)), raw, nil); err != nil {
+		t.Fatalf("failed to write EPOCH_DATA snapshot: %v", err)
+	}
+}
+
+func setExecutionEpochOffsetForTest(t *testing.T, offset int) {
+	t.Helper()
+
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+	handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset = offset
+	handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
+
+	t.Cleanup(func() {
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.Lock()
+		handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset = 0
+		handlers.EXECUTION_THREAD_METADATA.RWMutex.Unlock()
+	})
 }
 
 func requestLeaderFinalizationProof(t *testing.T, request websocket_pack.WsLeaderFinalizationProofRequest) map[string]any {
