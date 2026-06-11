@@ -1,10 +1,13 @@
 package system_contracts
 
 import (
+	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/modulrcloud/modulr-core/constants"
+	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -15,11 +18,18 @@ import (
 
 type DelayedTxExecutorFunction = func(map[string]string, string) bool
 
+const votingAgreementPrefix = "agreement:"
+
+type versionVotingPayload struct {
+	NewMajorVersion int `json:"newMajorVersion"`
+}
+
 var DELAYED_TRANSACTIONS_MAP = map[string]DelayedTxExecutorFunction{
 	"createValidator": CreateValidator,
 	"updateValidator": UpdateValidator,
 	"stake":           Stake,
 	"unstake":         Unstake,
+	"votingAccept":    VotingAccept,
 }
 
 type threadContext struct {
@@ -244,6 +254,125 @@ func Unstake(delayedTransaction map[string]string, context string) bool {
 	}
 
 	return true
+}
+
+func VotingAccept(delayedTransaction map[string]string, context string) bool {
+	votingType := delayedTransaction["votingType"]
+	if votingType != "version" {
+		return false
+	}
+
+	newMajorVersion, err := strconv.Atoi(delayedTransaction["newMajorVersion"])
+	if err != nil || newMajorVersion < 0 {
+		return false
+	}
+
+	quorumAgreements := collectVotingAgreements(delayedTransaction)
+	if len(quorumAgreements) == 0 {
+		return false
+	}
+
+	epochHandler, ok := currentEpochHandlerForContext(context)
+	if !ok {
+		return false
+	}
+
+	if !verifyVotingAcceptMajority(epochHandler, votingType, newMajorVersion, quorumAgreements) {
+		return false
+	}
+
+	switch context {
+	case constants.ContextApprovementThread:
+		handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = newMajorVersion
+	case constants.ContextExecutionThread:
+		handlers.EXECUTION_THREAD_METADATA.ChainCursor.CoreMajorVersion = newMajorVersion
+	default:
+		return false
+	}
+
+	return true
+}
+
+func collectVotingAgreements(delayedTransaction map[string]string) map[string]string {
+	quorumAgreements := make(map[string]string)
+
+	for key, signature := range delayedTransaction {
+		if !strings.HasPrefix(key, votingAgreementPrefix) || signature == "" {
+			continue
+		}
+
+		pubkey := strings.TrimPrefix(key, votingAgreementPrefix)
+		if pubkey == "" {
+			continue
+		}
+
+		quorumAgreements[pubkey] = signature
+	}
+
+	return quorumAgreements
+}
+
+func currentEpochHandlerForContext(context string) (*structures.EpochDataHandler, bool) {
+	switch context {
+	case constants.ContextApprovementThread:
+		return &handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler, true
+	case constants.ContextExecutionThread:
+		return &handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler, true
+	default:
+		return nil, false
+	}
+}
+
+func verifyVotingAcceptMajority(epochHandler *structures.EpochDataHandler, votingType string, newMajorVersion int, quorumAgreements map[string]string) bool {
+	if epochHandler == nil || len(quorumAgreements) == 0 {
+		return false
+	}
+
+	dataThatShouldBeSigned, ok := BuildVotingAcceptSigningPayload(epochHandler, votingType, newMajorVersion)
+	if !ok {
+		return false
+	}
+
+	quorumMap := make(map[string]bool, len(epochHandler.Quorum))
+	for _, pubkey := range epochHandler.Quorum {
+		quorumMap[pubkey] = true
+	}
+
+	unique := make(map[string]bool, len(quorumAgreements))
+	okSignatures := 0
+
+	for signerPubkey, signature := range quorumAgreements {
+		if unique[signerPubkey] || !quorumMap[signerPubkey] {
+			continue
+		}
+
+		if cryptography.VerifySignature(dataThatShouldBeSigned, signerPubkey, signature) {
+			unique[signerPubkey] = true
+			okSignatures++
+		}
+	}
+
+	return okSignatures >= utils.GetQuorumMajority(epochHandler)
+}
+
+func BuildVotingAcceptSigningPayload(epochHandler *structures.EpochDataHandler, votingType string, newMajorVersion int) (string, bool) {
+	if epochHandler == nil || votingType != "version" {
+		return "", false
+	}
+
+	payloadBytes, err := json.Marshal(versionVotingPayload{NewMajorVersion: newMajorVersion})
+	if err != nil {
+		return "", false
+	}
+
+	epochFullID := epochHandler.Hash + "#" + strconv.Itoa(epochHandler.Id)
+
+	return strings.Join([]string{
+		"votingAccept",
+		epochFullID,
+		votingType,
+		string(payloadBytes),
+	}, ":"), true
 }
 
 func removeFromSlice[T comparable](s []T, v T) []T {

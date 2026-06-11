@@ -6,9 +6,11 @@ import (
 	_ "github.com/modulrcloud/modulr-core/tests/testenv"
 
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/modulrcloud/modulr-core/constants"
+	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/handlers"
 	"github.com/modulrcloud/modulr-core/structures"
@@ -180,4 +182,102 @@ func TestUnstakeRemovesValidatorFromRegistryWhenBelowRequiredStake(t *testing.T)
 	if len(handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler.ValidatorsRegistry) != 0 {
 		t.Fatalf("expected validator to be removed from registry")
 	}
+}
+
+func TestVotingAcceptUpdatesApprovementCoreVersionWithQuorumMajority(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	setupApprovementHandler(t, structures.NetworkParameters{})
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = 0
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = structures.EpochDataHandler{
+		Id:     7,
+		Hash:   "epoch-hash",
+		Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+	}
+
+	delayedTx := testVersionVoteTx(t, handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler, 1, quorum[:3])
+
+	if !system_contracts.VotingAccept(delayedTx, constants.ContextApprovementThread) {
+		t.Fatalf("expected VotingAccept to succeed")
+	}
+
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion != 1 {
+		t.Fatalf("expected approvement core version 1, got %d", handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion)
+	}
+}
+
+func TestVotingAcceptUpdatesExecutionCoreVersionWithQuorumMajority(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	handlers.EXECUTION_THREAD_METADATA.ChainCursor = structures.ChainCursor{
+		CoreMajorVersion: 0,
+		EpochDataHandler: structures.EpochDataHandler{
+			Id:     7,
+			Hash:   "epoch-hash",
+			Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+		},
+		Statistics:      &structures.Statistics{LastHeight: -1},
+		EpochStatistics: &structures.Statistics{LastHeight: -1},
+	}
+
+	delayedTx := testVersionVoteTx(t, handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochDataHandler, 1, quorum[:3])
+
+	if !system_contracts.VotingAccept(delayedTx, constants.ContextExecutionThread) {
+		t.Fatalf("expected VotingAccept to succeed")
+	}
+
+	if handlers.EXECUTION_THREAD_METADATA.ChainCursor.CoreMajorVersion != 1 {
+		t.Fatalf("expected execution core version 1, got %d", handlers.EXECUTION_THREAD_METADATA.ChainCursor.CoreMajorVersion)
+	}
+}
+
+func TestVotingAcceptRejectsVersionUpdateWithoutQuorumMajority(t *testing.T) {
+	quorum := testQuorum(t, 4)
+	setupApprovementHandler(t, structures.NetworkParameters{})
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion = 0
+	handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler = structures.EpochDataHandler{
+		Id:     7,
+		Hash:   "epoch-hash",
+		Quorum: []string{quorum[0].Pub, quorum[1].Pub, quorum[2].Pub, quorum[3].Pub},
+	}
+
+	delayedTx := testVersionVoteTx(t, handlers.APPROVEMENT_THREAD_METADATA.Handler.EpochDataHandler, 1, quorum[:2])
+
+	if system_contracts.VotingAccept(delayedTx, constants.ContextApprovementThread) {
+		t.Fatalf("expected VotingAccept to fail without majority")
+	}
+
+	if handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion != 0 {
+		t.Fatalf("expected approvement core version to remain 0, got %d", handlers.APPROVEMENT_THREAD_METADATA.Handler.CoreMajorVersion)
+	}
+}
+
+func testQuorum(t *testing.T, size int) []cryptography.Ed25519Box {
+	t.Helper()
+
+	quorum := make([]cryptography.Ed25519Box, size)
+	for i := range quorum {
+		quorum[i] = cryptography.GenerateKeyPair("", "", nil)
+	}
+
+	return quorum
+}
+
+func testVersionVoteTx(t *testing.T, epoch structures.EpochDataHandler, newMajorVersion int, signers []cryptography.Ed25519Box) map[string]string {
+	t.Helper()
+
+	dataToSign, ok := system_contracts.BuildVotingAcceptSigningPayload(&epoch, "version", newMajorVersion)
+	if !ok {
+		t.Fatalf("failed to build voting accept signing payload")
+	}
+
+	payload := map[string]string{
+		"type":            "votingAccept",
+		"votingType":      "version",
+		"newMajorVersion": strconv.Itoa(newMajorVersion),
+	}
+
+	for _, signer := range signers {
+		payload["agreement:"+signer.Pub] = cryptography.GenerateSignature(signer.Prv, dataToSign)
+	}
+
+	return payload
 }
