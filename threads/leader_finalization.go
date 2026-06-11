@@ -193,6 +193,20 @@ func loadAlfpEpochSnapshot(epochId int) *structures.EpochDataSnapshot {
 	}
 	handlers.APPROVEMENT_THREAD_METADATA.RWMutex.RUnlock()
 
+	// Prefer the network-scoped snapshot (EPOCH_HANDLER:<localEpochId>) from
+	// APPROVEMENT_THREAD_METADATA. It is keyed by the active network's local epoch
+	// id and lives in a per-network directory, so it never collides across eras.
+	//
+	// We must NOT resolve a past epoch of the ACTIVE network via STATE first:
+	// during a scheduled recovery catch-up window the execution cursor still
+	// points at the previous era (EpochOffset not yet shifted to LastEpochIndex+1),
+	// so STATE EPOCH_DATA:<epochId+EpochOffset> would resolve to the PREVIOUS
+	// network's preserved snapshot of the same absolute id and yield a wrong
+	// quorum/hash (breaking last-leader ALFP collection).
+	if snapshot := getEpochSnapshotFromApprovementDB(epochId); snapshot != nil {
+		return snapshot
+	}
+
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RLock()
 	absoluteEpochId := epochId + handlers.EXECUTION_THREAD_METADATA.ChainCursor.EpochOffset
 	handlers.EXECUTION_THREAD_METADATA.RWMutex.RUnlock()
