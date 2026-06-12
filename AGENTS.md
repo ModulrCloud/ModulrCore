@@ -43,6 +43,7 @@ go run ./tests_e2e/harness scenario <name>
 
 ## Core Network Rules
 
+- For recovery operator flow and delayed transaction handling, see `scripts/recovery/README.md`.
 - Recovery keeps durable `STATE`; network-specific DB directories can be reset during recovery flows.
 - `Statistics` is observational and should not be used as a cursor or control pointer.
 - `ChainCursor` and offset fields are the right place for recovery-aware execution/height accounting.
