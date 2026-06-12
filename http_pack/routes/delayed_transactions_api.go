@@ -2,10 +2,7 @@ package routes
 
 import (
 	"encoding/json"
-	"fmt"
-	"strconv"
 
-	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/cryptography"
 	"github.com/modulrcloud/modulr-core/databases"
 	"github.com/modulrcloud/modulr-core/globals"
@@ -18,7 +15,9 @@ import (
 )
 
 type DelayedTransactionsSignRequest struct {
-	EpochIndex int `json:"epochIndex"`
+	NetworkId  string `json:"networkId"`
+	EpochIndex int    `json:"epochIndex"`
+	Legacy     bool   `json:"legacy,omitempty"`
 }
 
 type DelayedTransactionsSignResponse struct {
@@ -54,7 +53,19 @@ func SignDelayedTransactions(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	delayedTxKey := fmt.Sprintf(constants.DBKeyPrefixDelayedTransactions+"%d", request.EpochIndex)
+	networkId := request.NetworkId
+	if networkId == "" {
+		networkId = globals.GENESIS.NetworkId
+	}
+	if networkId != globals.GENESIS.NetworkId {
+		helpers.WriteErr(ctx, fasthttp.StatusBadRequest, "Invalid network id")
+		return
+	}
+
+	delayedTxKey := utils.DelayedTransactionsKey(networkId, request.EpochIndex)
+	if request.Legacy && utils.ShouldReadLegacyDelayedTransactions() {
+		delayedTxKey = utils.LegacyDelayedTransactionsKey(request.EpochIndex)
+	}
 	payloadBytes, err := databases.STATE.Get([]byte(delayedTxKey), nil)
 
 	if err != nil {
@@ -78,7 +89,7 @@ func SignDelayedTransactions(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	dataThatShouldBeSigned := constants.SigningPrefixDelayedOperations + ":" + strconv.Itoa(request.EpochIndex) + ":" + utils.Blake3(string(payloadBytes))
+	dataThatShouldBeSigned := utils.DelayedTransactionsSigningPayload(networkId, request.EpochIndex, payloadBytes)
 	signature := cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataThatShouldBeSigned)
 
 	helpers.WriteJSON(ctx, fasthttp.StatusOK, DelayedTransactionsSignResponse{Signature: signature})

@@ -7,6 +7,7 @@ type QuorumMemberData struct {
 }
 
 type DelayedTransactionsBatch struct {
+	NetworkId           string              `json:"networkId,omitempty"`
 	EpochIndex          int                 `json:"epochIndex"`
 	DelayedTransactions []map[string]string `json:"delayedTransactions"`
 	Proofs              map[string]string   `json:"proofs"`
@@ -46,4 +47,3 @@ type ExecutionStats struct {
 	Index int
 	Hash  string
 }
-

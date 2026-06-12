@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -88,11 +87,13 @@ func compactMempoolIfNeeded() {
 }
 
 func getBatchOfApprovedDelayedTxsByQuorum(epochSnapshot structures.EpochDataHandler, indexOfLeader int) structures.DelayedTransactionsBatch {
-	prevEpochIndex := epochSnapshot.Id - 2
+	absoluteEpochIndex := utils.ActiveDelayedTransactionsEpoch(epochSnapshot.Id)
+	networkId := globals.GENESIS.NetworkId
 	majority := utils.GetQuorumMajority(&epochSnapshot)
 
 	batch := structures.DelayedTransactionsBatch{
-		EpochIndex:          prevEpochIndex,
+		NetworkId:           networkId,
+		EpochIndex:          absoluteEpochIndex,
 		DelayedTransactions: []map[string]string{},
 		Proofs:              map[string]string{},
 	}
@@ -101,10 +102,20 @@ func getBatchOfApprovedDelayedTxsByQuorum(epochSnapshot structures.EpochDataHand
 		return batch
 	}
 
-	delayedTxKey := fmt.Sprintf(constants.DBKeyPrefixDelayedTransactions+"%d", prevEpochIndex)
+	legacyRead := false
+	delayedTxKey := utils.DelayedTransactionsKey(networkId, absoluteEpochIndex)
 	rawDelayedTxs, err := databases.STATE.Get([]byte(delayedTxKey), nil)
 	if err != nil {
-		return batch
+		if err != leveldb.ErrNotFound || !utils.ShouldReadLegacyDelayedTransactions() {
+			return batch
+		}
+
+		legacyKey := utils.LegacyDelayedTransactionsKey(absoluteEpochIndex)
+		rawDelayedTxs, err = databases.STATE.Get([]byte(legacyKey), nil)
+		if err != nil {
+			return batch
+		}
+		legacyRead = true
 	}
 
 	var delayedTransactions []map[string]string
@@ -116,14 +127,18 @@ func getBatchOfApprovedDelayedTxsByQuorum(epochSnapshot structures.EpochDataHand
 		return batch
 	}
 
-	dataThatShouldBeSigned := constants.SigningPrefixDelayedOperations + ":" + strconv.Itoa(prevEpochIndex) + ":" + utils.Blake3(string(rawDelayedTxs))
+	dataThatShouldBeSigned := utils.DelayedTransactionsSigningPayload(networkId, absoluteEpochIndex, rawDelayedTxs)
 
 	proofs := map[string]string{
 		globals.CONFIGURATION.PublicKey: cryptography.GenerateSignature(globals.CONFIGURATION.PrivateKey, dataThatShouldBeSigned),
 	}
 
 	quorumMembers := utils.GetQuorumUrlsAndPubkeys(&epochSnapshot)
-	reqBody, err := json.Marshal(map[string]int{"epochIndex": prevEpochIndex})
+	reqBody, err := json.Marshal(map[string]any{
+		"networkId":  networkId,
+		"epochIndex": absoluteEpochIndex,
+		"legacy":     legacyRead,
+	})
 	if err != nil {
 		return batch
 	}

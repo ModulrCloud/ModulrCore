@@ -20,8 +20,16 @@ func TestApplyRecoveryTransitionStagesNewNetworkAndCleansRecoveryState(t *testin
 	databases.STATE = openTempDB(t)
 
 	mustPutJSONToStateDB(t, "existing-account", structures.Account{Balance: 10, Nonce: 1})
-	mustPutJSONToStateDB(t, constants.DBKeyPrefixDelayedTransactions+"3", []map[string]string{{"type": "keep"}})
-	mustPutJSONToStateDB(t, constants.DBKeyPrefixDelayedTransactions+"4", []map[string]string{{"type": "delete"}})
+	mustPutJSONToStateDB(t, "stake-staker", structures.Account{Balance: 75})
+	mustPutJSONToStateDB(t, "unstaker", structures.Account{Balance: 10})
+	mustPutJSONToStateDB(t, utils.LegacyDelayedTransactionsKey(3), []map[string]string{
+		{"type": "stake", "staker": "stake-staker", "validatorPubKey": "validator-a", "amount": "25"},
+		{"type": "unstake", "unstaker": "unstaker", "validatorPubKey": "validator-a", "amount": "7"},
+		{"type": "createValidator", "creator": "new-validator"},
+	})
+	mustPutJSONToStateDB(t, utils.DelayedTransactionsKey("old-network", 5), []map[string]string{
+		{"type": "stake", "staker": "stake-staker", "validatorPubKey": "validator-b", "amount": "5"},
+	})
 	if err := databases.STATE.Put([]byte(constants.DBKeyRecoveryActive), []byte("42"), nil); err != nil {
 		t.Fatalf("failed to write recovery active marker: %v", err)
 	}
@@ -129,11 +137,21 @@ func TestApplyRecoveryTransitionStagesNewNetworkAndCleansRecoveryState(t *testin
 		t.Fatalf("expected recovery genesis validator in state, got %+v", storedValidator)
 	}
 
-	if _, err := databases.STATE.Get([]byte(constants.DBKeyPrefixDelayedTransactions+"3"), nil); err != nil {
-		t.Fatalf("delayed tx before recovery boundary should remain: %v", err)
+	var stakeStaker structures.Account
+	mustReadJSONFromStateDB(t, "stake-staker", &stakeStaker)
+	if stakeStaker.Balance != 105 {
+		t.Fatalf("expected pending stake amounts to be refunded, got %+v", stakeStaker)
 	}
-	if _, err := databases.STATE.Get([]byte(constants.DBKeyPrefixDelayedTransactions+"4"), nil); err != leveldb.ErrNotFound {
-		t.Fatalf("delayed tx after recovery boundary should be deleted, got err=%v", err)
+	var unstaker structures.Account
+	mustReadJSONFromStateDB(t, "unstaker", &unstaker)
+	if unstaker.Balance != 10 {
+		t.Fatalf("pending unstake should be dropped without refunding again, got %+v", unstaker)
+	}
+	if _, err := databases.STATE.Get([]byte(utils.LegacyDelayedTransactionsKey(3)), nil); err != leveldb.ErrNotFound {
+		t.Fatalf("legacy delayed tx key should be deleted, got err=%v", err)
+	}
+	if _, err := databases.STATE.Get([]byte(utils.DelayedTransactionsKey("old-network", 5)), nil); err != leveldb.ErrNotFound {
+		t.Fatalf("namespaced delayed tx key should be deleted, got err=%v", err)
 	}
 	if _, err := databases.STATE.Get([]byte(constants.DBKeyRecoveryActive), nil); err != leveldb.ErrNotFound {
 		t.Fatalf("recovery active marker should be deleted, got err=%v", err)

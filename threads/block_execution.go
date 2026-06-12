@@ -737,7 +737,7 @@ func applyTransactions(block *block_pack.Block, currentBlockId string, stateBatc
 	}
 
 	if len(delayedTxPayloadsForBatch) > 0 {
-		if err := addDelayedTransactionsToBatch(delayedTxPayloadsForBatch, cursor.EpochDataHandler.Id, stateBatch); err != nil {
+		if err := addDelayedTransactionsToBatch(delayedTxPayloadsForBatch, cursor, stateBatch); err != nil {
 			panic("Impossible to add delayed transactions to atomic batch")
 		}
 	}
@@ -951,8 +951,9 @@ func validateDelayedTransaction(delayedTxType string, tx *structures.Transaction
 	}
 }
 
-func addDelayedTransactionsToBatch(delayedTxPayloads []map[string]string, epochIndex int, batch *leveldb.Batch) error {
-	delayedTxKey := fmt.Sprintf(constants.DBKeyPrefixDelayedTransactions+"%d", epochIndex+2)
+func addDelayedTransactionsToBatch(delayedTxPayloads []map[string]string, cursor *structures.ChainCursor, batch *leveldb.Batch) error {
+	targetAbsoluteEpochIndex := utils.DelayedTransactionsTargetEpoch(cursor.EpochOffset, cursor.EpochDataHandler.Id)
+	delayedTxKey := utils.DelayedTransactionsKey(cursor.NetworkId, targetAbsoluteEpochIndex)
 
 	cachedPayloads := make([]map[string]string, 0)
 

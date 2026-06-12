@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/modulrcloud/modulr-core/constants"
 	"github.com/modulrcloud/modulr-core/databases"
@@ -43,7 +42,7 @@ func ApplyRecoveryTransition(cursor *structures.ChainCursor, stateBatch *leveldb
 	}
 	stateBatch.Put([]byte(constants.DBKeyPrefixEpochStats+strconv.Itoa(plan.LastEpochIndex)), statsBytes)
 
-	if err := DeleteDelayedTransactionsFromEpoch(stateBatch, plan.LastEpochIndex+1); err != nil {
+	if err := SettleAndDeleteDelayedTransactions(stateBatch); err != nil {
 		return err
 	}
 
@@ -142,18 +141,19 @@ func StageRecoveryGenesisState(stateBatch *leveldb.Batch, genesis structures.Gen
 	return nil
 }
 
-func DeleteDelayedTransactionsFromEpoch(batch *leveldb.Batch, fromEpoch int) error {
+func SettleAndDeleteDelayedTransactions(batch *leveldb.Batch) error {
 	prefix := []byte(constants.DBKeyPrefixDelayedTransactions)
 	it := databases.STATE.NewIterator(util.BytesPrefix(prefix), nil)
 	defer it.Release()
 
 	for it.Next() {
-		key := string(it.Key())
-		rawEpoch := strings.TrimPrefix(key, constants.DBKeyPrefixDelayedTransactions)
-
-		epoch, err := strconv.Atoi(rawEpoch)
-		if err != nil || epoch < fromEpoch {
-			continue
+		var delayedTransactions []map[string]string
+		if err := json.Unmarshal(it.Value(), &delayedTransactions); err == nil {
+			for _, delayedTx := range delayedTransactions {
+				if err := refundPendingStakeDelayedTransaction(batch, delayedTx); err != nil {
+					return err
+				}
+			}
 		}
 
 		keyCopy := append([]byte(nil), it.Key()...)
@@ -162,6 +162,33 @@ func DeleteDelayedTransactionsFromEpoch(batch *leveldb.Batch, fromEpoch int) err
 	if err := it.Error(); err != nil {
 		return fmt.Errorf("iterate delayed transactions: %w", err)
 	}
+
+	return nil
+}
+
+func refundPendingStakeDelayedTransaction(batch *leveldb.Batch, delayedTx map[string]string) error {
+	if delayedTx["type"] != "stake" {
+		return nil
+	}
+
+	staker := delayedTx["staker"]
+	if staker == "" {
+		return nil
+	}
+
+	amount, err := strconv.ParseUint(delayedTx["amount"], 10, 64)
+	if err != nil || amount == 0 {
+		return nil
+	}
+
+	account := GetAccountFromExecThreadState(staker)
+	account.Balance += amount
+
+	rawAccount, err := json.Marshal(account)
+	if err != nil {
+		return fmt.Errorf("marshal refunded stake account %s: %w", staker, err)
+	}
+	batch.Put([]byte(staker), rawAccount)
 
 	return nil
 }

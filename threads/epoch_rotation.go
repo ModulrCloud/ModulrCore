@@ -90,8 +90,12 @@ func EpochRotationThread() {
 						var delayedTransactionsToExecute []map[string]string
 
 						jsonedDelayedTxs, _ := json.Marshal(firstBlock.ExtraData.DelayedTransactionsBatch.DelayedTransactions)
+						delayedTxNetworkId := firstBlock.ExtraData.DelayedTransactionsBatch.NetworkId
+						if delayedTxNetworkId == "" {
+							delayedTxNetworkId = globals.GENESIS.NetworkId
+						}
 
-						dataThatShouldBeSigned := constants.SigningPrefixDelayedOperations + ":" + strconv.Itoa(firstBlock.ExtraData.DelayedTransactionsBatch.EpochIndex) + ":" + utils.Blake3(string(jsonedDelayedTxs))
+						dataThatShouldBeSigned := utils.DelayedTransactionsSigningPayload(delayedTxNetworkId, firstBlock.ExtraData.DelayedTransactionsBatch.EpochIndex, jsonedDelayedTxs)
 
 						okSignatures := 0
 
